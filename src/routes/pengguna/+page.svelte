@@ -50,8 +50,8 @@
 		activeTab === 'all'
 			? users
 			: activeTab === 'sso'
-				? users.filter((u) => Boolean(u.sso))
-				: users.filter((u) => !u.sso)
+				? users.filter((u) => Boolean(u.sso || u.dapodikPtkId))
+				: users.filter((u) => !u.sso && !u.dapodikPtkId)
 	);
 
 	// selectable ids derived once per render (positive existing user ids)
@@ -226,18 +226,18 @@
 			</button>
 			<button
 				type="button"
-				class={`tab tab-sm font-medium transition-all rounded-xl ${activeTab === 'local' ? 'tab-active font-bold bg-white dark:bg-base-100 shadow-sm' : ''}`}
-				onclick={() => (activeTab = 'local')}
+				class={`tab tab-sm font-medium transition-all rounded-xl gap-1.5 ${activeTab === 'sso' ? 'tab-active font-bold bg-white dark:bg-base-100 shadow-sm text-sky-600 dark:text-sky-400' : ''}`}
+				onclick={() => (activeTab = 'sso')}
 			>
-				Pengguna Lokal ({users.filter((u) => !u.sso).length})
+				<span class="h-2 w-2 rounded-full bg-sky-500 inline-block"></span>
+				SSO / Dapodik ({users.filter((u) => Boolean(u.sso || u.dapodikPtkId)).length})
 			</button>
 			<button
 				type="button"
-				class={`tab tab-sm font-medium transition-all rounded-xl gap-1.5 ${activeTab === 'sso' ? 'tab-active font-bold bg-white dark:bg-base-100 shadow-sm text-emerald-600 dark:text-emerald-400' : ''}`}
-				onclick={() => (activeTab = 'sso')}
+				class={`tab tab-sm font-medium transition-all rounded-xl ${activeTab === 'local' ? 'tab-active font-bold bg-white dark:bg-base-100 shadow-sm' : ''}`}
+				onclick={() => (activeTab = 'local')}
 			>
-				<span class="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
-				SSO Auth ({users.filter((u) => Boolean(u.sso)).length})
+				Lokal Tanpa Dapodik ({users.filter((u) => !u.sso && !u.dapodikPtkId).length})
 			</button>
 		</div>
 

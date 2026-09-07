@@ -81,7 +81,10 @@ export function buildZitadelAuthUrl(params: {
 	const url = new URL(`${params.issuer}/oauth/v2/authorize`);
 	url.searchParams.set('client_id', params.clientId);
 	url.searchParams.set('response_type', 'code');
-	url.searchParams.set('scope', 'openid profile email urn:zitadel:iam:org:project:roles');
+	url.searchParams.set(
+		'scope',
+		'openid profile email urn:zitadel:iam:org:project:roles urn:zitadel:iam:user:metadata urn:zitadel:iam:user:resourceowner'
+	);
 	url.searchParams.set('redirect_uri', params.redirectUri);
 	url.searchParams.set('state', params.state);
 	url.searchParams.set('code_challenge', params.codeChallenge);

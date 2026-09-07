@@ -10,27 +10,29 @@
 	{#if u.sso}
 		<div
 			class="flex items-center gap-1.5"
-			title={`PTK ID: ${u.sso.ptkId || u.dapodikPtkId || '-'} | NIP: ${u.sso.nip || '-'}`}
+			title={`Tersambung SSO ZITADEL | PTK ID: ${u.sso.ptkId || u.dapodikPtkId || '-'} | NIP: ${u.sso.nip || '-'}`}
 		>
 			<span class="badge badge-success badge-soft badge-sm font-semibold text-[11px] gap-1">
 				<span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-				Tersinkronisasi
+				Tersinkronisasi SSO
+			</span>
+		</div>
+	{:else if u.dapodikPtkId}
+		<div
+			class="flex items-center gap-1.5"
+			title={`Terkoneksi Dapodik (Siap Login SSO) | PTK ID: ${u.dapodikPtkId}`}
+		>
+			<span class="badge badge-info badge-soft badge-sm font-semibold text-[11px] gap-1">
+				<span class="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
+				Siap SSO (Dapodik)
 			</span>
 		</div>
 	{:else}
 		<div
 			class="flex items-center gap-1.5"
-			title={u.dapodikPtkId ? `PTK ID: ${u.dapodikPtkId}` : undefined}
+			title="Akun lokal manual (belum memiliki PTK ID Dapodik)"
 		>
 			<span class="badge badge-ghost badge-sm text-[11px] text-base-content/60"> Lokal </span>
-			{#if u.dapodikPtkId}
-				<span
-					class="badge badge-info badge-soft badge-xs text-[10px]"
-					title={`PTK ID: ${u.dapodikPtkId}`}
-				>
-					PTK ID
-				</span>
-			{/if}
 		</div>
 	{/if}
 </td>

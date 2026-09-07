@@ -238,7 +238,9 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	const isPublicRoute =
 		!routeId ||
 		PUBLIC_ROUTE_IDS.has(routeId) ||
-		event.url.pathname.startsWith('/api/auth/zitadel/');
+		event.url.pathname.startsWith('/api/auth/zitadel/') ||
+		event.url.pathname.startsWith('/sekolah/logo') ||
+		event.url.pathname.startsWith('/sekolah/logo-dinas');
 	const isLoginPath = event.url.pathname === '/login';
 
 	// Force a password change for accounts flagged with mustChangePassword (e.g.
