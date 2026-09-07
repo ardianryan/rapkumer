@@ -8,6 +8,9 @@ FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_SKIP_DOWNLOAD=true
+
 # Enable pnpm v9 (matches pnpm-lock.yaml lockfileVersion 9.0)
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
