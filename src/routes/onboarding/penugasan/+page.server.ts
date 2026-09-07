@@ -33,14 +33,18 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 
 	// Sekolah aktif pengguna
-	const sekolahId = locals.user.sekolahId ?? locals.sekolah?.id;
+	let sekolahId = locals.user.sekolahId ?? locals.sekolah?.id;
+	if (!sekolahId) {
+		const firstSekolah = await db.query.tableSekolah.findFirst({ columns: { id: true } });
+		sekolahId = firstSekolah?.id;
+	}
 
 	// Ambil mata pelajaran yang saat ini ditugaskan ke guru ini
 	const assignedMapelRows = await db
 		.select({
 			id: tableMataPelajaran.id,
 			nama: tableMataPelajaran.nama,
-			ringkasan: tableMataPelajaran.ringkasan,
+			kode: tableMataPelajaran.kode,
 			kelasId: tableMataPelajaran.kelasId
 		})
 		.from(tableAuthUserMataPelajaran)
@@ -62,14 +66,19 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.where(eq(tableAuthUserKelas.authUserId, userId));
 
 	// Ambil seluruh daftar mata pelajaran aktif di sekolah (dari Dapodik/Rapkumer)
-	let availableMapel: { id: number; nama: string; ringkasan: string | null }[] = [];
+	let availableMapel: { id: number; nama: string; kode: string | null }[] = [];
 	let availableKelas: { id: number; nama: string; fase: string | null }[] = [];
 
 	if (sekolahId) {
-		const rawMapel = await db.query.tableMataPelajaran.findMany({
-			where: eq(tableMataPelajaran.sekolahId, sekolahId),
-			columns: { id: true, nama: true, ringkasan: true }
-		});
+		const rawMapel = await db
+			.select({
+				id: tableMataPelajaran.id,
+				nama: tableMataPelajaran.nama,
+				kode: tableMataPelajaran.kode
+			})
+			.from(tableMataPelajaran)
+			.innerJoin(tableKelas, eq(tableKelas.id, tableMataPelajaran.kelasId))
+			.where(eq(tableKelas.sekolahId, sekolahId));
 
 		// Deduplikasi nama mata pelajaran untuk pilihan yang bersih
 		const mapelMap = new Map<string, (typeof rawMapel)[0]>();

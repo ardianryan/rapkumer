@@ -1,6 +1,11 @@
 import crypto from 'node:crypto';
 import db from '$lib/server/db';
-import { tableAuthUser, tableAuthZitadelUser, tablePegawai } from '$lib/server/db/schema';
+import {
+	tableAuthUser,
+	tableAuthZitadelUser,
+	tablePegawai,
+	tableSekolah
+} from '$lib/server/db/schema';
 import { eq, or, sql } from 'drizzle-orm';
 
 export interface ZitadelLiveMetadata {
@@ -182,11 +187,17 @@ function decodeMetadataValue(val: unknown): string {
 	const trimmed = val.trim();
 	if (!trimmed) return '';
 	try {
-		if (/^[A-Za-z0-9+/=_-]+$/.test(trimmed) && trimmed.length % 4 === 0) {
-			const decoded = Buffer.from(trimmed, 'base64').toString('utf-8');
+		const base64Clean = trimmed.replace(/-/g, '+').replace(/_/g, '/');
+		const padded = base64Clean.padEnd(
+			base64Clean.length + ((4 - (base64Clean.length % 4)) % 4),
+			'='
+		);
+		if (/^[A-Za-z0-9+/=]+$/.test(padded)) {
+			const decoded = Buffer.from(padded, 'base64').toString('utf-8');
 			if (
 				/^[\x20-\x7E\s]+$/.test(decoded) &&
-				Buffer.from(decoded, 'utf-8').toString('base64') === trimmed
+				Buffer.from(decoded, 'utf-8').toString('base64').replace(/=+$/, '') ===
+					base64Clean.replace(/=+$/, '')
 			) {
 				return decoded.trim();
 			}
@@ -260,8 +271,16 @@ export function extractZitadelMetadata(
 		extractedRole = merged.role;
 	}
 
-	const role =
+	const rawRole =
 		metaMap['role'] || extractedRole || (merged.role ? String(merged.role).trim() : undefined);
+	let role: string | undefined = undefined;
+	if (rawRole) {
+		const norm = rawRole.trim().toLowerCase();
+		if (norm === 'guru' || norm === 'teacher') role = 'guru';
+		else if (norm === 'tendik' || norm === 'staff' || norm === 'pegawai') role = 'tendik';
+		else if (norm === 'admin' || norm === 'administrator') role = 'admin';
+		else role = norm;
+	}
 
 	const ptk_id =
 		metaMap['ptk_id'] ||
@@ -304,20 +323,20 @@ export function extractZitadelMetadata(
 }
 
 /**
- * Validasi Role: Hanya peran yang secara eksplisit dilarang (misal: 'siswa', 'murid', 'orangtua')
- * yang ditolak. Jika role belum ditentukan di Zitadel (undefined / ''), pengguna tetap diizinkan
- * lanjut ke tahap pencocokan akun GTK di Rapkumer.
+ * Validasi Role: Kunci metadata ketat, HANYA peran 'guru', 'tendik', dan 'admin'
+ * yang diizinkan masuk portal.
  */
 export function isAllowedZitadelRole(role: string | null | undefined): boolean {
-	if (!role) return true;
+	if (!role) return false;
 	const normalized = role.trim().toLowerCase();
-	return !(
-		normalized === 'siswa' ||
-		normalized === 'student' ||
-		normalized === 'murid' ||
-		normalized === 'orangtua' ||
-		normalized === 'wali_murid' ||
-		normalized === 'parent'
+	return (
+		normalized === 'guru' ||
+		normalized === 'tendik' ||
+		normalized === 'admin' ||
+		normalized === 'teacher' ||
+		normalized === 'staff' ||
+		normalized === 'pegawai' ||
+		normalized === 'administrator'
 	);
 }
 
@@ -327,7 +346,7 @@ export type MatchResult =
 			userId: number;
 			isNewLink: boolean;
 			isOnboarded: boolean;
-			pegawai: { id: number; nama: string; nip: string };
+			pegawai: { id: number; nama: string; nip: string } | null;
 	  }
 	| {
 			success: false;
@@ -343,7 +362,7 @@ export async function matchAndLinkZitadelUser(
 	metadata: ZitadelLiveMetadata,
 	zitadelSubject: string
 ): Promise<MatchResult> {
-	// 1. Pemeriksaan Guard Role
+	// 1. Pemeriksaan Guard Role: Hanya guru dan tendik (serta admin) yang boleh masuk
 	const userRole = metadata.role?.trim().toLowerCase();
 	if (!isAllowedZitadelRole(userRole)) {
 		return {
@@ -438,17 +457,6 @@ export async function matchAndLinkZitadelUser(
 		}
 	}
 
-	// Jika pegawai dan authUser sama sekali tidak ditemukan di Rapkumer
-	if (!matchedPegawai && !matchedAuthUser) {
-		return {
-			success: false,
-			code: 'PTK_NOT_FOUND',
-			message:
-				'PTK ID Dapodik tidak ditemukan. Akun Anda belum terdaftar pada data Dapodik sekolah di Rapkumer. Silakan hubungi Admin Sekolah untuk melakukan sinkronisasi Dapodik atau pemetaan profil manual.',
-			metadata
-		};
-	}
-
 	// Jika dapodikPtkId di tablePegawai belum ada atau berbeda, sinkronkan sekarang
 	if (
 		matchedPegawai &&
@@ -461,12 +469,13 @@ export async function matchAndLinkZitadelUser(
 			.where(eq(tablePegawai.id, matchedPegawai.id));
 	}
 
-	// 4. Pastikan Akun auth_user tersedia
+	// 6. Pastikan Akun auth_user tersedia: Jika tidak ditemukan di Dapodik/database sekolah,
+	// JANGAN TOLAK akun guru/tendik tersebut, buatkan akun auth_user secara mandiri!
 	let authUserId: number;
 	if (matchedAuthUser) {
 		authUserId = matchedAuthUser.id;
 	} else if (matchedPegawai) {
-		// Buat akun auth_user otomatis jika belum dibuat admin
+		// Buat akun auth_user otomatis dari matchedPegawai
 		const cleanUsername = (
 			matchedPegawai.nama.toLowerCase().replace(/[^a-z0-9]/g, '') || `user${matchedPegawai.id}`
 		).slice(0, 30);
@@ -479,7 +488,7 @@ export async function matchAndLinkZitadelUser(
 				usernameNormalized: cleanUsername,
 				passwordHash: randomPass,
 				passwordSalt: 'sso-managed',
-				type: userRole === 'guru' ? 'user' : 'user',
+				type: 'user',
 				sekolahId: matchedPegawai.sekolahId,
 				pegawaiId: matchedPegawai.id,
 				namaLengkap: matchedPegawai.nama
@@ -488,15 +497,36 @@ export async function matchAndLinkZitadelUser(
 
 		authUserId = createdUser.id;
 	} else {
-		return {
-			success: false,
-			code: 'PTK_NOT_FOUND',
-			message: 'Data pengguna tidak valid.',
-			metadata
-		};
+		// Kasus: PTK ID belum ada di data Dapodik sekolah.
+		// Buat akun mandiri dengan pegawaiId null agar guru/tendik tetap dapat login.
+		const firstSekolah = await db.query.tableSekolah.findFirst({ columns: { id: true } });
+		const displayName = (metadata.name || metadata.username || 'Pengguna SSO').trim();
+		const baseSlug = (
+			metadata.username?.toLowerCase().replace(/[^a-z0-9]/g, '') ||
+			displayName.toLowerCase().replace(/[^a-z0-9]/g, '') ||
+			'sso'
+		).slice(0, 20);
+		const cleanUsername = `${baseSlug}_${crypto.randomBytes(3).toString('hex')}`;
+		const randomPass = crypto.randomBytes(16).toString('hex');
+
+		const [createdUser] = await db
+			.insert(tableAuthUser)
+			.values({
+				username: cleanUsername,
+				usernameNormalized: cleanUsername.toLowerCase(),
+				passwordHash: randomPass,
+				passwordSalt: 'sso-managed',
+				type: 'user',
+				sekolahId: firstSekolah?.id ?? null,
+				pegawaiId: null,
+				namaLengkap: displayName
+			})
+			.returning();
+
+		authUserId = createdUser.id;
 	}
 
-	// 5. Tautkan atau perbarui tableAuthZitadelUser (Upsert aman)
+	// 7. Tautkan atau perbarui tableAuthZitadelUser (Upsert aman)
 	const existingLink = await db.query.tableAuthZitadelUser.findFirst({
 		where: eq(tableAuthZitadelUser.userId, authUserId)
 	});
@@ -533,10 +563,12 @@ export async function matchAndLinkZitadelUser(
 		userId: authUserId,
 		isNewLink: !existingLink,
 		isOnboarded: Boolean(existingLink?.isOnboarded),
-		pegawai: {
-			id: matchedPegawai?.id ?? 0,
-			nama: matchedPegawai?.nama ?? metadata.name ?? metadata.username ?? 'Pengguna',
-			nip: matchedPegawai?.nip ?? nip ?? ''
-		}
+		pegawai: matchedPegawai
+			? {
+					id: matchedPegawai.id,
+					nama: matchedPegawai.nama,
+					nip: matchedPegawai.nip ?? nip ?? ''
+				}
+			: null
 	};
 }
