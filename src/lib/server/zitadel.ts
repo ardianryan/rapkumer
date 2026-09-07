@@ -21,6 +21,8 @@ export interface ZitadelConfig {
 	clientId: string;
 	clientSecret?: string;
 	buttonText: string;
+	redirectUri?: string;
+	postLogoutRedirectUri?: string;
 }
 
 /**
@@ -31,6 +33,9 @@ export function getZitadelConfig(): ZitadelConfig {
 	const clientId = (process.env.ZITADEL_CLIENT_ID ?? '').trim();
 	const clientSecret = (process.env.ZITADEL_CLIENT_SECRET ?? '').trim() || undefined;
 	const buttonText = (process.env.SSO_BUTTON_TEXT ?? 'Masuk dengan SSO').trim();
+	const redirectUri = (process.env.ZITADEL_REDIRECT_URI ?? '').trim() || undefined;
+	const postLogoutRedirectUri =
+		(process.env.ZITADEL_POST_LOGOUT_REDIRECT_URI ?? '').trim() || undefined;
 
 	const isConfigured = Boolean(issuer && clientId);
 	return {
@@ -38,7 +43,9 @@ export function getZitadelConfig(): ZitadelConfig {
 		issuer,
 		clientId,
 		clientSecret,
-		buttonText
+		buttonText,
+		redirectUri,
+		postLogoutRedirectUri
 	};
 }
 

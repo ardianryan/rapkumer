@@ -35,7 +35,7 @@ export const GET: RequestHandler = async ({ url, cookies, request }) => {
 		maxAge: 600
 	});
 
-	const redirectUri = `${url.origin}/api/auth/zitadel/callback`;
+	const redirectUri = config.redirectUri || `${url.origin}/api/auth/zitadel/callback`;
 
 	const authUrl = buildZitadelAuthUrl({
 		issuer: config.issuer,

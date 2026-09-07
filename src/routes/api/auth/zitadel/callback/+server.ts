@@ -41,7 +41,7 @@ export const GET: RequestHandler = async ({ url, cookies, request, getClientAddr
 		throw redirect(303, '/login?error=invalid_state');
 	}
 
-	const redirectUri = `${url.origin}/api/auth/zitadel/callback`;
+	const redirectUri = config.redirectUri || `${url.origin}/api/auth/zitadel/callback`;
 
 	let tokenResult;
 	try {
