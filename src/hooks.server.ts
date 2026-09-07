@@ -133,7 +133,9 @@ const PUBLIC_ROUTE_IDS = new Set([
 	'/logout',
 	'/tamu',
 	'/jadwal-pelajaran',
-	'/api/buku-tamu'
+	'/api/buku-tamu',
+	'/api/auth/zitadel/login',
+	'/api/auth/zitadel/callback'
 ]);
 
 // Image endpoints exempt from the menu-permission guard. They are fetched by the
@@ -232,7 +234,8 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	}
 
 	const routeId = event.route.id;
-	const isPublicRoute = !routeId || PUBLIC_ROUTE_IDS.has(routeId);
+	const isPublicRoute =
+		!routeId || PUBLIC_ROUTE_IDS.has(routeId) || event.url.pathname.startsWith('/api/auth/zitadel/');
 	const isLoginPath = event.url.pathname === '/login';
 
 	// Force a password change for accounts flagged with mustChangePassword (e.g.
