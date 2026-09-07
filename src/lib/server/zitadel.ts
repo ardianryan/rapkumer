@@ -463,10 +463,8 @@ export async function matchAndLinkZitadelUser(
 
 	// 4. Pastikan Akun auth_user tersedia
 	let authUserId: number;
-	let isExistingAccount = false;
 	if (matchedAuthUser) {
 		authUserId = matchedAuthUser.id;
-		isExistingAccount = true;
 	} else if (matchedPegawai) {
 		// Buat akun auth_user otomatis jika belum dibuat admin
 		const cleanUsername = (
@@ -524,7 +522,7 @@ export async function matchAndLinkZitadelUser(
 			nip,
 			nik: metadata.nik?.trim() || null,
 			role: metadata.role?.trim() || null,
-			isOnboarded: isExistingAccount,
+			isOnboarded: false,
 			rawMetadata: metadata,
 			lastLoginAt: new Date().toISOString()
 		});
@@ -534,7 +532,7 @@ export async function matchAndLinkZitadelUser(
 		success: true,
 		userId: authUserId,
 		isNewLink: !existingLink,
-		isOnboarded: isExistingAccount || Boolean(existingLink?.isOnboarded),
+		isOnboarded: Boolean(existingLink?.isOnboarded),
 		pegawai: {
 			id: matchedPegawai?.id ?? 0,
 			nama: matchedPegawai?.nama ?? metadata.name ?? metadata.username ?? 'Pengguna',
