@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { dataRoot, defaultDataRoot } from '$lib/server/data-dirs';
 import { envFilePath } from '$lib/server/env-file';
+import { getR2Config, isR2Configured } from '$lib/server/storage-r2';
 
 export interface StorageInfo {
 	dataRoot: string;
@@ -10,6 +11,13 @@ export interface StorageInfo {
 	envFileExists: boolean;
 	/** True when the running process overrides RAPKUMER_DATA_DIR (Windows launcher). */
 	rootManagedByLauncher: boolean;
+	r2?: {
+		isConfigured: boolean;
+		bucketName: string;
+		folderPath: string;
+		publicUrl: string;
+		endpoint: string;
+	};
 }
 
 /**
@@ -61,7 +69,14 @@ export async function getStorageInfo(): Promise<StorageInfo> {
 		// The Windows launcher (start-rapkumer.mjs) forces the root on every
 		// start; on Windows it is configured through its own `data-root.txt`
 		// file, while on other platforms RAPKUMER_DATA_DIR comes from `.env`.
-		rootManagedByLauncher: process.platform === 'win32' && Boolean(process.env.RAPKUMER_DATA_DIR)
+		rootManagedByLauncher: process.platform === 'win32' && Boolean(process.env.RAPKUMER_DATA_DIR),
+		r2: {
+			isConfigured: isR2Configured(),
+			bucketName: getR2Config().bucketName,
+			folderPath: getR2Config().folderPath,
+			publicUrl: getR2Config().publicUrl,
+			endpoint: getR2Config().endpoint
+		}
 	};
 }
 

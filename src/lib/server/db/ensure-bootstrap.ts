@@ -23,6 +23,7 @@ import { ensureJadwalBellSchema } from './ensure-jadwal-bell';
 import { ensureLoginAttemptsSchema } from './ensure-login-attempts';
 import { ensurePermissionMigration } from './ensure-permission-migration';
 import { ensurePresensiSettingsSchema } from './ensure-presensi-settings';
+import { ensureZitadelSchema } from './ensure-zitadel';
 import { resetEnsuredSchemas } from './ensure-helper';
 
 let startupEnsuresDone = false;
@@ -61,6 +62,7 @@ export async function runStartupEnsures() {
 	await ensureDefaultAdmin();
 	await ensurePermissionMigration();
 	await ensureKepalaSekolahAccounts();
+	await ensureZitadelSchema();
 	startupEnsuresDone = true;
 }
 

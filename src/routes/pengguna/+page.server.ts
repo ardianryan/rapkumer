@@ -21,6 +21,7 @@ import { resolveUniqueUsername } from '$lib/server/usernames';
 import { mergeAccountsUnderKepalaSekolah } from '$lib/server/pengguna-merge';
 import { randomBytes } from 'node:crypto';
 import { fail } from '@sveltejs/kit';
+import { ensureZitadelSchema } from '$lib/server/db/ensure-zitadel';
 
 const u = tableAuthUser;
 
@@ -564,6 +565,9 @@ export async function load({ url, locals }) {
 		.from(tableMataPelajaran)
 		.limit(1000);
 
+	// Ensure table auth_zitadel_user exists in SQLite / PostgreSQL
+	await ensureZitadelSchema();
+
 	// Fetch many-to-many mapel & kelas assignments for each user (for edit modal pre-fill)
 	const allUserIds = users
 		.map((r) => r.id)
@@ -596,6 +600,10 @@ export async function load({ url, locals }) {
 					})
 					.from(tableAuthZitadelUser)
 					.where(inArray(tableAuthZitadelUser.userId, allUserIds))
+					.catch((err) => {
+						console.warn('[pengguna] Failed to query auth_zitadel_user:', err);
+						return [];
+					})
 			])
 		: [[], [], []];
 
@@ -1151,7 +1159,7 @@ export const actions = {
 
 	delete_users: async ({ request }) => {
 		authority('user_delete');
-		let ids: number[] = [];
+		let ids: number[];
 		try {
 			// try JSON first
 			const contentType = request.headers.get('content-type') || '';

@@ -37,6 +37,7 @@ import {
 	saveAiSettings,
 	saveUserAiSettings
 } from '$lib/server/ai';
+import { isR2Configured } from '$lib/server/storage-r2';
 import path from 'node:path';
 
 interface AddressEntry {
@@ -279,6 +280,13 @@ export const actions: Actions = {
 	'update-storage-location': async ({ request, locals }) => {
 		if (locals.user?.type !== 'admin') {
 			return fail(403, { message: 'Hanya admin yang dapat mengubah lokasi data.' });
+		}
+
+		if (isR2Configured()) {
+			return fail(400, {
+				message:
+					'Pengaturan lokasi data lokal dinonaktifkan karena penyimpanan Cloudflare R2 / S3 sedang aktif.'
+			});
 		}
 
 		const form = await request.formData();
