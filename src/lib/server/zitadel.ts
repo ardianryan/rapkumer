@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import db from '$lib/server/db';
 import { tableAuthUser, tableAuthZitadelUser, tablePegawai } from '$lib/server/db/schema';
-import { eq, or } from 'drizzle-orm';
+import { eq, or, sql } from 'drizzle-orm';
 
 export interface ZitadelLiveMetadata {
 	ptk_id?: string;
@@ -356,6 +356,7 @@ export async function matchAndLinkZitadelUser(
 	const nip = metadata.nip?.trim() || null;
 
 	// 2. Cek apakah sudah pernah tertaut di tableAuthZitadelUser
+	// a. Berdasarkan zitadelUuid
 	if (zitadelUuid) {
 		const existingZitadelUser = await db.query.tableAuthZitadelUser.findFirst({
 			where: eq(tableAuthZitadelUser.zitadelUuid, zitadelUuid)
@@ -373,10 +374,12 @@ export async function matchAndLinkZitadelUser(
 				});
 			}
 
-			// Update waktu login terakhir
+			// Update waktu login terakhir & sinkronkan ptkId jika ada perubahan
 			await db
 				.update(tableAuthZitadelUser)
 				.set({
+					ptkId: ptkId ?? existingZitadelUser.ptkId,
+					nip: nip ?? existingZitadelUser.nip,
 					lastLoginAt: new Date().toISOString(),
 					rawMetadata: metadata
 				})
@@ -396,17 +399,61 @@ export async function matchAndLinkZitadelUser(
 		}
 	}
 
-	// 3. Pencocokan Pertama Kali:
-	// a. Cari di tablePegawai berdasarkan dapodikPtkId atau NIP
+	// b. Berdasarkan ptkId pada tableAuthZitadelUser (case-insensitive)
+	if (ptkId) {
+		const existingByPtk = await db.query.tableAuthZitadelUser.findFirst({
+			where: sql`lower(${tableAuthZitadelUser.ptkId}) = lower(${ptkId})`
+		});
+
+		if (existingByPtk) {
+			await db
+				.update(tableAuthZitadelUser)
+				.set({
+					zitadelUuid,
+					lastLoginAt: new Date().toISOString(),
+					rawMetadata: metadata
+				})
+				.where(eq(tableAuthZitadelUser.id, existingByPtk.id));
+
+			const authUser = await db.query.tableAuthUser.findFirst({
+				where: eq(tableAuthUser.id, existingByPtk.userId)
+			});
+
+			let peg: typeof tablePegawai.$inferSelect | undefined;
+			if (authUser?.pegawaiId) {
+				peg = await db.query.tablePegawai.findFirst({
+					where: eq(tablePegawai.id, authUser.pegawaiId)
+				});
+			}
+
+			return {
+				success: true,
+				userId: existingByPtk.userId,
+				isNewLink: false,
+				isOnboarded: true,
+				pegawai: {
+					id: peg?.id ?? 0,
+					nama: peg?.nama ?? authUser?.namaLengkap ?? '',
+					nip: peg?.nip ?? ''
+				}
+			};
+		}
+	}
+
+	// 3. Pencocokan Pertama Kali (Auto-sync berdasarkan ptk_id Dapodik atau NIP):
+	// a. Cari di tablePegawai berdasarkan dapodikPtkId (case-insensitive) atau NIP
 	let matchedPegawai: typeof tablePegawai.$inferSelect | undefined;
 
 	if (ptkId && nip) {
 		matchedPegawai = await db.query.tablePegawai.findFirst({
-			where: or(eq(tablePegawai.dapodikPtkId, ptkId), eq(tablePegawai.nip, nip))
+			where: or(
+				sql`lower(${tablePegawai.dapodikPtkId}) = lower(${ptkId})`,
+				eq(tablePegawai.nip, nip)
+			)
 		});
 	} else if (ptkId) {
 		matchedPegawai = await db.query.tablePegawai.findFirst({
-			where: eq(tablePegawai.dapodikPtkId, ptkId)
+			where: sql`lower(${tablePegawai.dapodikPtkId}) = lower(${ptkId})`
 		});
 	} else if (nip) {
 		matchedPegawai = await db.query.tablePegawai.findFirst({
@@ -455,7 +502,7 @@ export async function matchAndLinkZitadelUser(
 		};
 	}
 
-	// Jika dapodikPtkId di DB belum ada atau berbeda, sinkronkan sekarang
+	// Jika dapodikPtkId di tablePegawai belum ada atau berbeda, sinkronkan sekarang
 	if (
 		matchedPegawai &&
 		ptkId &&
@@ -469,8 +516,10 @@ export async function matchAndLinkZitadelUser(
 
 	// 4. Pastikan Akun auth_user tersedia
 	let authUserId: number;
+	let isExistingAccount = false;
 	if (matchedAuthUser) {
 		authUserId = matchedAuthUser.id;
+		isExistingAccount = true;
 	} else if (matchedPegawai) {
 		// Buat akun auth_user otomatis jika belum dibuat admin
 		const cleanUsername = (
@@ -502,24 +551,43 @@ export async function matchAndLinkZitadelUser(
 		};
 	}
 
-	// 5. Tautkan ke tableAuthZitadelUser
-	await db.insert(tableAuthZitadelUser).values({
-		userId: authUserId,
-		zitadelUuid,
-		ptkId,
-		nip,
-		nik: metadata.nik?.trim() || null,
-		role: metadata.role?.trim() || null,
-		isOnboarded: false, // Perlu onboarding konfirmasi penugasan
-		rawMetadata: metadata,
-		lastLoginAt: new Date().toISOString()
+	// 5. Tautkan atau perbarui tableAuthZitadelUser (Upsert aman)
+	const existingLink = await db.query.tableAuthZitadelUser.findFirst({
+		where: eq(tableAuthZitadelUser.userId, authUserId)
 	});
+
+	if (existingLink) {
+		await db
+			.update(tableAuthZitadelUser)
+			.set({
+				zitadelUuid,
+				ptkId: ptkId ?? existingLink.ptkId,
+				nip: nip ?? existingLink.nip,
+				nik: metadata.nik?.trim() || existingLink.nik,
+				role: metadata.role?.trim() || existingLink.role,
+				rawMetadata: metadata,
+				lastLoginAt: new Date().toISOString()
+			})
+			.where(eq(tableAuthZitadelUser.id, existingLink.id));
+	} else {
+		await db.insert(tableAuthZitadelUser).values({
+			userId: authUserId,
+			zitadelUuid,
+			ptkId,
+			nip,
+			nik: metadata.nik?.trim() || null,
+			role: metadata.role?.trim() || null,
+			isOnboarded: isExistingAccount,
+			rawMetadata: metadata,
+			lastLoginAt: new Date().toISOString()
+		});
+	}
 
 	return {
 		success: true,
 		userId: authUserId,
-		isNewLink: true,
-		isOnboarded: false,
+		isNewLink: !existingLink,
+		isOnboarded: isExistingAccount || Boolean(existingLink?.isOnboarded),
 		pegawai: {
 			id: matchedPegawai?.id ?? 0,
 			nama: matchedPegawai?.nama ?? metadata.name ?? metadata.username ?? 'Pengguna',
