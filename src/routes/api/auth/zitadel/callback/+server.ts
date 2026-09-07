@@ -66,7 +66,9 @@ export const GET: RequestHandler = async ({ url, cookies, request, getClientAddr
 		ptk_id: metadata.ptk_id,
 		nip: metadata.nip,
 		role: metadata.role,
-		uuid: metadata.uuid
+		uuid: metadata.uuid,
+		email: metadata.email,
+		username: metadata.username
 	});
 
 	const match = await matchAndLinkZitadelUser(metadata, subject);
@@ -90,6 +92,16 @@ export const GET: RequestHandler = async ({ url, cookies, request, getClientAddr
 
 	const isSecure = isSecureRequest(request, url);
 	applySessionCookie(cookies, session.token, session.expiresAt, isSecure);
+
+	if (tokenResult.idToken) {
+		cookies.set('zitadel_id_token', tokenResult.idToken, {
+			path: '/',
+			httpOnly: true,
+			sameSite: 'lax',
+			secure: isSecure,
+			maxAge: 86400
+		});
+	}
 
 	// Jika pengguna belum melakukan konfirmasi/onboarding penugasan
 	if (!match.isOnboarded) {

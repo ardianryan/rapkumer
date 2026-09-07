@@ -221,15 +221,27 @@ export const actions = {
 		// non-fatal: murid record is already saved, foto filename retried next save.
 		if (uploadedFile && uploadedFile.size && formMurid.id) {
 			const buffer = Buffer.from(await uploadedFile.arrayBuffer());
-			const ext = uploadedFile.type === 'image/png' ? '.png' : uploadedFile.type === 'image/webp' ? '.webp' : '.jpg';
+			const ext =
+				uploadedFile.type === 'image/png'
+					? '.png'
+					: uploadedFile.type === 'image/webp'
+						? '.webp'
+						: '.jpg';
 			const base = slugifyName(formMurid.nama || `murid-${formMurid.id}`);
 
 			if (isR2Configured()) {
 				const filename = `${base}_${Date.now()}${ext}`;
 				const key = buildR2Key('murid', filename);
 				try {
-					const { publicUrl } = await uploadBufferToR2(key, buffer, uploadedFile.type || 'image/jpeg');
-					await db.update(tableMurid).set({ foto: publicUrl }).where(eq(tableMurid.id, formMurid.id));
+					const { publicUrl } = await uploadBufferToR2(
+						key,
+						buffer,
+						uploadedFile.type || 'image/jpeg'
+					);
+					await db
+						.update(tableMurid)
+						.set({ foto: publicUrl })
+						.where(eq(tableMurid.id, formMurid.id));
 					formMurid.foto = publicUrl;
 
 					if (oldFoto) {
@@ -253,7 +265,10 @@ export const actions = {
 				const filePath = path.join(dir, filename);
 				try {
 					await fs.writeFile(filePath, buffer, { mode: 0o644 });
-					await db.update(tableMurid).set({ foto: filename }).where(eq(tableMurid.id, formMurid.id));
+					await db
+						.update(tableMurid)
+						.set({ foto: filename })
+						.where(eq(tableMurid.id, formMurid.id));
 					formMurid.foto = filename;
 					// remove old file only after the new file is in place
 					if (oldFoto && oldFoto !== filename) {

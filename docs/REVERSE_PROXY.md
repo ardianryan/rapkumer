@@ -7,6 +7,7 @@ Dokumen ini memuat panduan lengkap menjalankan Rapkumer di belakang **Reverse Pr
 ## 1. Menjalankan dengan Docker
 
 ### Membangun dan Menjalankan Container
+
 ```bash
 # Salin konfigurasi environment jika belum ada
 cp .env.example .env
@@ -19,6 +20,7 @@ docker compose up -d --build
 ```
 
 Container akan otomatis:
+
 1. Membangun aplikasi menggunakan multi-stage build Node 22.
 2. Memasang Chromium untuk rendering cetak rapor PagedJS/Puppeteer.
 3. Menjalankan proses di port `3000` dengan user non-root `rapkumer` dan supervisor `dumb-init`.
@@ -28,15 +30,15 @@ Container akan otomatis:
 
 ## 2. Variabel Lingkungan Kunci untuk Reverse Proxy
 
-| Variabel | Deskripsi | Contoh Nilai |
-| :--- | :--- | :--- |
-| `ORIGIN` | Domain publik lengkap protokol HTTPS Anda | `https://rapor.smansage.sch.id` |
-| `RAPKUMER_CSRF_TRUSTED_ORIGINS` | Daftar domain yang diizinkan untuk CSRF | `https://rapor.smansage.sch.id` |
-| `HOST_HEADER` | Header host dari proxy | `x-forwarded-host` |
-| `PROTOCOL_HEADER` | Header protokol dari proxy | `x-forwarded-proto` |
-| `ADDRESS_HEADER` | Header IP klien asli | `x-forwarded-for` |
-| `XFF_DEPTH` | Kedalaman proxy di depan aplikasi | `1` |
-| `BODY_SIZE_LIMIT` | Batas payload upload (rapor, bulk foto, excel) | `50M` |
+| Variabel                        | Deskripsi                                      | Contoh Nilai                    |
+| :------------------------------ | :--------------------------------------------- | :------------------------------ |
+| `ORIGIN`                        | Domain publik lengkap protokol HTTPS Anda      | `https://rapor.smansage.sch.id` |
+| `RAPKUMER_CSRF_TRUSTED_ORIGINS` | Daftar domain yang diizinkan untuk CSRF        | `https://rapor.smansage.sch.id` |
+| `HOST_HEADER`                   | Header host dari proxy                         | `x-forwarded-host`              |
+| `PROTOCOL_HEADER`               | Header protokol dari proxy                     | `x-forwarded-proto`             |
+| `ADDRESS_HEADER`                | Header IP klien asli                           | `x-forwarded-for`               |
+| `XFF_DEPTH`                     | Kedalaman proxy di depan aplikasi              | `1`                             |
+| `BODY_SIZE_LIMIT`               | Batas payload upload (rapor, bulk foto, excel) | `50M`                           |
 
 ---
 
@@ -104,13 +106,15 @@ rapor.smansage.sch.id {
     reverse_proxy 127.0.0.1:3000
 }
 ```
-*(Caddy secara otomatis mengelola sertifikat SSL dan meneruskan seluruh header `X-Forwarded-*` secara standar).*
+
+_(Caddy secara otomatis mengelola sertifikat SSL dan meneruskan seluruh header `X-Forwarded-*` secara standar)._
 
 ---
 
 ## 5. Konfigurasi Cloudflare Tunnel
 
 Jika menggunakan `cloudflared`:
+
 1. Buat Public Hostname mengarah ke Service: `http://localhost:3000`.
 2. Di `.env` Rapkumer, set:
    ```env

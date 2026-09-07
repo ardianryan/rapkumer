@@ -60,7 +60,8 @@
 				</div>
 				<p class="text-base-content/70 text-sm">
 					{#if isR2Active}
-						Penyimpanan media publik dialihkan ke Object Storage (Cloudflare R2 / S3). Pengaturan path folder fisik lokal server terkunci secara otomatis.
+						Penyimpanan media publik dialihkan ke Object Storage (Cloudflare R2 / S3). Pengaturan
+						path folder fisik lokal server terkunci secara otomatis.
 					{:else}
 						Pilih root data. Subfolder <code>ttd/</code>, <code>dinas-luar/</code>,
 						<code>uploads/</code>, dan <code>sounds/</code> akan dibuat otomatis di dalamnya. File yang
@@ -76,16 +77,22 @@
 						<span>Penyimpanan Berkas Ditangani oleh Cloudflare R2 / S3</span>
 					</div>
 					<p class="text-xs leading-relaxed text-base-content/80">
-						Seluruh berkas media (foto profil, bukti dinas luar, paraf/tanda tangan presensi, dan dokumen lampiran lainnya) diunggah langsung dan disajikan melalui URL CDN publik Cloudflare R2.
+						Seluruh berkas media (foto profil, bukti dinas luar, paraf/tanda tangan presensi, dan
+						dokumen lampiran lainnya) diunggah langsung dan disajikan melalui URL CDN publik
+						Cloudflare R2.
 					</p>
 					<div class="grid grid-cols-1 gap-2 pt-1 text-xs sm:grid-cols-2">
 						<div class="rounded-lg border border-base-200 bg-base-100/80 p-2.5">
 							<span class="block font-medium text-base-content/60">Bucket:</span>
-							<span class="font-mono font-semibold text-base-content/90">{storage.r2?.bucketName || '-'}</span>
+							<span class="font-mono font-semibold text-base-content/90"
+								>{storage.r2?.bucketName || '-'}</span
+							>
 						</div>
 						<div class="rounded-lg border border-base-200 bg-base-100/80 p-2.5">
 							<span class="block font-medium text-base-content/60">Folder Path:</span>
-							<span class="font-mono font-semibold text-base-content/90">{storage.r2?.folderPath ? storage.r2.folderPath : '(root bucket)'}</span>
+							<span class="font-mono font-semibold text-base-content/90"
+								>{storage.r2?.folderPath ? storage.r2.folderPath : '(root bucket)'}</span
+							>
 						</div>
 						{#if storage.r2?.publicUrl}
 							<div class="rounded-lg border border-base-200 bg-base-100/80 p-2.5 sm:col-span-2">
@@ -103,7 +110,10 @@
 					</div>
 					<div class="flex items-center gap-1.5 pt-1 text-[11px] text-base-content/60">
 						<Icon name="info" class="h-3.5 w-3.5 shrink-0" />
-						<span>Untuk mengubah konfigurasi bucket/kredensial, perbarui variabel <code>R2_*</code> di environment (.env / Portainer).</span>
+						<span
+							>Untuk mengubah konfigurasi bucket/kredensial, perbarui variabel <code>R2_*</code> di environment
+							(.env / Portainer).</span
+						>
 					</div>
 				</div>
 			{/if}
@@ -160,8 +170,8 @@
 				<div role="alert" class="alert alert-info mt-4 alert-soft">
 					<Icon name="info" />
 					<span
-						>File di lokasi lama akan disalin ke lokasi baru (tidak dihapus). Perlu mulai ulang server
-						agar aplikasi membaca folder baru.</span
+						>File di lokasi lama akan disalin ke lokasi baru (tidak dihapus). Perlu mulai ulang
+						server agar aplikasi membaca folder baru.</span
 					>
 				</div>
 

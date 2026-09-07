@@ -392,7 +392,8 @@
 						placeholder="Contoh: 1faad84c-f1a5-404d-849b-4e8bf0a7ab82"
 					/>
 					<p class="label text-wrap">
-						Opsional: UUID PTK dari Dapodik untuk pencocokan otomatis akun saat login via SSO ZITADEL.
+						Opsional: UUID PTK dari Dapodik untuk pencocokan otomatis akun saat login via SSO
+						ZITADEL.
 					</p>
 				</fieldset>
 

@@ -1,10 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import {
-	isR2Configured,
-	buildR2Key,
-	createPresignedUploadUrl
-} from '$lib/server/storage-r2';
+import { isR2Configured, buildR2Key, createPresignedUploadUrl } from '$lib/server/storage-r2';
 
 const ALLOWED_CONTENT_TYPES = [
 	'image/jpeg',

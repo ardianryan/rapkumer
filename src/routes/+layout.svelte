@@ -234,21 +234,25 @@
 
 		try {
 			const response = await fetch('/logout', { method: 'POST' });
+			if (response.ok) {
+				const body = await response.json().catch(() => null);
+				if (body?.redirectUrl) {
+					window.location.href = body.redirectUrl;
+					return;
+				}
+				window.location.href = '/login';
+				return;
+			}
+
 			if (response.redirected) {
 				window.location.href = response.url;
 				return;
 			}
 
-			if (response.ok) {
-				window.location.href = '/login';
-				return;
-			}
-
-			console.error('Gagal logout', response.status, await response.text().catch(() => ''));
-			toast({ message: 'Gagal keluar. Coba lagi.', type: 'error' });
+			window.location.href = '/login';
 		} catch (error) {
 			console.error('Gagal logout', error);
-			toast({ message: 'Gagal keluar. Coba lagi.', type: 'error' });
+			window.location.href = '/login';
 		} finally {
 			loggingOut = false;
 		}
@@ -395,14 +399,26 @@
 						class="border-slate-200/70 dark:border-slate-800/80 mb-3 flex items-center gap-2.5 border-b px-1 pt-14 pb-2.5 lg:pt-1 shrink-0"
 					>
 						<div
-							class="bg-primary/10 text-primary shadow-xs flex h-8 w-8 items-center justify-center rounded-lg font-bold text-base shrink-0"
+							class="bg-primary/10 text-primary shadow-xs flex h-8 w-8 items-center justify-center rounded-lg font-bold text-base shrink-0 overflow-hidden"
 						>
 							{#if data.meta?.logoUrl}
 								<img
-									class="h-6 w-6 rounded object-contain"
+									class="h-full w-full rounded object-contain p-0.5"
 									src={data.meta.logoUrl}
 									alt="Logo Sekolah"
 								/>
+							{:else if data.sekolah?.id}
+								<img
+									class="h-full w-full rounded object-contain p-0.5"
+									src={`/sekolah/logo/${data.sekolah.id}`}
+									alt={data.sekolah.nama || 'Logo Sekolah'}
+									onerror={(e) => {
+										(e.currentTarget as HTMLElement).style.display = 'none';
+										const sibling = (e.currentTarget as HTMLElement).nextElementSibling;
+										if (sibling) (sibling as HTMLElement).style.display = 'flex';
+									}}
+								/>
+								<span style="display: none;">R</span>
 							{:else}
 								<span>R</span>
 							{/if}
@@ -412,10 +428,10 @@
 								href="/"
 								class="font-display hover:text-primary text-sm font-bold leading-tight tracking-tight transition-colors truncate"
 							>
-								Rapkumer
+								{appName}
 							</a>
 							<span class="text-base-content/60 text-[11px] font-medium tracking-normal truncate">
-								SMA Negeri 1 Gedeg
+								{data.sekolah?.nama ?? 'Administrasi Sekolah'}
 							</span>
 						</div>
 					</div>

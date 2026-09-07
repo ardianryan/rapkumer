@@ -157,7 +157,9 @@ export async function POST({
 	const allowed = ['image/png', 'image/jpeg', 'image/webp'];
 	if (!allowed.includes(uploadedFile.type)) {
 		return new Response(
-			JSON.stringify({ message: 'Format file tidak didukung; hanya JPG, PNG, dan WebP yang diizinkan' }),
+			JSON.stringify({
+				message: 'Format file tidak didukung; hanya JPG, PNG, dan WebP yang diizinkan'
+			}),
 			{ status: 400 }
 		);
 	}
@@ -171,7 +173,12 @@ export async function POST({
 
 	try {
 		const buffer = Buffer.from(await uploadedFile.arrayBuffer());
-		const ext = uploadedFile.type === 'image/png' ? '.png' : uploadedFile.type === 'image/webp' ? '.webp' : '.jpg';
+		const ext =
+			uploadedFile.type === 'image/png'
+				? '.png'
+				: uploadedFile.type === 'image/webp'
+					? '.webp'
+					: '.jpg';
 		const base = slugifyName(murid.nama || `murid-${murid.id}`);
 
 		let finalFotoRef: string;
@@ -220,9 +227,12 @@ export async function POST({
 
 		await db.update(tableMurid).set({ foto: finalFotoRef }).where(eq(tableMurid.id, id));
 
-		return new Response(JSON.stringify({ foto: finalFotoRef, message: 'Foto berhasil diperbarui' }), {
-			headers: { 'Content-Type': 'application/json' }
-		});
+		return new Response(
+			JSON.stringify({ foto: finalFotoRef, message: 'Foto berhasil diperbarui' }),
+			{
+				headers: { 'Content-Type': 'application/json' }
+			}
+		);
 	} catch (err) {
 		console.error('Upload error:', err);
 		return new Response(JSON.stringify({ message: 'Gagal upload foto' }), { status: 500 });

@@ -315,13 +315,14 @@
 							...users[idx],
 							username: body.user?.username ?? body.username ?? users[idx].username,
 							pegawaiName: body.displayName ?? users[idx].pegawaiName,
-							dapodikPtkId: body.dapodikPtkId !== undefined ? body.dapodikPtkId : users[idx].dapodikPtkId,
+							dapodikPtkId:
+								body.dapodikPtkId !== undefined ? body.dapodikPtkId : users[idx].dapodikPtkId,
 							sso: users[idx].sso
 								? {
 										...users[idx].sso,
 										ptkId:
 											body.dapodikPtkId !== undefined ? body.dapodikPtkId : users[idx].sso.ptkId
-								  }
+									}
 								: users[idx].sso,
 							type: newType,
 							roles: [typeLabels[newType] ?? newType],

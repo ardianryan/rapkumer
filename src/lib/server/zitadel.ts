@@ -12,6 +12,9 @@ export interface ZitadelLiveMetadata {
 	nik?: string;
 	nip?: string;
 	uuid?: string;
+	email?: string;
+	username?: string;
+	name?: string;
 	[key: string]: unknown;
 }
 
@@ -169,6 +172,29 @@ export async function exchangeZitadelCode(params: {
 }
 
 /**
+ * Helper untuk decode metadata ZITADEL yang mungkin di-base64 encode
+ */
+function decodeMetadataValue(val: unknown): string {
+	if (typeof val !== 'string') return val != null ? String(val) : '';
+	const trimmed = val.trim();
+	if (!trimmed) return '';
+	try {
+		if (/^[A-Za-z0-9+/=_-]+$/.test(trimmed) && trimmed.length % 4 === 0) {
+			const decoded = Buffer.from(trimmed, 'base64').toString('utf-8');
+			if (
+				/^[\x20-\x7E\s]+$/.test(decoded) &&
+				Buffer.from(decoded, 'utf-8').toString('base64') === trimmed
+			) {
+				return decoded.trim();
+			}
+		}
+	} catch {
+		// Nilai bukan base64 valid, kembalikan teks asli
+	}
+	return trimmed;
+}
+
+/**
  * Mengekstrak zitadel_live_metadata dari payload klaim ID token atau userinfo
  */
 export function extractZitadelMetadata(
@@ -182,28 +208,114 @@ export function extractZitadelMetadata(
 		return merged.zitadel_live_metadata as ZitadelLiveMetadata;
 	}
 
-	// 2. Cek klaim ber-prefix atau custom claims
+	// 2. Decode user metadata dari standard claims ZITADEL: 'urn:zitadel:iam:user:metadata'
+	const rawUserMetadata = (merged['urn:zitadel:iam:user:metadata'] ??
+		merged['urn:zitadel:iam:action:user:metadata'] ??
+		merged.metadata ??
+		{}) as Record<string, unknown>;
+
+	const metaMap: Record<string, string> = {};
+	if (typeof rawUserMetadata === 'object' && rawUserMetadata !== null) {
+		for (const [k, v] of Object.entries(rawUserMetadata)) {
+			metaMap[k.toLowerCase().trim()] = decodeMetadataValue(v);
+		}
+	}
+
+	// 3. Extract role dari ZITADEL project roles: 'urn:zitadel:iam:org:project:roles'
+	let extractedRole: string | undefined = undefined;
+	const projectRoles = (merged['urn:zitadel:iam:org:project:roles'] ??
+		merged['urn:zitadel:iam:project:roles']) as Record<string, unknown> | string[] | undefined;
+
+	if (projectRoles) {
+		if (Array.isArray(projectRoles)) {
+			extractedRole = projectRoles[0];
+		} else if (typeof projectRoles === 'object' && projectRoles !== null) {
+			const roleKeys = Object.keys(projectRoles);
+			for (const k of roleKeys) {
+				const norm = k.toLowerCase().trim();
+				if (
+					norm === 'guru' ||
+					norm === 'tendik' ||
+					norm === 'admin' ||
+					norm === 'teacher' ||
+					norm === 'staff'
+				) {
+					extractedRole = norm === 'teacher' ? 'guru' : norm === 'staff' ? 'tendik' : norm;
+					break;
+				}
+			}
+			if (!extractedRole && roleKeys.length > 0) {
+				extractedRole = roleKeys[0];
+			}
+		}
+	}
+
+	if (!extractedRole && Array.isArray(merged.roles) && merged.roles.length > 0) {
+		extractedRole = String(merged.roles[0]);
+	}
+	if (!extractedRole && typeof merged.role === 'string') {
+		extractedRole = merged.role;
+	}
+
+	const role =
+		metaMap['role'] || extractedRole || (merged.role ? String(merged.role).trim() : undefined);
+
+	const ptk_id =
+		metaMap['ptk_id'] ||
+		metaMap['dapodik_id'] ||
+		metaMap['ptkid'] ||
+		metaMap['dapodikptkid'] ||
+		(merged.ptk_id ? String(merged.ptk_id).trim() : '') ||
+		(merged.dapodik_id ? String(merged.dapodik_id).trim() : '');
+
+	const nip = metaMap['nip'] || (merged.nip ? String(merged.nip).trim() : undefined);
+
+	const nik = metaMap['nik'] || (merged.nik ? String(merged.nik).trim() : undefined);
+
+	const email = merged.email ? String(merged.email).trim().toLowerCase() : undefined;
+	const username = (
+		merged.preferred_username
+			? String(merged.preferred_username)
+			: merged.name
+				? String(merged.name)
+				: ''
+	).trim();
+
 	const metadata: ZitadelLiveMetadata = {
 		uuid: String(merged.sub ?? merged.uuid ?? ''),
-		ptk_id: String(merged.ptk_id ?? merged.dapodik_id ?? ''),
-		dapodik_id: String(merged.dapodik_id ?? merged.ptk_id ?? ''),
-		nip: merged.nip ? String(merged.nip) : undefined,
-		nik: merged.nik ? String(merged.nik) : undefined,
-		role: merged.role ? String(merged.role) : undefined,
-		source: merged.source ? String(merged.source) : undefined,
-		academic_year_id: merged.academic_year_id ? String(merged.academic_year_id) : undefined
+		ptk_id: ptk_id || undefined,
+		dapodik_id: ptk_id || undefined,
+		nip: nip || undefined,
+		nik: nik || undefined,
+		role: role || undefined,
+		email: email || undefined,
+		username: username || undefined,
+		name: merged.name ? String(merged.name).trim() : undefined,
+		source: metaMap['source'] || (merged.source ? String(merged.source) : undefined),
+		academic_year_id:
+			metaMap['academic_year_id'] ||
+			(merged.academic_year_id ? String(merged.academic_year_id) : undefined)
 	};
 
 	return metadata;
 }
 
 /**
- * Validasi Role: Hanya 'guru' dan 'tendik' yang diperbolehkan masuk.
+ * Validasi Role: Hanya peran yang secara eksplisit dilarang (misal: 'siswa', 'murid', 'orangtua')
+ * yang ditolak. Jika role belum ditentukan di Zitadel (undefined / ''), pengguna tetap diizinkan
+ * lanjut ke tahap pencocokan akun GTK di Rapkumer.
  */
 export function isAllowedZitadelRole(role: string | null | undefined): boolean {
-	if (!role) return false;
+	if (!role) return true;
 	const normalized = role.trim().toLowerCase();
-	return normalized === 'guru' || normalized === 'tendik';
+	return !(
+		normalized === 'siswa' ||
+		normalized === 'student' ||
+		normalized === 'murid' ||
+		normalized === 'orangtua' ||
+		normalized === 'wali_murid' ||
+		normalized === 'parent'
+	);
 }
 
 export type MatchResult =
@@ -284,7 +396,8 @@ export async function matchAndLinkZitadelUser(
 		}
 	}
 
-	// 3. Pencocokan Pertama Kali: Cari di tablePegawai berdasarkan dapodikPtkId atau NIP
+	// 3. Pencocokan Pertama Kali:
+	// a. Cari di tablePegawai berdasarkan dapodikPtkId atau NIP
 	let matchedPegawai: typeof tablePegawai.$inferSelect | undefined;
 
 	if (ptkId && nip) {
@@ -301,8 +414,38 @@ export async function matchAndLinkZitadelUser(
 		});
 	}
 
-	// Jika pegawai tidak ditemukan di Rapkumer
-	if (!matchedPegawai) {
+	// b. Cari akun auth_user yang sesuai jika pegawai ditemukan
+	let matchedAuthUser: typeof tableAuthUser.$inferSelect | undefined;
+
+	if (matchedPegawai) {
+		matchedAuthUser = await db.query.tableAuthUser.findFirst({
+			where: eq(tableAuthUser.pegawaiId, matchedPegawai.id)
+		});
+	} else {
+		// c. Jika pegawai belum ditemukan lewat PTK ID / NIP, cari lewat username atau email
+		const usernameCandidates = [
+			metadata.username?.toLowerCase().trim(),
+			metadata.email ? metadata.email.split('@')[0].toLowerCase().trim() : null
+		].filter((u): u is string => Boolean(u));
+
+		for (const u of usernameCandidates) {
+			const found = await db.query.tableAuthUser.findFirst({
+				where: or(eq(tableAuthUser.username, u), eq(tableAuthUser.usernameNormalized, u))
+			});
+			if (found) {
+				matchedAuthUser = found;
+				if (found.pegawaiId) {
+					matchedPegawai = await db.query.tablePegawai.findFirst({
+						where: eq(tablePegawai.id, found.pegawaiId)
+					});
+				}
+				break;
+			}
+		}
+	}
+
+	// Jika pegawai dan authUser sama sekali tidak ditemukan di Rapkumer
+	if (!matchedPegawai && !matchedAuthUser) {
 		return {
 			success: false,
 			code: 'PTK_NOT_FOUND',
@@ -313,19 +456,22 @@ export async function matchAndLinkZitadelUser(
 	}
 
 	// Jika dapodikPtkId di DB belum ada atau berbeda, sinkronkan sekarang
-	if (ptkId && (!matchedPegawai.dapodikPtkId || matchedPegawai.dapodikPtkId !== ptkId)) {
+	if (
+		matchedPegawai &&
+		ptkId &&
+		(!matchedPegawai.dapodikPtkId || matchedPegawai.dapodikPtkId !== ptkId)
+	) {
 		await db
 			.update(tablePegawai)
 			.set({ dapodikPtkId: ptkId })
 			.where(eq(tablePegawai.id, matchedPegawai.id));
 	}
 
-	// 4. Cari atau Buat Akun auth_user untuk Pegawai ini
-	let authUser = await db.query.tableAuthUser.findFirst({
-		where: eq(tableAuthUser.pegawaiId, matchedPegawai.id)
-	});
-
-	if (!authUser) {
+	// 4. Pastikan Akun auth_user tersedia
+	let authUserId: number;
+	if (matchedAuthUser) {
+		authUserId = matchedAuthUser.id;
+	} else if (matchedPegawai) {
 		// Buat akun auth_user otomatis jika belum dibuat admin
 		const cleanUsername = (
 			matchedPegawai.nama.toLowerCase().replace(/[^a-z0-9]/g, '') || `user${matchedPegawai.id}`
@@ -346,12 +492,19 @@ export async function matchAndLinkZitadelUser(
 			})
 			.returning();
 
-		authUser = createdUser;
+		authUserId = createdUser.id;
+	} else {
+		return {
+			success: false,
+			code: 'PTK_NOT_FOUND',
+			message: 'Data pengguna tidak valid.',
+			metadata
+		};
 	}
 
 	// 5. Tautkan ke tableAuthZitadelUser
 	await db.insert(tableAuthZitadelUser).values({
-		userId: authUser.id,
+		userId: authUserId,
 		zitadelUuid,
 		ptkId,
 		nip,
@@ -364,13 +517,13 @@ export async function matchAndLinkZitadelUser(
 
 	return {
 		success: true,
-		userId: authUser.id,
+		userId: authUserId,
 		isNewLink: true,
 		isOnboarded: false,
 		pegawai: {
-			id: matchedPegawai.id,
-			nama: matchedPegawai.nama,
-			nip: matchedPegawai.nip
+			id: matchedPegawai?.id ?? 0,
+			nama: matchedPegawai?.nama ?? metadata.name ?? metadata.username ?? 'Pengguna',
+			nip: matchedPegawai?.nip ?? nip ?? ''
 		}
 	};
 }

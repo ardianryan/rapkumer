@@ -18,10 +18,16 @@
 			</span>
 		</div>
 	{:else}
-		<div class="flex items-center gap-1.5" title={u.dapodikPtkId ? `PTK ID: ${u.dapodikPtkId}` : undefined}>
+		<div
+			class="flex items-center gap-1.5"
+			title={u.dapodikPtkId ? `PTK ID: ${u.dapodikPtkId}` : undefined}
+		>
 			<span class="badge badge-ghost badge-sm text-[11px] text-base-content/60"> Lokal </span>
 			{#if u.dapodikPtkId}
-				<span class="badge badge-info badge-soft badge-xs text-[10px]" title={`PTK ID: ${u.dapodikPtkId}`}>
+				<span
+					class="badge badge-info badge-soft badge-xs text-[10px]"
+					title={`PTK ID: ${u.dapodikPtkId}`}
+				>
 					PTK ID
 				</span>
 			{/if}
