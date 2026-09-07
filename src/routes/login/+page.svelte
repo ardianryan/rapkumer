@@ -334,6 +334,32 @@
 					</div>
 				{/snippet}
 			</FormEnhance>
+
+			<!-- SSO Section Divider & Button -->
+			{#if data.sso?.enabled}
+				<div class="pt-2 space-y-4">
+					<div class="relative flex items-center justify-center">
+						<div class="border-t border-slate-200 dark:border-slate-800 w-full"></div>
+						<span
+							class="bg-white dark:bg-slate-900 px-3 text-[11px] font-medium text-slate-400 uppercase tracking-wider shrink-0"
+						>
+							atau masuk dengan
+						</span>
+					</div>
+
+					<a
+						href={data.sso.loginUrl}
+						class="btn btn-outline border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-400 h-12 rounded-xl font-bold text-xs sm:text-sm tracking-wide w-full transition-all flex items-center justify-center gap-2.5 text-slate-700 dark:text-slate-200 shadow-sm"
+					>
+						<div
+							class="h-6 w-6 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0"
+						>
+							<Icon name="key" class="h-3.5 w-3.5" />
+						</div>
+						<span>{data.sso.buttonText}</span>
+					</a>
+				</div>
+			{/if}
 		</div>
 
 		<!-- Footer Panel Kanan -->

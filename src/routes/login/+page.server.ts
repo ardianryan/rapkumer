@@ -48,6 +48,8 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 		description: 'Masuk ke Rapkumer untuk mengelola data administrasi guru.'
 	};
 
+	const zitadelConfig = getZitadelConfig();
+
 	return {
 		meta,
 		appVersion: getAppVersion(),
@@ -58,7 +60,12 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 					nama: locals.sekolah.nama,
 					npsn: locals.sekolah.npsn
 				}
-			: null
+			: null,
+		sso: {
+			enabled: process.env.SSO_ENABLED !== 'false',
+			buttonText: zitadelConfig.buttonText,
+			loginUrl: '/api/auth/zitadel/login'
+		}
 	};
 };
 

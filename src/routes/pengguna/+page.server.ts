@@ -7,6 +7,7 @@ import {
 	tableMataPelajaran,
 	tableAuthUserMataPelajaran,
 	tableAuthUserKelas,
+	tableAuthZitadelUser,
 	tableMurid,
 	tableSemester
 } from '$lib/server/db/schema';
@@ -566,7 +567,7 @@ export async function load({ url, locals }) {
 	const allUserIds = users
 		.map((r) => r.id)
 		.filter((id): id is number => typeof id === 'number' && id > 0);
-	const [userMapelRows, userKelasRows] = allUserIds.length
+	const [userMapelRows, userKelasRows, userZitadelRows] = allUserIds.length
 		? await Promise.all([
 				db
 					.select({
@@ -581,9 +582,21 @@ export async function load({ url, locals }) {
 						kelasId: tableAuthUserKelas.kelasId
 					})
 					.from(tableAuthUserKelas)
-					.where(inArray(tableAuthUserKelas.authUserId, allUserIds))
+					.where(inArray(tableAuthUserKelas.authUserId, allUserIds)),
+				db
+					.select({
+						userId: tableAuthZitadelUser.userId,
+						zitadelUuid: tableAuthZitadelUser.zitadelUuid,
+						ptkId: tableAuthZitadelUser.ptkId,
+						nip: tableAuthZitadelUser.nip,
+						role: tableAuthZitadelUser.role,
+						isOnboarded: tableAuthZitadelUser.isOnboarded,
+						lastLoginAt: tableAuthZitadelUser.lastLoginAt
+					})
+					.from(tableAuthZitadelUser)
+					.where(inArray(tableAuthZitadelUser.userId, allUserIds))
 			])
-		: [[], []];
+		: [[], [], []];
 
 	const userMapelMap = new Map<number, number[]>();
 	for (const row of userMapelRows) {
@@ -597,13 +610,18 @@ export async function load({ url, locals }) {
 		arr.push(row.kelasId);
 		userKelasMap.set(row.userId, arr);
 	}
+	const userZitadelMap = new Map<number, (typeof userZitadelRows)[0]>();
+	for (const row of userZitadelRows) {
+		userZitadelMap.set(row.userId, row);
+	}
 
-	// Attach mapelIds/kelasIds to each user for edit modal
+	// Attach mapelIds/kelasIds/sso to each user for edit modal & table display
 	for (const user of users) {
 		const uid = user.id as number;
 		if (uid > 0) {
 			(user as Record<string, unknown>).mataPelajaranIds = userMapelMap.get(uid) ?? [];
 			(user as Record<string, unknown>).kelasIds = userKelasMap.get(uid) ?? [];
+			(user as Record<string, unknown>).sso = userZitadelMap.get(uid) ?? null;
 		}
 	}
 
@@ -1156,5 +1174,17 @@ export const actions = {
 			console.error('Failed to delete users', err);
 			return new Response(String(err), { status: 500 });
 		}
+	},
+
+	unlinkSso: async ({ request }) => {
+		authority('user_set_permissions');
+		const formData = await request.formData();
+		const userId = Number(formData.get('userId'));
+		if (!userId) {
+			return fail(400, { message: 'ID pengguna tidak valid.' });
+		}
+
+		await db.delete(tableAuthZitadelUser).where(eq(tableAuthZitadelUser.userId, userId));
+		return { success: true, message: 'Tautan akun SSO berhasil diputuskan.' };
 	}
 };

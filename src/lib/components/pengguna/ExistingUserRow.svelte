@@ -7,6 +7,21 @@
 <td>{(u.roles ?? []).join(', ')}</td>
 <td>{u.username ? u.username : '-'}</td>
 <td>
+	{#if u.sso}
+		<div
+			class="flex items-center gap-1.5"
+			title={`PTK ID: ${u.sso.ptkId || '-'} | NIP: ${u.sso.nip || '-'}`}
+		>
+			<span class="badge badge-success badge-soft badge-sm font-semibold text-[11px] gap-1">
+				<span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+				Tersinkronisasi
+			</span>
+		</div>
+	{:else}
+		<span class="badge badge-ghost badge-sm text-[11px] text-base-content/60"> Lokal </span>
+	{/if}
+</td>
+<td>
 	<div class="flex flex-row">
 		<button
 			class="btn btn-sm btn-soft rounded-r-none shadow-none"

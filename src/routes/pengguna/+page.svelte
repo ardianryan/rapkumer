@@ -18,6 +18,15 @@
 		mataPelajaranId?: number | null;
 		mataPelajaranIds?: number[];
 		kelasIds?: number[];
+		sso?: {
+			userId: number;
+			zitadelUuid: string;
+			ptkId?: string | null;
+			nip?: string | null;
+			role?: string | null;
+			isOnboarded?: boolean;
+			lastLoginAt?: string | null;
+		} | null;
 	};
 	// svelte-ignore state_referenced_locally
 	let users = $state<LocalUser[]>(data.users ?? []);
@@ -35,9 +44,18 @@
 	// selected ids for bulk actions
 	let selectedIds = $state<number[]>([]);
 
+	let activeTab = $state<'all' | 'local' | 'sso'>('all');
+	let filteredUsers = $derived(
+		activeTab === 'all'
+			? users
+			: activeTab === 'sso'
+				? users.filter((u) => Boolean(u.sso))
+				: users.filter((u) => !u.sso)
+	);
+
 	// selectable ids derived once per render (positive existing user ids)
 	let selectableIds = $derived(
-		users.map((u) => Number(u.id)).filter((n) => Number.isFinite(n) && n > 0)
+		filteredUsers.map((u) => Number(u.id)).filter((n) => Number.isFinite(n) && n > 0)
 	);
 
 	function toggleSelect(id: number) {
@@ -196,6 +214,33 @@
 			</div>
 			<UsersHeader {selectedIds} onDelete={handleDelete} onAdd={handleAdd} />
 		</header>
+
+		<!-- Filter Tabs: Semua / Lokal / SSO Auth -->
+		<div class="tabs tabs-box bg-base-200/60 p-1 rounded-2xl inline-flex w-fit text-xs">
+			<button
+				type="button"
+				class={`tab tab-sm font-medium transition-all rounded-xl ${activeTab === 'all' ? 'tab-active font-bold bg-white dark:bg-base-100 shadow-sm' : ''}`}
+				onclick={() => (activeTab = 'all')}
+			>
+				Semua Pengguna ({users.length})
+			</button>
+			<button
+				type="button"
+				class={`tab tab-sm font-medium transition-all rounded-xl ${activeTab === 'local' ? 'tab-active font-bold bg-white dark:bg-base-100 shadow-sm' : ''}`}
+				onclick={() => (activeTab = 'local')}
+			>
+				Pengguna Lokal ({users.filter((u) => !u.sso).length})
+			</button>
+			<button
+				type="button"
+				class={`tab tab-sm font-medium transition-all rounded-xl gap-1.5 ${activeTab === 'sso' ? 'tab-active font-bold bg-white dark:bg-base-100 shadow-sm text-emerald-600 dark:text-emerald-400' : ''}`}
+				onclick={() => (activeTab = 'sso')}
+			>
+				<span class="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
+				SSO Auth ({users.filter((u) => Boolean(u.sso)).length})
+			</button>
+		</div>
+
 		<div class="overflow-x-auto">
 			<table class="table">
 				<thead>
@@ -212,12 +257,13 @@
 						<th>Nama</th>
 						<th>Role</th>
 						<th>Nama Pengguna</th>
+						<th>Autentikasi</th>
 						<th>Aksi</th>
 						<th>Hak Akses</th>
 					</tr>
 				</thead>
 				<tbody>
-					{#each users as u (u.id)}
+					{#each filteredUsers as u (u.id)}
 						<tr>
 							<td>
 								<input

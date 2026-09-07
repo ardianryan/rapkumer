@@ -103,6 +103,41 @@ export const tableAuthSession = pgTable(
 	(table) => [unique().on(table.tokenHash), index('auth_session_user_id_idx').on(table.userId)]
 );
 
+export const tableAuthZitadelUser = pgTable(
+	'auth_zitadel_user',
+	{
+		id: serial().primaryKey(),
+		userId: integer()
+			.references(() => tableAuthUser.id, { onDelete: 'cascade' })
+			.notNull(),
+		zitadelUuid: text().notNull(),
+		ptkId: text(),
+		nip: text(),
+		nik: text(),
+		role: text(),
+		isOnboarded: boolean().default(false).notNull(),
+		rawMetadata: jsonb().$type<{
+			ptk_id?: string;
+			dapodik_id?: string;
+			source?: string;
+			academic_year_id?: string;
+			role?: string;
+			nik?: string;
+			nip?: string;
+			uuid?: string;
+			[key: string]: unknown;
+		}>(),
+		lastLoginAt: text(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.zitadelUuid),
+		unique().on(table.userId),
+		index('auth_zitadel_ptk_id_idx').on(table.ptkId),
+		index('auth_zitadel_user_id_idx').on(table.userId)
+	]
+);
+
 export const tableAlamat = pgTable('alamat', {
 	id: serial().primaryKey(),
 	jalan: text().notNull(),
@@ -331,12 +366,24 @@ export const tableAuthUserRelations = relations(tableAuthUser, ({ many, one }) =
 	sekolah: one(tableSekolah, {
 		fields: [tableAuthUser.sekolahId],
 		references: [tableSekolah.id]
+	}),
+	// optional relation to zitadel sso account
+	zitadelUser: one(tableAuthZitadelUser, {
+		fields: [tableAuthUser.id],
+		references: [tableAuthZitadelUser.userId]
 	})
 }));
 
 export const tableAuthSessionRelations = relations(tableAuthSession, ({ one }) => ({
 	user: one(tableAuthUser, {
 		fields: [tableAuthSession.userId],
+		references: [tableAuthUser.id]
+	})
+}));
+
+export const tableAuthZitadelUserRelations = relations(tableAuthZitadelUser, ({ one }) => ({
+	user: one(tableAuthUser, {
+		fields: [tableAuthZitadelUser.userId],
 		references: [tableAuthUser.id]
 	})
 }));
