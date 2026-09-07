@@ -12,14 +12,13 @@
 	type UserItem = typeof data.users extends Array<infer U> ? U : unknown;
 
 	// local reactive users copy so UI updates instantly without full reload
-	// extend with local-only fields used for inline add
-	interface LocalUser extends UserItem {
+	type LocalUser = (typeof data.users extends Array<infer U> ? U : any) & {
 		isNew?: boolean;
 		nama?: string;
 		mataPelajaranId?: number | null;
 		mataPelajaranIds?: number[];
 		kelasIds?: number[];
-	}
+	};
 	// svelte-ignore state_referenced_locally
 	let users = $state<LocalUser[]>(data.users ?? []);
 

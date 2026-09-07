@@ -1,5 +1,10 @@
 import { json } from '@sveltejs/kit';
-import { compareVersions, fetchLatestRelease, getAppVersion } from '$lib/server/update-manager';
+import {
+	compareVersions,
+	fetchLatestRelease,
+	getAppVersion,
+	isAppUpdateDisabled
+} from '$lib/server/update-manager';
 import { isAuthorizedUser } from '../../../pengguna/permissions';
 
 // require permission 'app_check_update' to use update APIs
@@ -13,8 +18,21 @@ export const GET = async ({ locals }) => {
 		);
 	}
 
+	const currentVersion = getAppVersion();
+
+	if (isAppUpdateDisabled()) {
+		return json(
+			{
+				currentVersion,
+				updateAvailable: false,
+				latest: null,
+				error: 'Pembaruan otomatis dinonaktifkan untuk versi kustom ini (SMA Negeri 1 Gedeg).'
+			},
+			{ status: 200 }
+		);
+	}
+
 	try {
-		const currentVersion = getAppVersion();
 		const latest = await fetchLatestRelease();
 		const updateAvailable = compareVersions(latest.version, currentVersion) > 0;
 
@@ -29,7 +47,7 @@ export const GET = async ({ locals }) => {
 		console.error('[updates] gagal memeriksa rilis terbaru', error);
 		return json(
 			{
-				currentVersion: getAppVersion(),
+				currentVersion,
 				updateAvailable: false,
 				latest: null,
 				error:

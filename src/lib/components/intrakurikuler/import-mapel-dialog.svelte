@@ -9,11 +9,7 @@
 		adaDataDapodik?: boolean;
 	}
 
-	let {
-		open = $bindable(false),
-		onSuccess,
-		adaDataDapodik = false
-	}: Props = $props();
+	let { open = $bindable(false), onSuccess, adaDataDapodik = false }: Props = $props();
 
 	const fileInputId = 'import-mapel-file';
 	let fileInput: HTMLInputElement | null = null;

@@ -199,7 +199,7 @@
 	}
 </script>
 
-<div class="navbar bg-base-100 border-base-200 sticky top-0 z-50">
+<div class="navbar glass-navbar sticky top-0 z-30 px-3 py-2 transition-colors">
 	<div class="flex-none lg:hidden">
 		<label for="my-drawer-2" class="btn btn-square btn-ghost drawer-button">
 			<span class="text-lg">
@@ -216,13 +216,17 @@
 			disabled={loadingFav}
 		>
 			<span class="text-xl">
-				<Icon name="star" class={isFavorited ? 'text-success fill-current' : ''} />
+				<Icon name="star" class={isFavorited ? 'text-warning fill-current' : ''} />
 			</span>
 		</button>
 	{/if}
-	<span class="mx-2 flex-1 truncate px-2 text-lg font-bold">{currentTitle}</span>
+	<span
+		class="font-display mx-2 flex-1 truncate px-2 text-base font-bold text-slate-800 md:text-lg dark:text-slate-100"
+	>
+		{currentTitle}
+	</span>
 	<div class="ml-auto flex-none">
-		<ul class="flex items-center px-1">
+		<ul class="flex items-center gap-1.5 px-1">
 			<!-- tasks modal for mobile -->
 			<li>
 				<button
@@ -248,137 +252,160 @@
 					title="Petunjuk"
 					onclick={showHelp}
 				>
-					<span class="text-xl">
+					<span class="text-lg opacity-80">
 						<Icon name="question" />
 					</span>
 				</button>
 			</li>
 
-			<!-- Dropdown ganti kelas -->
-			<li class="ml-2">
+			<!-- Dropdown ganti kelas aktif -->
+			<li>
 				<div class="dropdown dropdown-end">
 					<div
 						tabindex="0"
 						role="button"
-						title="Ganti kelas"
-						class="btn btn-soft rounded-full shadow-none"
+						title="Ganti kelas aktif"
+						class="badge badge-soft badge-primary font-semibold text-xs px-3 py-3 gap-1.5 cursor-pointer hover:opacity-90 transition-all shadow-xs"
 					>
-						<span class="hidden sm:block">{excerpt(kelasAktifLabel, 16)}</span>
-						<Icon name="users" class="sm:hidden" />
-						<Icon name="select" class="hidden sm:block" />
+						<Icon name="users" class="h-3.5 w-3.5" />
+						<span class="max-w-28 truncate">{excerpt(kelasAktifLabel, 14)}</span>
+						<Icon name="select" class="h-3 w-3 opacity-70" />
 					</div>
-					<ul
-						class="border-base-300 menu dropdown-content bg-base-100 ring-opacity-5 z-1 mt-5 mr-1 w-72 origin-top-right rounded-xl border p-4 shadow-xl focus:outline-none"
+					<div
+						class="dropdown-content bg-base-100 border border-slate-200/80 dark:border-slate-800 z-50 mt-3 w-64 rounded-2xl p-3 shadow-xl focus:outline-none"
 					>
-						<!-- alert akun admin -->
-						{#if user?.type === 'admin'}
-							<div role="alert" class="alert alert-info mb-4">
-								<Icon name="info" />
-								<span>Masuk sebagai <strong>Admin</strong></span>
-							</div>
-						{:else if user?.type === 'kepala_sekolah'}
-							<div role="alert" class="alert alert-info mb-4">
-								<Icon name="info" />
-								<span>
-									<strong>{displayUserName}</strong> - Kepala Sekolah
-								</span>
-							</div>
-						{:else if user?.type === 'user'}
-							<div role="alert" class="alert alert-info mb-4">
-								<Icon name="info" />
-								<span>
-									<strong>{displayUserName}</strong> - Guru Mapel
-								</span>
-							</div>
-						{:else if user?.type === 'wali_kelas' && isNonOwnClass}
-							<div role="alert" class="alert alert-info mb-4">
-								<Icon name="info" />
-								<span>
-									<strong>{displayUserName}</strong> - Guru Mapel
-								</span>
-							</div>
-						{:else if user?.type === 'wali_asuh'}
-							<div role="alert" class="alert alert-info mb-4">
-								<Icon name="info" />
-								<span>
-									<strong>{displayUserName}</strong> - Wali Asuh
-								</span>
-							</div>
-						{/if}
-
-						<div class="flex items-center gap-4">
-							<div
-								class="bg-base-300 dark:bg-base-200 flex h-14 w-14 items-center justify-center rounded-full"
-							>
-								<Icon name="user" class="text-4xl" />
-							</div>
-							<div class="flex flex-col gap-1">
-								<!-- Nama wali kelas -->
-								<p class="text-base-content text-sm font-semibold">
-									{kelasAktif?.waliKelas?.nama ?? 'Belum ada wali kelas'}
-								</p>
-								<!-- Nama kelas -->
-								<p class="text-base-content/70 text-xs">{kelasAktifLabel}</p>
-							</div>
+						<div class="px-2 py-1.5 border-b border-slate-200/60 dark:border-slate-800 mb-2">
+							<p class="text-xs font-bold text-base-content/80 uppercase tracking-wider">
+								Pilih Rombel / Kelas
+							</p>
 						</div>
-
 						{#if daftarKelas.length}
-							<details
-								class="bg-base-300 dark:bg-base-200 collapse-plus collapse mt-6 rounded-b-none"
-							>
-								<!-- opsi pindah kelas -->
-								<summary class="collapse-title font-semibold">Pindah Kelas</summary>
-								<div
-									class="border-base-100 flex max-h-[30vh] flex-col overflow-y-auto border-t-3 p-1"
-								>
-									{#each daftarKelas as kelas (kelas.id)}
-										{@const label = kelas.fase ? `${kelas.nama} - ${kelas.fase}` : kelas.nama}
-										<a
-											class="btn btn-ghost btn-sm justify-start text-left shadow-none"
-											href={buildKelasHref(kelas.id)}
-											onclick={handleKelasClick}
-											class:active={kelasAktif?.id === kelas.id}
-										>
-											{label}
-										</a>
-									{/each}
-								</div>
-							</details>
+							<div class="flex max-h-56 flex-col gap-1 overflow-y-auto pr-1">
+								{#each daftarKelas as kelas (kelas.id)}
+									{@const label = kelas.fase ? `${kelas.nama} - ${kelas.fase}` : kelas.nama}
+									<a
+										class="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all {kelasAktif?.id ===
+										kelas.id
+											? 'bg-primary text-primary-content font-bold shadow-xs'
+											: 'hover:bg-base-200 text-base-content/80'}"
+										href={buildKelasHref(kelas.id)}
+										onclick={handleKelasClick}
+									>
+										<span>{label}</span>
+										{#if kelasAktif?.id === kelas.id}
+											<Icon name="check" class="h-3.5 w-3.5" />
+										{/if}
+									</a>
+								{/each}
+							</div>
 						{:else}
-							<p class="text-base-content/70 mt-6 text-sm">
+							<p class="text-base-content/60 text-xs px-2 py-3">
 								Belum ada data kelas yang dapat dipilih.
 							</p>
 						{/if}
+					</div>
+				</div>
+			</li>
 
-						<li class="mt-1">
-							<a class="btn btn-sm rounded-none shadow-none" href="/pengaturan">
-								<Icon name="gear" />
-								Pengaturan
+			<!-- Dropdown profil pengguna -->
+			<li class="ml-1">
+				<div class="dropdown dropdown-end">
+					<div
+						tabindex="0"
+						role="button"
+						title="Profil pengguna"
+						class="btn btn-ghost btn-circle avatar shadow-none"
+					>
+						<div
+							class="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm border border-primary/20"
+						>
+							{(displayUserName || user?.username || 'U')[0].toUpperCase()}
+						</div>
+					</div>
+					<div
+						class="dropdown-content bg-base-100 border border-slate-200/80 dark:border-slate-800 z-50 mt-3 w-72 rounded-2xl p-4 shadow-xl focus:outline-none"
+					>
+						<!-- User Info Header -->
+						<div
+							class="flex items-center gap-3 pb-3 border-b border-slate-200/60 dark:border-slate-800"
+						>
+							<div
+								class="w-11 h-11 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-base border border-primary/20 shadow-xs"
+							>
+								{(displayUserName || user?.username || 'U')[0].toUpperCase()}
+							</div>
+							<div class="flex flex-col min-w-0">
+								<p class="font-bold text-sm text-base-content truncate">
+									{displayUserName || user?.username}
+								</p>
+								<div class="flex items-center gap-1.5 mt-0.5">
+									{#if user?.type === 'admin'}
+										<span class="badge badge-xs badge-primary font-medium">Admin</span>
+									{:else if user?.type === 'kepala_sekolah'}
+										<span class="badge badge-xs badge-info font-medium">Kepala Sekolah</span>
+									{:else if user?.type === 'wali_kelas'}
+										<span class="badge badge-xs badge-secondary font-medium">Wali Kelas</span>
+									{:else if user?.type === 'wali_asuh'}
+										<span class="badge badge-xs badge-accent font-medium">Wali Asuh</span>
+									{:else}
+										<span class="badge badge-xs badge-neutral font-medium">Guru Mapel</span>
+									{/if}
+									<span class="text-[10px] text-base-content/50">SMAN 1 Gedeg</span>
+								</div>
+							</div>
+						</div>
+
+						<!-- Links -->
+						<div class="py-2 flex flex-col gap-1">
+							<a
+								href="/pengaturan/profil"
+								class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-base-content/80 hover:bg-base-200 transition-all"
+							>
+								<Icon name="user" class="h-4 w-4 text-base-content/60" />
+								<span>Profil Saya</span>
 							</a>
-						</li>
-						{#if user}{/if}
-						<li class="mt-1 flex flex-row">
+							{#if user?.type === 'admin'}
+								<a
+									href="/pengguna"
+									class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-base-content/80 hover:bg-base-200 transition-all"
+								>
+									<Icon name="users" class="h-4 w-4 text-base-content/60" />
+									<span>Manajemen Pengguna</span>
+								</a>
+							{/if}
+							<a
+								href="/pengaturan"
+								class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-base-content/80 hover:bg-base-200 transition-all"
+							>
+								<Icon name="gear" class="h-4 w-4 text-base-content/60" />
+								<span>Pengaturan Aplikasi</span>
+							</a>
+						</div>
+
+						<!-- Actions -->
+						<div class="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex gap-2">
 							<button
-								class="btn btn-sm hover:btn-warning flex-1 rounded-tl-none rounded-r-none rounded-bl-lg shadow-none"
+								class="btn btn-sm btn-soft btn-error flex-1 rounded-xl shadow-none"
 								type="button"
-								title="Keluar dari aplikasi"
 								onclick={logout}
 								disabled={loggingOut}
 							>
-								<Icon name="export" />
-								{loggingOut ? 'Keluar…' : 'Keluar'}
+								<Icon name="export" class="h-3.5 w-3.5" />
+								<span>{loggingOut ? 'Keluar…' : 'Keluar'}</span>
 							</button>
-							<button
-								class="btn btn-sm hover:btn-error flex-1 rounded-l-none rounded-tr-none rounded-br-lg shadow-none"
-								type="button"
-								onclick={stopServer}
-								disabled={stoppingServer || !canStopServer}
-							>
-								<Icon name="power" />
-								{stoppingServer ? 'Menghentikan server…' : 'Stop Server'}
-							</button>
-						</li>
-					</ul>
+							{#if canStopServer}
+								<button
+									class="btn btn-sm btn-ghost text-base-content/60 hover:text-error rounded-xl shadow-none"
+									type="button"
+									title="Stop Server"
+									onclick={stopServer}
+									disabled={stoppingServer}
+								>
+									<Icon name="power" class="h-3.5 w-3.5" />
+								</button>
+							{/if}
+						</div>
+					</div>
 				</div>
 			</li>
 		</ul>

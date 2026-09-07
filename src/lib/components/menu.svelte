@@ -175,21 +175,29 @@
 
 {#snippet menu_item(item: MenuItem)}
 	{@const active = isMenuActive(page.url.pathname, item.path)}
-	<li>
+	<li class="w-full">
 		{#if item.subMenu}
-			<details open={expanded.value || !!search}>
-				<summary>
+			<details open={expanded.value || !!search} class="group w-full">
+				<summary
+					class="w-full rounded-xl py-2 px-2.5 text-xs font-semibold text-base-content/80 hover:bg-base-200/80 hover:text-base-content transition-colors flex items-center"
+				>
 					{@render menu_item_label(item)}
 				</summary>
-				<ul>
+				<ul
+					class="my-0.5 space-y-0.5 border-l-2 border-slate-200/80 dark:border-slate-800 ml-3 pl-1.5 w-full flex-col flex-nowrap"
+				>
 					{#each item.subMenu as menu (menu.path ?? menu.title)}
 						{@render menu_item(menu)}
 					{/each}
 				</ul>
 			</details>
 		{:else}
-			<!-- `class:menu-active` is shorthand for `class="{active ? 'menu-active': ''}"` -->
-			<a class:menu-active={active} href={item.path}>
+			<a
+				class="w-full rounded-xl py-2 px-2.5 text-xs font-medium transition-all flex items-center {active
+					? 'bg-primary/10 text-primary font-bold shadow-2xs'
+					: 'text-base-content/75 hover:bg-base-200/80 hover:text-base-content'}"
+				href={item.path}
+			>
 				{@render menu_item_label(item)}
 			</a>
 		{/if}
@@ -198,38 +206,46 @@
 
 {#snippet menu_item_label(item: MenuItem)}
 	{#if item.icon}
-		<Icon name={item.icon} />
+		<Icon name={item.icon} class="h-4 w-4 shrink-0 opacity-80" />
 	{/if}
-	<span>{@html searchQueryMarker(search, item.title)}</span>
+	<span class="truncate">{@html searchQueryMarker(search, item.title)}</span>
 	{#if search && item.tags?.length}
-		<div class="badge badge-xs badge-accent" title="Termasuk di dalam menu">tag</div>
+		<div
+			class="badge badge-xs badge-soft badge-primary ml-auto text-[10px]"
+			title="Termasuk di dalam menu"
+		>
+			tag
+		</div>
 	{/if}
 {/snippet}
 
-<div class="flex-1">
-	<div class="mb-3 flex gap-1">
-		<label class="input bg-base-200 dark:bg-base-300 rounded-box dark:border-none">
-			<Icon name="search" />
-			<input type="search" class="grow" bind:value={search} placeholder="Cari menu" />
+<div class="flex-1 flex flex-col min-h-0 w-full">
+	<div class="mb-2.5 flex items-center gap-1.5 shrink-0 w-full">
+		<label
+			class="input input-sm border-slate-200/80 dark:border-slate-800/80 bg-slate-100/80 dark:bg-base-200 rounded-xl flex items-center gap-2 grow px-3 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all"
+		>
+			<Icon name="search" class="h-3.5 w-3.5 text-base-content/50 shrink-0" />
+			<input type="search" class="grow text-xs" bind:value={search} placeholder="Cari menu..." />
 		</label>
 		<label
-			class="btn swap btn-square rounded-box shadow-none"
+			class="btn btn-sm btn-ghost btn-square rounded-xl text-base-content/60 hover:bg-base-200 shadow-none cursor-pointer shrink-0"
 			title={expanded.value ? 'Sempitkan menu' : 'Luaskan menu'}
 		>
-			<input type="checkbox" bind:checked={expanded.value} />
-			<span class="swap-on"><Icon name="expand-all" /></span>
-			<span class="swap-off"><Icon name="collapse-all" /></span>
+			<input type="checkbox" class="hidden" bind:checked={expanded.value} />
+			<Icon name={expanded.value ? 'collapse-all' : 'expand-all'} class="h-4 w-4" />
 		</label>
 	</div>
-	<div
-		class="lg:bg-base-200 lg:rounded-box lg:max-h-[calc(100vh-13.5rem)] lg:overflow-y-auto lg:shadow-inner"
-	>
-		{#each menuItems as menu (menu.path ?? menu.title)}
-			{@render menu_item(menu)}
-		{:else}
-			<li>
-				<span class="italic opacity-50 text-sm"> Tidak ada hasil pencarian </span>
-			</li>
-		{/each}
+	<div class="flex-1 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-14rem)] pr-0.5 w-full">
+		<ul class="menu menu-sm p-0 w-full flex-col flex-nowrap space-y-0.5">
+			{#each menuItems as menu (menu.path ?? menu.title)}
+				{@render menu_item(menu)}
+			{:else}
+				<li>
+					<span class="italic text-base-content/50 text-xs px-2 py-3"
+						>Tidak ada hasil pencarian</span
+					>
+				</li>
+			{/each}
+		</ul>
 	</div>
 </div>

@@ -23,8 +23,23 @@ const DEFAULT_DB_URL = 'file:./data/database.sqlite3';
  * file, and we fall back to the installer's fixed `%LOCALAPPDATA%\Rapkumer-data`
  * path so backup/reset/import still target a live database.
  */
+export function getEffectiveDatabaseUrl(): string {
+	return process.env.DB_URL || env.DB_URL || DEFAULT_DB_URL;
+}
+
+export function isPostgresDatabaseUrl(url?: string): boolean {
+	const effective = url || getEffectiveDatabaseUrl();
+	return effective.startsWith('postgres://') || effective.startsWith('postgresql://');
+}
+
 export function resolveDatabasePath() {
-	const dbUrl = process.env.DB_URL || env.DB_URL || DEFAULT_DB_URL;
+	const dbUrl = getEffectiveDatabaseUrl();
+	if (isPostgresDatabaseUrl(dbUrl)) {
+		throw error(
+			400,
+			'Operasi berkas database fisik hanya didukung untuk SQLite. Database aktif adalah PostgreSQL.'
+		);
+	}
 	if (!dbUrl.startsWith('file:')) {
 		throw error(500, 'Database URL tidak didukung');
 	}

@@ -1,9 +1,15 @@
 import { env } from '$env/dynamic/private';
 import path from 'node:path';
 import fs from 'node:fs';
-import { createClient, type Client } from '@libsql/client';
-import { drizzle } from 'drizzle-orm/libsql/node';
-import * as schema from './schema';
+import { createClient, type Client as LibsqlClient } from '@libsql/client';
+import { drizzle as drizzleLibsql } from 'drizzle-orm/libsql/node';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
+import postgres, { type Sql as PgClient } from 'postgres';
+import { drizzle as drizzlePg } from 'drizzle-orm/postgres-js';
+import * as schemaSqlite from './schema';
+import * as schemaPg from './schema.pg';
+import type { UnifiedDatabaseClient } from './client-types';
+import { translateSqliteToPostgres } from './sql-translate';
 
 const defaultDbUrl = 'file:./data/database.sqlite3';
 
@@ -40,7 +46,7 @@ function loadDotEnvIfPresent() {
 
 loadDotEnvIfPresent();
 
-function resolveInstalledDbUrl() {
+export function resolveInstalledDbUrl() {
 	// Prefer an explicit runtime `process.env.DB_URL` first (allows .env or env vars at node runtime),
 	// then SvelteKit's dynamic `env.DB_URL`.
 	if (process.env.DB_URL) return process.env.DB_URL;
@@ -50,9 +56,14 @@ function resolveInstalledDbUrl() {
 	// local development and packaged runs default to `data/database.sqlite3`.
 	return defaultDbUrl;
 }
-const clientKey = '__rapkumerLibsqlClient';
 
-async function enableWAL(client: Client) {
+export function isPostgresUrl(url: string) {
+	return url.startsWith('postgres://') || url.startsWith('postgresql://');
+}
+
+const clientKey = '__rapkumerActiveClient';
+
+async function enableWAL(client: LibsqlClient) {
 	try {
 		await client.execute('PRAGMA journal_mode=WAL');
 		await client.execute('PRAGMA synchronous=NORMAL');
@@ -62,41 +73,147 @@ async function enableWAL(client: Client) {
 	}
 }
 
-function createClientInstance(): Client {
+async function initPostgresCollation(client: PgClient) {
+	try {
+		await client.unsafe(
+			`CREATE COLLATION IF NOT EXISTS nocase (provider = icu, locale = 'und-u-ks-level2', deterministic = false)`
+		);
+	} catch {
+		try {
+			await client.unsafe(`CREATE COLLATION IF NOT EXISTS nocase (provider = libc, locale = 'C')`);
+		} catch (e) {
+			console.warn('[db] could not register nocase collation in PostgreSQL:', e);
+		}
+	}
+}
+
+function createClientBundle(): { client: UnifiedDatabaseClient; dbInstance: unknown } {
 	const url = resolveInstalledDbUrl();
+	const isPg = isPostgresUrl(url);
+
+	if (isPg) {
+		console.info(`[db] connecting to PostgreSQL: ${url.replace(/:[^:@]+@/, ':****@')}`);
+		const maxConnections = Number(process.env.PG_MAX_CONNECTIONS || 20);
+		const pgClient = postgres(url, {
+			max: maxConnections,
+			idle_timeout: 30,
+			connect_timeout: 10,
+			onnotice: () => {}
+		});
+
+		// Asynchronously ensure nocase collation exists
+		initPostgresCollation(pgClient).catch((e) => {
+			console.warn('[db] background nocase collation check failed:', e);
+		});
+
+		const dbInstance = drizzlePg(pgClient, { casing: 'snake_case', schema: schemaPg });
+
+		const unifiedClient: UnifiedDatabaseClient = {
+			isPostgres: true,
+			execute: async (statement: string | { sql: string; args?: unknown[] }) => {
+				const sqlStr = (typeof statement === 'string' ? statement : statement.sql).trim();
+				// Intercept SQLite PRAGMAs gracefully
+				if (/^pragma\s+/i.test(sqlStr)) {
+					const tableInfoMatch = sqlStr.match(
+						/pragma\s+table_info\s*\(\s*["']?([^"')]+)["']?\s*\)/i
+					);
+					if (tableInfoMatch) {
+						const table = tableInfoMatch[1].toLowerCase();
+						const cols = await pgClient.unsafe(
+							`SELECT column_name AS name FROM information_schema.columns WHERE table_name = '${table}'`
+						);
+						return { rows: cols as unknown as unknown[] };
+					}
+					// Other pragmas (wal, synchronous, timeout) are no-ops on PG
+					return { rows: [] };
+				}
+				// Intercept SQLite sqlite_master table existence queries
+				if (/sqlite_master/i.test(sqlStr)) {
+					const args = typeof statement === 'object' && statement.args ? statement.args : [];
+					const tableMatch = sqlStr.match(/name\s*=\s*['"]?([^'")\s]+)['"]?/i);
+					const tableName = (
+						args[0] ? String(args[0]) : tableMatch ? tableMatch[1] : ''
+					).toLowerCase();
+					const tables = await pgClient.unsafe(
+						`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '${tableName}'`
+					);
+					return { rows: tables as unknown as unknown[] };
+				}
+
+				const translatedSql = translateSqliteToPostgres(sqlStr);
+				try {
+					const res = await pgClient.unsafe(translatedSql);
+					return { rows: res as unknown as unknown[] };
+				} catch (e: unknown) {
+					const msg = String(e || '').toLowerCase();
+					if (
+						msg.includes('already exists') ||
+						msg.includes('duplicate') ||
+						(msg.includes('relation') && msg.includes('exists'))
+					) {
+						return { rows: [] };
+					}
+					throw e;
+				}
+			},
+			close: async () => {
+				await pgClient.end();
+			}
+		};
+
+		Object.assign(dbInstance as object, { $client: unifiedClient });
+		return { client: unifiedClient, dbInstance };
+	}
+
+	// Default: LibSQL / SQLite
 	const authToken = env.DB_AUTH_TOKEN;
 	console.info(
 		`[db] creating libsql client; DB_URL=${url ? url : '(none)'}${authToken ? ' (auth token present)' : ''}`
 	);
-	return createClient({ url, authToken });
+	if (url.startsWith('file:')) {
+		const filePath = path.resolve(process.cwd(), url.replace(/^file:/, ''));
+		const dir = path.dirname(filePath);
+		if (!fs.existsSync(dir)) {
+			fs.mkdirSync(dir, { recursive: true });
+		}
+	}
+	const libsqlClient = createClient({ url, authToken });
+	enableWAL(libsqlClient);
+
+	const dbInstance = drizzleLibsql(libsqlClient, { casing: 'snake_case', schema: schemaSqlite });
+
+	const unifiedClient: UnifiedDatabaseClient = {
+		isPostgres: false,
+		execute: async (statement: string | { sql: string }) => {
+			const res = await libsqlClient.execute(statement);
+			return { rows: res.rows as unknown as unknown[] };
+		},
+		close: async () => {
+			libsqlClient.close();
+		}
+	};
+
+	Object.assign(dbInstance as object, { $client: unifiedClient });
+	return { client: unifiedClient, dbInstance };
 }
 
-// create or reuse a client stored on globalThis so hot-reloads keep using same connection
-function initClient(): Client {
-	const store = globalThis as unknown as Record<string, Client | undefined>;
-	const existing = store[clientKey];
-	if (existing) return existing;
-
-	const client = createClientInstance();
-	store[clientKey] = client;
-	enableWAL(client);
-	return client;
+function initClientAndDb() {
+	const store = globalThis as unknown as Record<string, UnifiedDatabaseClient | undefined>;
+	const bundle = createClientBundle();
+	store[clientKey] = bundle.client;
+	return bundle;
 }
 
-let currentClient: Client = initClient();
-let currentDb = drizzle(currentClient, { casing: 'snake_case', schema });
+let { dbInstance: currentDb } = initClientAndDb();
 
 export async function closeDbClient() {
-	const store = globalThis as unknown as Record<string, Client | undefined>;
+	const store = globalThis as unknown as Record<string, UnifiedDatabaseClient | undefined>;
 	const existing = store[clientKey];
 	if (existing) {
-		const maybeClose = (existing as unknown as { close?: () => Promise<void> | void }).close;
-		if (typeof maybeClose === 'function') {
-			try {
-				await maybeClose.call(existing);
-			} catch (e) {
-				console.warn('[db] error closing existing client:', e);
-			}
+		try {
+			await existing.close();
+		} catch (e) {
+			console.warn('[db] error closing existing client:', e);
 		}
 	}
 	delete store[clientKey];
@@ -105,13 +222,11 @@ export async function closeDbClient() {
 export async function reloadDbClient() {
 	try {
 		await closeDbClient();
-		const client = createClientInstance();
-		const store = globalThis as unknown as Record<string, Client | undefined>;
-		store[clientKey] = client;
-		await enableWAL(client);
-		currentClient = client;
-		currentDb = drizzle(currentClient, { casing: 'snake_case', schema });
-		console.info('[db] reloaded libsql client and drizzle instance');
+		const bundle = createClientBundle();
+		const store = globalThis as unknown as Record<string, UnifiedDatabaseClient | undefined>;
+		store[clientKey] = bundle.client;
+		currentDb = bundle.dbInstance;
+		console.info('[db] reloaded database client and drizzle instance');
 	} catch (e) {
 		console.error('[db] failed to reload client', e);
 	}
@@ -123,17 +238,20 @@ const dbProxy = new Proxy(
 	{},
 	{
 		get(_t, prop) {
-			const target = currentDb as unknown as Record<string, unknown>;
-			const v = (target as Record<string, unknown>)[String(prop)];
-			if (typeof v === 'function')
-				return (v as unknown as (...args: unknown[]) => unknown).bind(target);
+			const target = currentDb as Record<string, unknown>;
+			const v = target[String(prop)];
+			if (typeof v === 'function') return (v as (...args: unknown[]) => unknown).bind(target);
 			return v;
 		},
 		set(_t, prop, value) {
-			(currentDb as unknown as Record<string, unknown>)[String(prop)] = value;
+			(currentDb as Record<string, unknown>)[String(prop)] = value;
 			return true;
 		}
 	}
 );
 
-export default dbProxy as unknown as typeof currentDb;
+export type AppDatabase = LibSQLDatabase<typeof schemaSqlite> & {
+	$client: UnifiedDatabaseClient;
+};
+
+export default dbProxy as unknown as AppDatabase;

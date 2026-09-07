@@ -65,6 +65,17 @@ function findChromeExecutable(): string | undefined {
 		}
 		return undefined;
 	}
+	if (process.platform === 'darwin') {
+		const macPaths = [
+			'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+			'/Applications/Chromium.app/Contents/MacOS/Chromium',
+			'/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
+		];
+		for (const p of macPaths) {
+			if (existsSync(p)) return p;
+		}
+		return undefined;
+	}
 	const commonPaths = [
 		'/usr/bin/google-chrome-stable',
 		'/usr/bin/google-chrome',

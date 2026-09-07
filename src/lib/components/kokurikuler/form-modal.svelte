@@ -63,14 +63,14 @@
 		<div class="modal-box flex max-h-[85vh] flex-col p-4 sm:max-w-2xl">
 			<h3 class="shrink-0 text-lg font-bold">{title}</h3>
 
-		<div class="min-h-0 flex-1 overflow-y-auto px-1 py-4">
-			<FormEnhance
-				id="form-kokurikuler"
-				class="space-y-4"
-				{action}
-				onsuccess={onSuccess}
-				submitStateChange={(v) => (submitting = v)}
-			>
+			<div class="min-h-0 flex-1 overflow-y-auto px-1 py-4">
+				<FormEnhance
+					id="form-kokurikuler"
+					class="space-y-4"
+					{action}
+					onsuccess={onSuccess}
+					submitStateChange={(v) => (submitting = v)}
+				>
 					{#snippet children()}
 						<input name="kelasId" value={kelasId ?? ''} hidden />
 						{#if isEditMode && modalItem}
@@ -88,7 +88,8 @@
 											value={dimensi.key}
 											name="dimensi"
 											checked={selectedDimensions.includes(dimensi.key)}
-											onchange={(event) => onToggleDimension(dimensi.key, event.currentTarget.checked)}
+											onchange={(event) =>
+												onToggleDimension(dimensi.key, event.currentTarget.checked)}
 											aria-label={dimensi.label}
 										/>
 										<div class="flex flex-col">
@@ -121,7 +122,8 @@
 								placeholder="Ketik kegiatan atau tema kegiatan kokurikuler"
 								name="kokurikuler"
 								value={tujuanInput}
-								oninput={(event) => onTujuanChange((event.currentTarget as HTMLTextAreaElement).value)}
+								oninput={(event) =>
+									onTujuanChange((event.currentTarget as HTMLTextAreaElement).value)}
 								required
 								disabled={!canManage}></textarea>
 						</div>

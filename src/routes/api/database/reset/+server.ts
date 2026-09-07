@@ -1,4 +1,4 @@
-import { error, json } from '@sveltejs/kit';
+import { error, json, type RequestEvent } from '@sveltejs/kit';
 import { copyFile, mkdir, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import db from '$lib/server/db';
@@ -12,7 +12,7 @@ function delay(ms: number): Promise<void> {
 	return new Promise((r) => setTimeout(r, ms));
 }
 
-export async function POST({ request, cookies }) {
+export async function POST({ request, cookies }: RequestEvent) {
 	// Verify the caller is an admin/kepala_sekolah before touching anything.
 	const existingToken = cookies?.get?.(cookieNames.AUTH_SESSION);
 	if (!existingToken) {
@@ -47,8 +47,29 @@ export async function POST({ request, cookies }) {
 
 	console.info('[database-reset] permintaan reset diverifikasi');
 
+	// ── Handle PostgreSQL Reset ──
+	if (db.$client?.isPostgres) {
+		const client = db.$client;
+		try {
+			const tablesRes = await client.execute(
+				`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';`
+			);
+			for (const row of tablesRes.rows as Array<{ table_name: string }>) {
+				await client.execute(`DROP TABLE IF EXISTS "${row.table_name}" CASCADE;`);
+			}
+			console.info('[database-reset] semua tabel postgres berhasil di-drop');
+			resetStartupEnsures();
+			await runStartupEnsures();
+			return json({ success: true, message: 'Database PostgreSQL berhasil direset' });
+		} catch (e: unknown) {
+			const err = e as { message?: string } | undefined;
+			console.error('[database-reset] gagal reset postgres:', e);
+			throw error(500, 'Gagal mengosongkan database PostgreSQL: ' + (err?.message || String(e)));
+		}
+	}
+
 	// ── Step 1: Checkpoint WAL via the live connection ──
-	const libsql = db.$client as { execute: (q: { sql: string }) => Promise<unknown> };
+	const libsql = db.$client;
 	try {
 		await libsql.execute({ sql: 'PRAGMA wal_checkpoint(FULL)' });
 	} catch (err) {

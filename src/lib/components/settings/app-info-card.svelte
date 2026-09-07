@@ -2,7 +2,6 @@
 	/* eslint-disable svelte/no-navigation-without-resolve -- card uses links for internal navigation */
 	import { browser } from '$app/environment';
 	import Icon from '$lib/components/icon.svelte';
-	import UpdateModal from '$lib/components/settings/update-modal.svelte';
 	import { toast } from '$lib/components/toast.svelte';
 	import { onMount } from 'svelte';
 
@@ -21,7 +20,6 @@
 	// svelte-ignore state_referenced_locally
 	let appAddress = $state(addresses[0] ?? '');
 	let copying = $state(false);
-	let updateModalOpen = $state(false);
 
 	onMount(() => {
 		if (!appAddress && browser) {
@@ -71,7 +69,10 @@
 				<p class="text-base-content/70 text-sm">
 					Pengaturan tambahan untuk lingkungan server lokal.
 				</p>
-				<p class="text-base-content/60 text-xs">Versi terpasang: v{currentVersion}</p>
+				<p class="text-base-content/60 text-xs">
+					Versi terpasang: v{currentVersion}
+					<span class="badge badge-soft badge-primary ml-1 text-xs">SMAN 1 Gedeg (Kustom)</span>
+				</p>
 			</div>
 		</header>
 
@@ -116,17 +117,14 @@
 			</p>
 		</fieldset>
 	</div>
-	<UpdateModal open={updateModalOpen} {currentVersion} on:close={() => (updateModalOpen = false)} />
 	<div class="mt-4 flex flex-col justify-between gap-2 sm:flex-row">
 		{#if isAdmin}
-			<button
-				class="btn btn-soft btn-secondary shadow-none sm:self-start"
-				type="button"
-				onclick={() => (updateModalOpen = true)}
+			<div
+				class="flex items-center gap-2 text-xs text-base-content/70 self-center sm:self-auto py-1"
 			>
-				<Icon name="download" />
-				Cek Update
-			</button>
+				<span class="badge badge-soft badge-neutral text-xs">Custom Build</span>
+				<span class="text-base-content/60">Pembaruan upstream dinonaktifkan</span>
+			</div>
 		{/if}
 		<div class="flex flex-col gap-2 sm:flex-row">
 			{#if isAdmin}

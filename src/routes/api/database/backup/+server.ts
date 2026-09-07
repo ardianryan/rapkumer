@@ -4,6 +4,36 @@ import db from '$lib/server/db';
 import { resolveDatabasePath } from '$lib/server/db-url';
 
 export async function GET() {
+	// Handle PostgreSQL
+	if (db.$client?.isPostgres) {
+		try {
+			const client = db.$client;
+			const tablesRes = await client.execute(
+				`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';`
+			);
+			const backupData: Record<string, unknown[]> = {};
+			for (const row of tablesRes.rows as Array<{ table_name: string }>) {
+				const tableName = row.table_name;
+				const dataRes = await client.execute(`SELECT * FROM "${tableName}"`);
+				backupData[tableName] = dataRes.rows;
+			}
+			const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+			const filename = `rapkumer-backup-${timestamp}.json`;
+			const jsonStr = JSON.stringify(backupData, null, 2);
+			return new Response(jsonStr, {
+				headers: {
+					'Content-Type': 'application/json',
+					'Content-Disposition': `attachment; filename="${filename}"`
+				}
+			});
+		} catch (e: unknown) {
+			const err = e as { message?: string } | undefined;
+			console.error('[backup] PostgreSQL backup failed:', e);
+			throw error(500, 'Gagal membuat backup database PostgreSQL: ' + (err?.message || String(e)));
+		}
+	}
+
+	// Handle SQLite
 	const dbPath = resolveDatabasePath();
 
 	try {
@@ -15,7 +45,7 @@ export async function GET() {
 
 	// Checkpoint WAL on the main server client to flush all changes to the main DB file
 	try {
-		await (db.$client as { execute: (sql: { sql: string }) => Promise<unknown> }).execute({
+		await db.$client.execute({
 			sql: 'PRAGMA wal_checkpoint(FULL)'
 		});
 	} catch (err) {

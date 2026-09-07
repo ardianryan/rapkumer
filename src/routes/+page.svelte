@@ -213,9 +213,8 @@
 		return () => clearInterval(id);
 	});
 
-	let nextEventMessage = $state('');
-	$effect(() => {
-		nextEventMessage = computeNextEventMessage({
+	const nextEventMessage = $derived.by(() => {
+		return computeNextEventMessage({
 			now: _now,
 			bellActive,
 			isHoliday,
@@ -318,6 +317,23 @@
 		});
 	}
 
+	const greeting = $derived.by(() => {
+		const hour = _now.getHours();
+		if (hour < 11) return 'Selamat Pagi';
+		if (hour < 15) return 'Selamat Siang';
+		if (hour < 18) return 'Selamat Sore';
+		return 'Selamat Malam';
+	});
+
+	const userName = $derived(
+		(data.user as { pegawaiName?: string; namaLengkap?: string; username?: string } | null)
+			?.pegawaiName ||
+			(data.user as { pegawaiName?: string; namaLengkap?: string; username?: string } | null)
+				?.namaLengkap ||
+			data.user?.username ||
+			'Bapak/Ibu Guru'
+	);
+
 	onMount(() => {
 		checkPresensiFallback();
 		// Re-check whenever a dialog closes (catches the teacher force-closing the modal).
@@ -327,7 +343,44 @@
 	});
 </script>
 
-<BellStatus {bellActive} {hariIni} {nextEventMessage} class="alert alert-info alert-soft mb-4" />
+<!-- Hero Banner Selamat Datang -->
+<div
+	class="card-clean mb-4 flex flex-col items-start justify-between gap-4 border border-slate-200/80 bg-gradient-to-r from-white via-slate-50 to-blue-50/40 p-5 sm:flex-row sm:items-center sm:p-6 dark:border-slate-800 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800"
+>
+	<div class="space-y-1">
+		<div class="flex items-center gap-2">
+			<span class="badge badge-sm badge-soft badge-primary font-semibold text-[11px]">
+				SMA Negeri 1 Gedeg
+			</span>
+			<span class="text-base-content/60 text-xs font-medium">
+				{hariIni}
+			</span>
+		</div>
+		<h1
+			class="font-display text-slate-800 text-xl font-extrabold tracking-tight sm:text-2xl dark:text-slate-100"
+		>
+			{greeting}, {userName}!
+		</h1>
+		<p class="text-base-content/70 text-xs sm:text-sm">
+			Selamat datang di portal administrasi guru dan penilaian rapor terpadu.
+		</p>
+	</div>
+	{#if bellActive && nextEventMessage}
+		<div
+			class="flex shrink-0 items-center gap-2.5 rounded-xl border border-blue-200/60 bg-blue-50 px-3.5 py-2 dark:border-blue-800/60 dark:bg-blue-950/40"
+		>
+			<Icon name="calendar" class="text-primary h-4 w-4 shrink-0" />
+			<div class="text-xs">
+				<p class="text-primary font-bold">Jadwal & Bel Sekolah</p>
+				<p class="text-primary/80 font-mono text-[11px]">{nextEventMessage}</p>
+			</div>
+		</div>
+	{/if}
+</div>
+
+{#if (!bellActive || !nextEventMessage) && nextEventMessage}
+	<BellStatus {bellActive} {hariIni} {nextEventMessage} class="alert alert-info alert-soft mb-4" />
+{/if}
 
 {#if presensiWarningVisible}
 	<div class="alert alert-warning alert-soft mb-4 flex items-center gap-3">
@@ -364,3 +417,23 @@
 		<QuickActionsCard />
 	</div>
 </div>
+
+<!-- Footer Dashboard -->
+<footer
+	class="mt-8 pt-4 border-t border-slate-200/70 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-base-content/60 pb-4"
+>
+	<p>
+		{sekolah?.nama ?? 'SMA Negeri 1 Gedeg'} • Portal Administrasi Guru & Penilaian Rapor
+	</p>
+	<p>
+		Powered by
+		<a
+			href="https://github.com/sira313/rapkumer"
+			target="_blank"
+			rel="noreferrer noopener"
+			class="font-semibold text-primary hover:underline"
+		>
+			Rapkumer
+		</a>
+	</p>
+</footer>

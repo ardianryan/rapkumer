@@ -1,7 +1,7 @@
-import { error, json } from '@sveltejs/kit';
+import { error, json, type RequestEvent } from '@sveltejs/kit';
 import { copyFile, mkdir, stat, writeFile, unlink } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { closeDbClient, reloadDbClient } from '$lib/server/db';
+import db, { closeDbClient, reloadDbClient } from '$lib/server/db';
 import { resolveDatabasePath } from '$lib/server/db-url';
 import { runStartupEnsures, resetStartupEnsures } from '$lib/server/db/ensure-bootstrap';
 import { execFile } from 'node:child_process';
@@ -33,7 +33,13 @@ function runScript(script: string, options: { env?: NodeJS.ProcessEnv; maxBuffer
 	});
 }
 
-export async function POST({ request, cookies }) {
+export async function POST({ request, cookies }: RequestEvent) {
+	if (db.$client?.isPostgres) {
+		throw error(
+			400,
+			'Impor berkas SQLite (.sqlite3) tidak didukung saat menggunakan PostgreSQL. Gunakan skrip migrasi "pnpm db:migrate:to-pg".'
+		);
+	}
 	const formData = await request.formData();
 	const file = formData.get('database');
 	console.log('[database-import] menerima permintaan import');

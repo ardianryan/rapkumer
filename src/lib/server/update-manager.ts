@@ -11,6 +11,12 @@ import { getAppVersion } from './app-info';
 const releasesEndpoint = 'https://api.github.com/repos/sira313/rapkumer/releases/latest';
 const userAgent = 'RapkumerUpdater/1.0';
 
+export const APP_UPDATES_DISABLED = true;
+
+export function isAppUpdateDisabled(): boolean {
+	return process.env.ENABLE_APP_UPDATES !== 'true';
+}
+
 const downloads = new Map<string, DownloadRecord>();
 
 const updateBaseDir = (() => {
@@ -108,6 +114,12 @@ interface DownloadRecord {
 type DownloadState = 'pending' | 'downloading' | 'completed' | 'failed' | 'cancelled';
 
 export async function fetchLatestRelease(): Promise<ReleaseSummary> {
+	if (isAppUpdateDisabled()) {
+		throw new Error(
+			'Pembaruan aplikasi dinonaktifkan untuk versi kustom ini (SMA Negeri 1 Gedeg).'
+		);
+	}
+
 	const response = await fetch(releasesEndpoint, { headers: buildGithubHeaders() });
 	if (!response.ok) {
 		const details = await response.text().catch(() => '');
@@ -336,7 +348,8 @@ export async function scheduleInstall(downloadId: string): Promise<{ message: st
 		});
 	} catch (error) {
 		throw new Error(
-			error instanceof Error ? error.message : 'Gagal menjalankan proses pemasangan pembaruan.'
+			error instanceof Error ? error.message : 'Gagal menjalankan proses pemasangan pembaruan.',
+			{ cause: error }
 		);
 	}
 

@@ -19,8 +19,8 @@
 				<h1 class="text-base-content text-3xl font-bold md:text-4xl">Rapkumer</h1>
 				<p class="text-base-content/70 mt-1 text-sm">v{appVersion}</p>
 				<p class="text-base-content/80 mt-4">
-					Aplikasi administrasi guru terpadu untuk presensi, jurnal mengajar, nilai, dan rapor,
-					siap cetak sesuai Kurikulum Merdeka.
+					Aplikasi administrasi guru terpadu untuk presensi, jurnal mengajar, nilai, dan rapor, siap
+					cetak sesuai Kurikulum Merdeka.
 				</p>
 				<div class="mt-6 flex flex-wrap justify-center gap-2">
 					<a
@@ -64,7 +64,8 @@
 					<div>
 						<p class="font-semibold">Tarik data dan kirim nilai ke Dapodik</p>
 						<p class="text-base-content/70 text-sm">
-							Aplikasi ini sudah bisa menarik data dan mengirim matev beserta nilainya langsung ke Dapodik.
+							Aplikasi ini sudah bisa menarik data dan mengirim matev beserta nilainya langsung ke
+							Dapodik.
 						</p>
 					</div>
 				</div>

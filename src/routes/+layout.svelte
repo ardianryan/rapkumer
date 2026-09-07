@@ -284,14 +284,30 @@
 	<title>{appName}{page.data.meta.title ? ' - ' + page.data.meta.title : ''}</title>
 </svelte:head>
 
-{#if isLoginPage || isTamuPage || isUnauthenticatedError}
-	<div class="bg-base-200 flex min-h-screen flex-col items-center justify-center p-6">
+{#if isLoginPage}
+	<div class="min-h-screen w-full bg-slate-50 dark:bg-slate-950">
+		{@render children()}
+	</div>
+{:else if isTamuPage || isUnauthenticatedError}
+	<div
+		class="relative min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-slate-50/90 dark:bg-slate-950 overflow-hidden"
+	>
+		<!-- Subtle ambient background accents -->
+		<div
+			class="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 h-[32rem] w-[42rem] rounded-full bg-gradient-to-b from-primary/10 via-sky-400/5 to-transparent blur-3xl opacity-60"
+		></div>
+		<div
+			class="pointer-events-none absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] opacity-60"
+		></div>
+
 		{#if isUnauthenticatedError}
-			<div class="w-full max-w-lg">
+			<div class="relative z-10 w-full max-w-lg">
 				{@render children()}
 			</div>
 		{:else}
-			{@render children()}
+			<div class="relative z-10 w-full flex flex-col items-center justify-center">
+				{@render children()}
+			</div>
 		{/if}
 	</div>
 {:else if isJadwalPublikPage}
@@ -305,7 +321,7 @@
 			<Navbar {stopServer} {stoppingServer} {logout} {loggingOut} />
 
 			<div
-				class="bg-base-300 dark:bg-base-200 dark:border-base-200 border-base-300 flex flex-1 flex-col border lg:mr-2 lg:mb-2 lg:rounded-xl"
+				class="border-slate-200/70 bg-slate-50/80 dark:border-slate-800/80 dark:bg-base-200/50 flex flex-1 flex-col overflow-hidden border-t transition-colors lg:mr-2 lg:mb-2 lg:rounded-2xl lg:border-t-0 lg:border-l"
 			>
 				<div
 					class="max-h-[calc(100vh-4.2rem)] min-h-[calc(100vh-4.2rem)] max-w-none overflow-y-auto md:max-h-[calc(100vh-4.6rem)] md:min-h-[calc(100vh-4.6rem)]"
@@ -369,29 +385,83 @@
 				</div>
 			</div>
 		</div>
-		<div class="drawer-side">
+		<div class="drawer-side z-40">
 			<label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label>
-			<ul class="menu bg-base-100 text-base-content min-h-full w-70 p-4">
-				<div class="mt-16 flex items-center gap-2 pb-4 lg:mt-1">
-					{#if data.meta?.logoUrl}
-						<img class="h-8 rounded" src={data.meta.logoUrl} alt="Brand logo" />
+			<aside
+				class="bg-base-100 border-slate-200/80 dark:border-slate-800 text-base-content flex min-h-full w-64 max-w-64 flex-col justify-between border-r p-3.5 overflow-x-hidden"
+			>
+				<div class="flex flex-col flex-1 min-h-0 w-full">
+					<div
+						class="border-slate-200/70 dark:border-slate-800/80 mb-3 flex items-center gap-2.5 border-b px-1 pt-14 pb-2.5 lg:pt-1 shrink-0"
+					>
+						<div
+							class="bg-primary/10 text-primary shadow-xs flex h-8 w-8 items-center justify-center rounded-lg font-bold text-base shrink-0"
+						>
+							{#if data.meta?.logoUrl}
+								<img
+									class="h-6 w-6 rounded object-contain"
+									src={data.meta.logoUrl}
+									alt="Logo Sekolah"
+								/>
+							{:else}
+								<span>R</span>
+							{/if}
+						</div>
+						<div class="flex flex-col min-w-0">
+							<a
+								href="/"
+								class="font-display hover:text-primary text-sm font-bold leading-tight tracking-tight transition-colors truncate"
+							>
+								Rapkumer
+							</a>
+							<span class="text-base-content/60 text-[11px] font-medium tracking-normal truncate">
+								SMA Negeri 1 Gedeg
+							</span>
+						</div>
+					</div>
+
+					<Menu />
+				</div>
+
+				<div
+					class="border-slate-200/70 dark:border-slate-800/80 flex flex-col gap-0.5 border-t pt-2.5 mt-2 shrink-0"
+				>
+					{#if data.user?.type === 'admin'}
+						<a
+							href="/pengguna"
+							class="text-base-content/70 hover:bg-base-200/80 hover:text-primary flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-all"
+						>
+							<Icon name="users" class="h-4 w-4 shrink-0" />
+							<span>Manajemen Pengguna</span>
+						</a>
 					{/if}
-					<a href="/"><h2 class="mb-2 text-xl font-bold">Dashboard</h2></a>
-				</div>
-
-				<Menu />
-
-				<div class="mt-4 flex flex-col gap-3">
-					<a href="/pengaturan" class="flex items-center gap-2">
-						<Icon name="gear" />
-						<h2 class="font-bold">Pengaturan</h2>
+					<a
+						href="/pengaturan"
+						class="text-base-content/70 hover:bg-base-200/80 hover:text-primary flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-all"
+					>
+						<Icon name="gear" class="h-4 w-4 shrink-0" />
+						<span>Pengaturan</span>
 					</a>
-					<a href="/tentang" class="flex items-center gap-2">
-						<Icon name="info" />
-						<h2 class="font-bold">Tentang Aplikasi</h2>
+					<a
+						href="/tentang"
+						class="text-base-content/70 hover:bg-base-200/80 hover:text-primary flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-all"
+					>
+						<Icon name="info" class="h-4 w-4 shrink-0" />
+						<span>Tentang Aplikasi</span>
 					</a>
+					<div class="px-2.5 pt-1.5 text-[10px] text-base-content/40">
+						Powered by
+						<a
+							href="https://github.com/sira313/rapkumer"
+							target="_blank"
+							rel="noreferrer noopener"
+							class="text-primary/80 hover:underline font-medium"
+						>
+							Rapkumer
+						</a>
+					</div>
 				</div>
-			</ul>
+			</aside>
 		</div>
 	</main>
 {/if}

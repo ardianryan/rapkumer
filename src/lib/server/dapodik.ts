@@ -34,9 +34,7 @@ import { buildCapaianKompetensi, type TujuanScoreEntry } from '$lib/rapor-modes'
 const keyByName = new Map<string, string>(agamaMapelOptions.map((o) => [o.name, o.key]));
 
 /** Normalisasi nama → nama canonical agama. Cocok "Katholik" → "Katolik", dll. */
-const canonicalAgamaByNorm = new Map(
-	agamaMapelOptions.map((o) => [normMapelName(o.name), o.name])
-);
+const canonicalAgamaByNorm = new Map(agamaMapelOptions.map((o) => [normMapelName(o.name), o.name]));
 function resolveCanonicalAgamaName(dapodikName: string): string | null {
 	return canonicalAgamaByNorm.get(normMapelName(dapodikName)) ?? null;
 }
@@ -860,10 +858,7 @@ async function buildPegawaiIndex(sekolahId: number): Promise<PegawaiIndex> {
 			return null;
 		}
 	};
-	const rows = await db
-		.select()
-		.from(tablePegawai)
-		.where(eq(tablePegawai.sekolahId, sekolahId));
+	const rows = await db.select().from(tablePegawai).where(eq(tablePegawai.sekolahId, sekolahId));
 	for (const row of rows) {
 		if (row.dapodikPtkId) index.byDapodik.set(row.dapodikPtkId, row.id);
 		if (row.nip) index.byNip.set(row.nip, row.id);
@@ -1967,9 +1962,7 @@ async function upsertPembelajaran(
 								...(pengampuId ? { pengampuId } : {})
 							})
 							.where(eq(tableMataPelajaran.id, canonicalRow.id));
-						await db
-							.delete(tableMataPelajaran)
-							.where(eq(tableMataPelajaran.id, existing.id));
+						await db.delete(tableMataPelajaran).where(eq(tableMataPelajaran.id, existing.id));
 						updated++;
 						continue;
 					}

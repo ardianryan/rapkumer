@@ -439,8 +439,7 @@
 					class="btn btn-soft shadow-none mr-auto"
 					type="button"
 					onclick={close}
-					disabled={saving}
-					><Icon name="close" /> Batal</button
+					disabled={saving}><Icon name="close" /> Batal</button
 				>
 				<button
 					class="btn btn-primary shadow-none"

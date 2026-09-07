@@ -1,5 +1,10 @@
 import { json } from '@sveltejs/kit';
-import { fetchLatestRelease, normalizeVersion, startDownload } from '$lib/server/update-manager';
+import {
+	fetchLatestRelease,
+	isAppUpdateDisabled,
+	normalizeVersion,
+	startDownload
+} from '$lib/server/update-manager';
 import { isAuthorizedUser } from '../../../pengguna/permissions';
 
 // require permission 'app_check_update' to use update APIs
@@ -10,6 +15,15 @@ export const POST = async ({ request, locals }) => {
 		return json(
 			{ message: 'Anda tidak memiliki izin untuk memulai unduhan pembaruan.' },
 			{ status: 403 }
+		);
+	}
+
+	if (isAppUpdateDisabled()) {
+		return json(
+			{
+				message: 'Fitur unduh pembaruan dinonaktifkan untuk versi kustom ini (SMA Negeri 1 Gedeg).'
+			},
+			{ status: 400 }
 		);
 	}
 

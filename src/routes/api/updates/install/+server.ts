@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { scheduleInstall } from '$lib/server/update-manager';
+import { isAppUpdateDisabled, scheduleInstall } from '$lib/server/update-manager';
 import { isAuthorizedUser } from '../../../pengguna/permissions';
 
 // require permission 'app_check_update' to schedule install
@@ -8,6 +8,15 @@ const REQUIRED_PERMISSION: UserPermission = 'app_check_update';
 export const POST = async ({ request, locals }) => {
 	if (!isAuthorizedUser([REQUIRED_PERMISSION], locals.user)) {
 		return json({ message: 'Anda tidak memiliki izin untuk memasang pembaruan.' }, { status: 403 });
+	}
+
+	if (isAppUpdateDisabled()) {
+		return json(
+			{
+				message: 'Fitur pasang pembaruan dinonaktifkan untuk versi kustom ini (SMA Negeri 1 Gedeg).'
+			},
+			{ status: 400 }
+		);
 	}
 	let payload: { downloadId?: string };
 	try {

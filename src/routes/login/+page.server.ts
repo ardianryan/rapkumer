@@ -48,7 +48,18 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 		description: 'Masuk ke Rapkumer untuk mengelola data administrasi guru.'
 	};
 
-	return { meta, appVersion: getAppVersion(), initialRetryAfterSeconds };
+	return {
+		meta,
+		appVersion: getAppVersion(),
+		initialRetryAfterSeconds,
+		sekolah: locals.sekolah
+			? {
+					id: locals.sekolah.id,
+					nama: locals.sekolah.nama,
+					npsn: locals.sekolah.npsn
+				}
+			: null
+	};
 };
 
 const LOGIN_LOG_PREFIX = '[login action]';
