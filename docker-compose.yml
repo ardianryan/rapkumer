@@ -1,0 +1,60 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rapkumer_app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      # Konfigurasi Reverse Proxy (Domain publik Anda)
+      - ORIGIN=${ORIGIN:-http://localhost:3000}
+      - RAPKUMER_CSRF_TRUSTED_ORIGINS=${RAPKUMER_CSRF_TRUSTED_ORIGINS:-http://localhost:3000}
+      - ADDRESS_HEADER=x-forwarded-for
+      - HOST_HEADER=x-forwarded-host
+      - PROTOCOL_HEADER=x-forwarded-proto
+      - XFF_DEPTH=1
+      - BODY_SIZE_LIMIT=50M
+      # Database: PostgreSQL lokal/eksternal atau SQLite bawaan
+      - DB_URL=${DB_URL:-file:./data/database.sqlite3}
+      # Konfigurasi ZITADEL SSO
+      - ZITADEL_ISSUER=${ZITADEL_ISSUER:-}
+      - ZITADEL_CLIENT_ID=${ZITADEL_CLIENT_ID:-}
+      - ZITADEL_CLIENT_SECRET=${ZITADEL_CLIENT_SECRET:-}
+      - ZITADEL_REDIRECT_URI=${ZITADEL_REDIRECT_URI:-}
+      - ZITADEL_POST_LOGOUT_REDIRECT_URI=${ZITADEL_POST_LOGOUT_REDIRECT_URI:-}
+      - SSO_BUTTON_TEXT=${SSO_BUTTON_TEXT:-Masuk dengan SSO}
+      - SSO_ENABLED=${SSO_ENABLED:-true}
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+# Opsional: Jika ingin menjalankan PostgreSQL via Docker Compose secara mandiri
+# uncomment blok di bawah ini dan sesuaikan DB_URL=postgresql://rapkumer:password123@db:5432/rapkumer
+#
+#   db:
+#     image: postgres:16-alpine
+#     container_name: rapkumer_db
+#     restart: unless-stopped
+#     environment:
+#       POSTGRES_USER: ${POSTGRES_USER:-rapkumer}
+#       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+#       POSTGRES_DB: ${POSTGRES_DB:-rapkumer}
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+#     ports:
+#       - "5432:5432"
+#
+# volumes:
+#   postgres_data:

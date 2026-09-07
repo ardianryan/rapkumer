@@ -105,6 +105,16 @@ const csrfGuard: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
+	// Reverse proxy check (X-Forwarded-Host & X-Forwarded-Proto)
+	const forwardedHost = event.request.headers.get('x-forwarded-host');
+	if (forwardedHost) {
+		const proto = resolveRequestProtocol(event.request, event.url);
+		const proxyOrigin = normalizeOrigin(`${proto}://${forwardedHost.split(',')[0].trim()}`);
+		if (proxyOrigin && requestOrigin === proxyOrigin) {
+			return resolve(event);
+		}
+	}
+
 	const trustedOrigins = await parseTrustedOrigins();
 	if (trustedOrigins.has(requestOrigin)) {
 		return resolve(event);

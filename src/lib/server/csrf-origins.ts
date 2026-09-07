@@ -89,7 +89,9 @@ export async function writeFileTrustedOrigins(origins: string[]): Promise<void> 
 
 export async function readCombinedOriginsFromEnvAndFile(): Promise<Set<string>> {
 	const envRaw = env.RAPKUMER_CSRF_TRUSTED_ORIGINS || '';
-	const envEntries = envRaw
+	const envOrigin = env.ORIGIN || '';
+	const combinedEnv = [envRaw, envOrigin].filter(Boolean).join(',');
+	const envEntries = combinedEnv
 		.split(',')
 		.map((s) => s.trim())
 		.filter(Boolean)
@@ -97,18 +99,10 @@ export async function readCombinedOriginsFromEnvAndFile(): Promise<Set<string>> 
 		.filter((s): s is string => Boolean(s));
 
 	const fileSet = await getFileTrustedOrigins();
-	// Also always check repo ./data as an additional source (helpful for dev and
-	// build tests). We prefer the repo-local file when present (so working tree
-	// overrides an AppData persisted file during development). If the repo file
-	// is missing, fall back to the persisted data dir file. The environment
-	// variable is only used when no file-based sources exist at all.
 	const repoSet = await readRepoDataFileOrigins();
 
-	// Choose the primary source (repo file > persisted data dir > env)
-	let primary = new Set<string>();
-	if (repoSet.size > 0) primary = new Set<string>(repoSet);
-	else if (fileSet.size > 0) primary = new Set<string>(fileSet);
-	else primary = new Set<string>(envEntries);
+	// Union of all sources: env (termasuk ORIGIN reverse proxy) selalu digabung
+	const primary = new Set<string>([...envEntries, ...fileSet, ...repoSet]);
 
 	// Always attempt to detect local IPv4 addresses on the host and add them
 	// to the trusted origins set so LAN access works without manual editing.
