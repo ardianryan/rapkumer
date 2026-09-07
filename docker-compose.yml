@@ -1,5 +1,6 @@
 services:
   app:
+    image: ghcr.io/ardianryan/rapkumer:zitadel
     build:
       context: .
       dockerfile: Dockerfile
