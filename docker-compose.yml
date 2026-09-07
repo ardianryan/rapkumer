@@ -42,7 +42,7 @@ services:
       - R2_REGION=${R2_REGION:-auto}
       - R2_USE_PATH_STYLE_ENDPOINT=${R2_USE_PATH_STYLE_ENDPOINT:-true}
     volumes:
-      - ./data:/app/data
+      - rapkumer_data:/app/data
     healthcheck:
       test:
         [
@@ -72,5 +72,6 @@ services:
 #     ports:
 #       - "5432:5432"
 #
-# volumes:
-#   postgres_data:
+volumes:
+  rapkumer_data:
+    name: rapkumer_data
