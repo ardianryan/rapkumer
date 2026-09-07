@@ -85,9 +85,10 @@
 	}
 	const sekolahNama = $derived(data.sekolah?.nama ?? 'SMA Negeri 1 Gedeg');
 	const sekolahNpsn = $derived(data.sekolah?.npsn ?? null);
-	const logoSrc = $derived(data.sekolah?.id ? '/sekolah/logo' : '/logo.png');
+	const logoSrc = $derived(data.sekolah?.id ? `/sekolah/logo/${data.sekolah.id}` : '/tutwuri.png');
 
 	let showHelpTip = $state(false);
+	let showManualLogin = $state(false);
 </script>
 
 <div
@@ -193,7 +194,14 @@
 		<div
 			class="lg:hidden flex items-center gap-3 pb-6 mb-6 border-b border-slate-100 dark:border-slate-800"
 		>
-			<img src={logoSrc} alt={`Logo ${sekolahNama}`} class="h-10 w-10 object-contain" />
+			<img
+				src={logoSrc}
+				alt={`Logo ${sekolahNama}`}
+				class="h-10 w-10 object-contain"
+				onerror={(e) => {
+					(e.currentTarget as HTMLImageElement).src = '/tutwuri.png';
+				}}
+			/>
 			<div>
 				<h3 class="font-display text-sm font-bold text-slate-800 dark:text-slate-100">
 					{sekolahNama}
@@ -212,7 +220,11 @@
 					Selamat Datang
 				</h2>
 				<p class="text-xs sm:text-sm text-base-content/65">
-					Silakan masukkan nama pengguna dan kata sandi akun Anda untuk melanjutkan
+					{#if data.sso?.enabled}
+						Silakan masuk ke Portal Administrasi Guru menggunakan akun SSO sekolah atau formulir login manual
+					{:else}
+						Silakan masukkan nama pengguna dan kata sandi akun Anda untuk melanjutkan
+					{/if}
 				</p>
 			</header>
 
@@ -230,134 +242,148 @@
 				</div>
 			{/if}
 
-			<!-- Form -->
-			<FormEnhance action="?/login" onfailure={handleLoginFailure}>
-				{#snippet children({ submitting, invalid })}
-					<div class="space-y-4">
-						<!-- Username -->
-						<div class="space-y-1.5">
-							<label
-								class="text-xs font-semibold text-slate-700 dark:text-slate-300"
-								for="username"
-							>
-								Nama Pengguna / NIP
-							</label>
-							<div class="relative flex items-center">
-								<Icon
-									name="user"
-									class="absolute left-3.5 h-4 w-4 text-base-content/40 pointer-events-none"
-								/>
-								<input
-									type="text"
-									id="username"
-									name="username"
-									required
-									autocomplete="username"
-									placeholder="Contoh: Admin atau NIP Anda"
-									class="input rounded-xl border-slate-200/90 dark:border-slate-700 bg-slate-50/50 dark:bg-base-200 w-full pl-10 pr-3 h-11 text-xs sm:text-sm focus:border-primary focus:bg-white dark:focus:bg-base-100 focus:ring-2 focus:ring-primary/10 transition-all"
-								/>
-							</div>
-						</div>
-
-						<!-- Password -->
-						<div class="space-y-1.5">
-							<div class="flex items-center justify-between">
-								<label
-									class="text-xs font-semibold text-slate-700 dark:text-slate-300"
-									for="password"
-								>
-									Kata Sandi
-								</label>
-								<button
-									type="button"
-									class="text-[11px] text-primary hover:underline font-medium cursor-pointer"
-									onclick={() => (showHelpTip = !showHelpTip)}
-								>
-									Lupa kata sandi?
-								</button>
-							</div>
-							<div class="relative flex items-center">
-								<Icon
-									name="lock"
-									class="absolute left-3.5 h-4 w-4 text-base-content/40 pointer-events-none"
-								/>
-								<input
-									type={showPassword ? 'text' : 'password'}
-									id="password"
-									name="password"
-									required
-									autocomplete="current-password"
-									placeholder="••••••••"
-									class="input rounded-xl border-slate-200/90 dark:border-slate-700 bg-slate-50/50 dark:bg-base-200 w-full pl-10 pr-10 h-11 text-xs sm:text-sm focus:border-primary focus:bg-white dark:focus:bg-base-100 focus:ring-2 focus:ring-primary/10 transition-all"
-								/>
-								<button
-									type="button"
-									class="absolute right-3 text-base-content/45 hover:text-base-content transition-colors p-1 cursor-pointer"
-									onclick={() => (showPassword = !showPassword)}
-									aria-label="Lihat atau sembunyikan kata sandi"
-								>
-									<Icon name={showPassword ? 'eye-off' : 'eye'} class="h-4 w-4" />
-								</button>
-							</div>
-						</div>
-
-						<!-- Password Help Drawer -->
-						{#if showHelpTip}
-							<div
-								class="rounded-xl border border-blue-100 dark:border-blue-900/60 bg-blue-50/80 dark:bg-blue-950/40 p-3.5 text-[11px] text-blue-800 dark:text-blue-300 space-y-1 animate-in fade-in duration-200"
-							>
-								<div class="font-bold flex items-center gap-1.5">
-									<Icon name="info" class="h-3.5 w-3.5" />
-									<span>Bantuan Akun & Kata Sandi</span>
-								</div>
-								<p class="leading-relaxed opacity-90">
-									Silakan hubungi <strong>Admin IT / Kurikulum Sekolah</strong> untuk mereset kata sandi
-									atau memperbarui data akun GTK Anda.
-								</p>
-							</div>
-						{/if}
-
-						<!-- Submit Button -->
-						<button
-							class="btn btn-primary h-12 rounded-xl font-bold text-xs sm:text-sm tracking-wide mt-3 w-full shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-							type="submit"
-							disabled={submitting || invalid || isLocked}
-						>
-							{#if submitting}
-								<span class="loading loading-spinner loading-xs"></span>
-								<span>Memverifikasi Akun…</span>
-							{:else}
-								<span>Masuk ke Portal</span>
-								<Icon name="right" class="h-4 w-4" />
-							{/if}
-						</button>
-					</div>
-				{/snippet}
-			</FormEnhance>
-
-			<!-- SSO Section Divider & Button -->
+			<!-- SSO Section (Ditaruh di bagian atas jika aktif) -->
 			{#if data.sso?.enabled}
-				<div class="pt-2 space-y-4">
-					<div class="relative flex items-center justify-center">
-						<div class="border-t border-slate-200 dark:border-slate-800 w-full"></div>
-						<span
-							class="bg-white dark:bg-slate-900 px-3 text-[11px] font-medium text-slate-400 uppercase tracking-wider shrink-0"
-						>
-							atau masuk dengan
-						</span>
-					</div>
-
+				<div class="space-y-3">
 					<a
 						href={data.sso.loginUrl}
-						class="btn btn-outline border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-400 h-12 rounded-xl font-bold text-xs sm:text-sm tracking-wide w-full transition-all flex items-center justify-center gap-2.5 text-slate-700 dark:text-slate-200 shadow-sm"
+						class="btn btn-primary h-12 rounded-xl font-bold text-xs sm:text-sm tracking-wide w-full transition-all flex items-center justify-center gap-2.5 text-white shadow-md shadow-primary/25 hover:shadow-lg hover:shadow-primary/35 active:scale-[0.98]"
 					>
 						<div
-							class="h-6 w-6 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0"
+							class="h-6 w-6 rounded-lg bg-white/20 flex items-center justify-center shrink-0"
 						>
-							<Icon name="key" class="h-3.5 w-3.5" />
+							<Icon name="key" class="h-3.5 w-3.5 text-white" />
 						</div>
 						<span>{data.sso.buttonText}</span>
 					</a>
+				</div>
+
+				<!-- Pemisah / Toggle Buka-Tutup Login Manual -->
+				<div class="relative flex items-center justify-center pt-1">
+					<div class="border-t border-slate-200 dark:border-slate-800 w-full"></div>
+					<button
+						type="button"
+						class="bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-500 hover:text-primary dark:text-slate-400 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 rounded-lg py-1 hover:bg-slate-50 dark:hover:bg-slate-800"
+						onclick={() => (showManualLogin = !showManualLogin)}
+					>
+						<span>{showManualLogin ? 'Sembunyikan Login Manual' : 'Atau Masuk dengan Username & Kata Sandi'}</span>
+						<Icon name={showManualLogin ? 'up' : 'down'} class="h-3.5 w-3.5" />
+					</button>
+				</div>
+			{/if}
+
+			<!-- Form Manual (Auto-hide jika SSO aktif, tapi tetap bisa dibuka) -->
+			{#if !data.sso?.enabled || showManualLogin}
+				<div class="space-y-4 pt-1">
+					<FormEnhance
+						action="?/login"
+						onfailure={(params) => {
+							showManualLogin = true;
+							handleLoginFailure(params);
+						}}
+					>
+						{#snippet children({ submitting, invalid })}
+							<div class="space-y-4">
+								<!-- Username -->
+								<div class="space-y-1.5">
+									<label
+										class="text-xs font-semibold text-slate-700 dark:text-slate-300"
+										for="username"
+									>
+										Nama Pengguna / NIP
+									</label>
+									<div class="relative flex items-center">
+										<Icon
+											name="user"
+											class="absolute left-3.5 h-4 w-4 text-base-content/40 pointer-events-none"
+										/>
+										<input
+											type="text"
+											id="username"
+											name="username"
+											required
+											autocomplete="username"
+											placeholder="Contoh: Admin atau NIP Anda"
+											class="input rounded-xl border-slate-200/90 dark:border-slate-700 bg-slate-50/50 dark:bg-base-200 w-full pl-10 pr-3 h-11 text-xs sm:text-sm focus:border-primary focus:bg-white dark:focus:bg-base-100 focus:ring-2 focus:ring-primary/10 transition-all"
+										/>
+									</div>
+								</div>
+
+								<!-- Password -->
+								<div class="space-y-1.5">
+									<div class="flex items-center justify-between">
+										<label
+											class="text-xs font-semibold text-slate-700 dark:text-slate-300"
+											for="password"
+										>
+											Kata Sandi
+										</label>
+										<button
+											type="button"
+											class="text-[11px] text-primary hover:underline font-medium cursor-pointer"
+											onclick={() => (showHelpTip = !showHelpTip)}
+										>
+											Lupa kata sandi?
+										</button>
+									</div>
+									<div class="relative flex items-center">
+										<Icon
+											name="lock"
+											class="absolute left-3.5 h-4 w-4 text-base-content/40 pointer-events-none"
+										/>
+										<input
+											type={showPassword ? 'text' : 'password'}
+											id="password"
+											name="password"
+											required
+											autocomplete="current-password"
+											placeholder="••••••••"
+											class="input rounded-xl border-slate-200/90 dark:border-slate-700 bg-slate-50/50 dark:bg-base-200 w-full pl-10 pr-10 h-11 text-xs sm:text-sm focus:border-primary focus:bg-white dark:focus:bg-base-100 focus:ring-2 focus:ring-primary/10 transition-all"
+										/>
+										<button
+											type="button"
+											class="absolute right-3 text-base-content/45 hover:text-base-content transition-colors p-1 cursor-pointer"
+											onclick={() => (showPassword = !showPassword)}
+											aria-label="Lihat atau sembunyikan kata sandi"
+										>
+											<Icon name={showPassword ? 'eye-off' : 'eye'} class="h-4 w-4" />
+										</button>
+									</div>
+								</div>
+
+								<!-- Password Help Drawer -->
+								{#if showHelpTip}
+									<div
+										class="rounded-xl border border-blue-100 dark:border-blue-900/60 bg-blue-50/80 dark:bg-blue-950/40 p-3.5 text-[11px] text-blue-800 dark:text-blue-300 space-y-1 animate-in fade-in duration-200"
+									>
+										<div class="font-bold flex items-center gap-1.5">
+											<Icon name="info" class="h-3.5 w-3.5" />
+											<span>Bantuan Akun & Kata Sandi</span>
+										</div>
+										<p class="leading-relaxed opacity-90">
+											Silakan hubungi <strong>Admin IT / Kurikulum Sekolah</strong> untuk mereset kata sandi
+											atau memperbarui data akun GTK Anda.
+										</p>
+									</div>
+								{/if}
+
+								<!-- Submit Button -->
+								<button
+									class="btn btn-outline border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 h-11 rounded-xl font-bold text-xs sm:text-sm tracking-wide mt-2 w-full active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+									type="submit"
+									disabled={submitting || invalid || isLocked}
+								>
+									{#if submitting}
+										<span class="loading loading-spinner loading-xs"></span>
+										<span>Memverifikasi Akun…</span>
+									{:else}
+										<span>Masuk dengan Kredensial Manual</span>
+										<Icon name="right" class="h-4 w-4" />
+									{/if}
+								</button>
+							</div>
+						{/snippet}
+					</FormEnhance>
 				</div>
 			{/if}
 		</div>

@@ -51,15 +51,21 @@ export const load: PageServerLoad = async ({ locals, url, getClientAddress }) =>
 
 	const zitadelConfig = getZitadelConfig();
 
+	const defaultSekolah =
+		locals.sekolah ??
+		(await db.query.tableSekolah.findFirst({
+			columns: { id: true, nama: true, npsn: true }
+		}));
+
 	return {
 		meta,
 		appVersion: getAppVersion(),
 		initialRetryAfterSeconds,
-		sekolah: locals.sekolah
+		sekolah: defaultSekolah
 			? {
-					id: locals.sekolah.id,
-					nama: locals.sekolah.nama,
-					npsn: locals.sekolah.npsn
+					id: defaultSekolah.id,
+					nama: defaultSekolah.nama,
+					npsn: defaultSekolah.npsn
 				}
 			: null,
 		sso: {
