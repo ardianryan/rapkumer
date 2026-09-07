@@ -5,6 +5,13 @@ import db from '$lib/server/db/index.js';
 import { tableMurid } from '$lib/server/db/schema.js';
 import { uploadsDir } from '$lib/server/data-dirs';
 import { eq, inArray } from 'drizzle-orm';
+import {
+	isR2Configured,
+	buildR2Key,
+	uploadBufferToR2,
+	deleteFromR2,
+	isPublicUrl
+} from '$lib/server/storage-r2';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let unzipper: any;
 
@@ -213,27 +220,59 @@ export async function POST({
 				// Use first photo (or could allow multiple - for now use first)
 				const photo = photos[0];
 
-				// Use NISN as filename (guaranteed unique per murid)
-				const filename = `${murid.nisn}${photo.ext}`;
-				const filePath = path.join(uploadsPath, filename);
+				if (isR2Configured()) {
+					const filename = `${murid.nisn}_${Date.now()}${photo.ext}`;
+					const key = buildR2Key('murid', filename);
+					const mime =
+						photo.ext === '.png'
+							? 'image/png'
+							: photo.ext === '.webp'
+								? 'image/webp'
+								: 'image/jpeg';
+					const { publicUrl } = await uploadBufferToR2(key, photo.buffer, mime);
 
-				// Remove old file if exists and has different name
-				if (murid.foto && murid.foto !== filename) {
-					try {
-						await fs.unlink(path.join(uploadsPath, murid.foto));
-					} catch {
-						// ignore if file doesn't exist
+					if (murid.foto) {
+						if (isPublicUrl(murid.foto)) {
+							await deleteFromR2(murid.foto);
+						} else {
+							try {
+								await fs.unlink(path.join(uploadsPath, murid.foto));
+							} catch {
+								// ignore
+							}
+						}
 					}
+
+					await db.update(tableMurid).set({ foto: publicUrl }).where(eq(tableMurid.id, murid.id));
+					uploadedCount++;
+					processedNisn.add(murid.nisn);
+				} else {
+					// Use NISN as filename (guaranteed unique per murid)
+					const filename = `${murid.nisn}${photo.ext}`;
+					const filePath = path.join(uploadsPath, filename);
+
+					// Remove old file if exists and has different name
+					if (murid.foto && murid.foto !== filename) {
+						if (isPublicUrl(murid.foto)) {
+							await deleteFromR2(murid.foto);
+						} else {
+							try {
+								await fs.unlink(path.join(uploadsPath, murid.foto));
+							} catch {
+								// ignore if file doesn't exist
+							}
+						}
+					}
+
+					// Write file (will replace if exists)
+					await fs.writeFile(filePath, photo.buffer, { mode: 0o644 });
+
+					// Update database
+					await db.update(tableMurid).set({ foto: filename }).where(eq(tableMurid.id, murid.id));
+
+					uploadedCount++;
+					processedNisn.add(murid.nisn);
 				}
-
-				// Write file (will replace if exists)
-				await fs.writeFile(filePath, photo.buffer, { mode: 0o644 });
-
-				// Update database
-				await db.update(tableMurid).set({ foto: filename }).where(eq(tableMurid.id, murid.id));
-
-				uploadedCount++;
-				processedNisn.add(murid.nisn);
 			} catch (err) {
 				console.error(`Failed to upload photo for murid ${murid.id}:`, err);
 				failedCount++;

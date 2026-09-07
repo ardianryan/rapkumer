@@ -5,9 +5,17 @@ import db from '$lib/server/db/index.js';
 import { tableMurid } from '$lib/server/db/schema.js';
 import { uploadsDir } from '$lib/server/data-dirs';
 import { eq } from 'drizzle-orm';
+import {
+	isR2Configured,
+	buildR2Key,
+	uploadBufferToR2,
+	deleteFromR2,
+	isPublicUrl
+} from '$lib/server/storage-r2';
 
 function contentTypeFor(filename: string) {
 	if (filename.endsWith('.png')) return 'image/png';
+	if (filename.endsWith('.webp')) return 'image/webp';
 	return 'image/jpeg';
 }
 
@@ -31,7 +39,7 @@ async function generateUniqueFilename(
 ) {
 	let filename = `${base}${ext}`;
 	let counter = 1;
-	let exists = false;
+	let exists: boolean;
 
 	do {
 		try {
@@ -56,6 +64,14 @@ export async function GET({ params }: { params: Record<string, string> }) {
 		columns: { foto: true }
 	});
 	if (!murid || !murid.foto) throw error(404, 'Not found');
+
+	// If photo is stored as a public R2 URL, redirect directly to CDN
+	if (isPublicUrl(murid.foto)) {
+		return new Response(null, {
+			status: 302,
+			headers: { Location: murid.foto }
+		});
+	}
 
 	const dir = uploadsDir();
 	const filePath = path.join(dir, murid.foto);
@@ -90,12 +106,16 @@ export async function DELETE({
 	if (!sekolahId || murid.sekolahId !== sekolahId)
 		return new Response(JSON.stringify({ message: 'Unauthorized' }), { status: 401 });
 
-	const dir = uploadsDir();
 	if (murid.foto) {
-		try {
-			await fs.unlink(path.join(dir, murid.foto));
-		} catch {
-			// ignore
+		if (isPublicUrl(murid.foto)) {
+			await deleteFromR2(murid.foto);
+		} else {
+			const dir = uploadsDir();
+			try {
+				await fs.unlink(path.join(dir, murid.foto));
+			} catch {
+				// ignore
+			}
 		}
 		await db.update(tableMurid).set({ foto: null }).where(eq(tableMurid.id, id));
 	}
@@ -134,44 +154,73 @@ export async function POST({
 		return new Response(JSON.stringify({ message: 'No file provided' }), { status: 400 });
 	}
 
-	const allowed = ['image/png', 'image/jpeg'];
+	const allowed = ['image/png', 'image/jpeg', 'image/webp'];
 	if (!allowed.includes(uploadedFile.type)) {
 		return new Response(
-			JSON.stringify({ message: 'Format file tidak didukung; hanya JPG dan PNG yang diizinkan' }),
+			JSON.stringify({ message: 'Format file tidak didukung; hanya JPG, PNG, dan WebP yang diizinkan' }),
 			{ status: 400 }
 		);
 	}
 
-	if (uploadedFile.size > 500 * 1024) {
+	if (uploadedFile.size > 5 * 1024 * 1024) {
 		return new Response(
-			JSON.stringify({ message: 'Ukuran file foto tidak boleh lebih dari 500KB' }),
+			JSON.stringify({ message: 'Ukuran file foto tidak boleh lebih dari 5MB' }),
 			{ status: 400 }
 		);
 	}
 
 	try {
 		const buffer = Buffer.from(await uploadedFile.arrayBuffer());
-		const dir = uploadsDir();
-		await fs.mkdir(dir, { recursive: true });
-
-		const ext = uploadedFile.type === 'image/png' ? '.png' : '.jpg';
+		const ext = uploadedFile.type === 'image/png' ? '.png' : uploadedFile.type === 'image/webp' ? '.webp' : '.jpg';
 		const base = slugifyName(murid.nama || `murid-${murid.id}`);
-		const filename = await generateUniqueFilename(db, base, ext, dir);
-		const filePath = path.join(dir, filename);
 
-		// Remove old file if exists and different
-		if (murid.foto && murid.foto !== filename) {
-			try {
-				await fs.unlink(path.join(dir, murid.foto));
-			} catch {
-				// ignore
+		let finalFotoRef: string;
+
+		if (isR2Configured()) {
+			const filename = `${base}_${Date.now()}${ext}`;
+			const key = buildR2Key('murid', filename);
+			const { publicUrl } = await uploadBufferToR2(key, buffer, uploadedFile.type);
+			finalFotoRef = publicUrl;
+
+			// Delete old photo if exists
+			if (murid.foto) {
+				if (isPublicUrl(murid.foto)) {
+					await deleteFromR2(murid.foto);
+				} else {
+					try {
+						await fs.unlink(path.join(uploadsDir(), murid.foto));
+					} catch {
+						// ignore
+					}
+				}
 			}
+		} else {
+			const dir = uploadsDir();
+			await fs.mkdir(dir, { recursive: true });
+
+			const filename = await generateUniqueFilename(db, base, ext, dir);
+			const filePath = path.join(dir, filename);
+
+			// Remove old file if exists and different
+			if (murid.foto && murid.foto !== filename) {
+				if (isPublicUrl(murid.foto)) {
+					await deleteFromR2(murid.foto);
+				} else {
+					try {
+						await fs.unlink(path.join(dir, murid.foto));
+					} catch {
+						// ignore
+					}
+				}
+			}
+
+			await fs.writeFile(filePath, buffer, { mode: 0o644 });
+			finalFotoRef = filename;
 		}
 
-		await fs.writeFile(filePath, buffer, { mode: 0o644 });
-		await db.update(tableMurid).set({ foto: filename }).where(eq(tableMurid.id, id));
+		await db.update(tableMurid).set({ foto: finalFotoRef }).where(eq(tableMurid.id, id));
 
-		return new Response(JSON.stringify({ foto: filename, message: 'Foto berhasil diperbarui' }), {
+		return new Response(JSON.stringify({ foto: finalFotoRef, message: 'Foto berhasil diperbarui' }), {
 			headers: { 'Content-Type': 'application/json' }
 		});
 	} catch (err) {

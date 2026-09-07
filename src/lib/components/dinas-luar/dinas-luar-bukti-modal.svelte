@@ -99,6 +99,7 @@
 	}
 
 	function buktiUrl(item: BuktiItem): string {
+		if (item.namaFile?.startsWith('http')) return item.namaFile;
 		return `/api/dinas-luar/bukti/${item.namaFile}`;
 	}
 

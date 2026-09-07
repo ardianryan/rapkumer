@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import db from '$lib/server/db';
 import { tableMurid } from '$lib/server/db/schema';
 import { uploadsDir } from '$lib/server/data-dirs';
+import { fetchR2Buffer } from '$lib/server/storage-r2';
 import { jenisKelamin } from '$lib/statics';
 import {
 	requireInteger,
@@ -82,13 +83,32 @@ function composeOrangTuaAlamat(
 	};
 }
 
-function readFotoDataUri(filename: string | null | undefined): string | null {
+async function readFotoDataUri(filename: string | null | undefined): Promise<string | null> {
 	if (!filename) return null;
+	if (filename.startsWith('http://') || filename.startsWith('https://')) {
+		try {
+			const buf = await fetchR2Buffer(filename);
+			if (buf) {
+				const ext = filename.split('?')[0].split('.').pop()?.toLowerCase();
+				const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+				return `data:${mime};base64,${buf.toString('base64')}`;
+			}
+			const res = await fetch(filename);
+			if (res.ok) {
+				const ab = await res.arrayBuffer();
+				const mime = res.headers.get('content-type') || 'image/jpeg';
+				return `data:${mime};base64,${Buffer.from(ab).toString('base64')}`;
+			}
+		} catch (e) {
+			console.error('Failed to load remote photo for biodata print:', e);
+		}
+		return filename;
+	}
 	try {
 		const filePath = path.join(uploadsDir(), filename);
 		const buffer = fs.readFileSync(filePath);
 		const ext = path.extname(filename).toLowerCase();
-		const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+		const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
 		return `data:${mime};base64,${buffer.toString('base64')}`;
 	} catch {
 		return null;
@@ -147,7 +167,7 @@ export async function getBiodataPreviewPayload({ locals, url }: BiodataContext) 
 		showBgLogo,
 		murid: {
 			id: murid.id,
-			foto: readFotoDataUri(murid.foto),
+			foto: await readFotoDataUri(murid.foto),
 			nama: murid.nama,
 			nis: murid.nis,
 			nisn: murid.nisn,

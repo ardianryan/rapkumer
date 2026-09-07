@@ -35,9 +35,11 @@
 	let { sppd }: { sppd: SppdDetailData } = $props();
 
 	const undanganUrl = $derived(
-		sppd.undanganFile?.startsWith('undangan/')
-			? `/api/dinas-luar/undangan/${sppd.undanganFile.slice('undangan/'.length)}`
-			: null
+		sppd.undanganFile?.startsWith('http')
+			? sppd.undanganFile
+			: sppd.undanganFile?.startsWith('undangan/')
+				? `/api/dinas-luar/undangan/${sppd.undanganFile.slice('undangan/'.length)}`
+				: null
 	);
 	const undanganName = $derived(sppd.undanganFile?.split('/').pop() ?? null);
 
@@ -45,6 +47,7 @@
 	const fotoBukti = $derived(sppd.bukti.filter((b) => b.jenis === 'foto'));
 
 	function buktiUrl(item: BuktiItem): string {
+		if (item.namaFile?.startsWith('http')) return item.namaFile;
 		return `/api/dinas-luar/bukti/${item.namaFile}`;
 	}
 </script>

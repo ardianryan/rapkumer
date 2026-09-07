@@ -25,9 +25,11 @@
 	}
 
 	const undanganUrl = $derived(
-		permohonan.undanganFile?.startsWith('undangan/')
-			? `/api/dinas-luar/undangan/${permohonan.undanganFile.slice('undangan/'.length)}`
-			: null
+		permohonan.undanganFile?.startsWith('http')
+			? permohonan.undanganFile
+			: permohonan.undanganFile?.startsWith('undangan/')
+				? `/api/dinas-luar/undangan/${permohonan.undanganFile.slice('undangan/'.length)}`
+				: null
 	);
 
 	const undanganName = $derived(permohonan.undanganFile?.split('/').pop() ?? null);

@@ -4,6 +4,14 @@ import { eq, like } from 'drizzle-orm';
 import db from '$lib/server/db';
 import { dataRoot } from '$lib/server/data-dirs';
 import { tableBukuTamu, tablePresensiGuru } from '$lib/server/db/schema';
+import {
+	isR2Configured,
+	buildR2Key,
+	uploadBufferToR2,
+	deleteFromR2,
+	fetchR2Buffer,
+	isPublicUrl
+} from '$lib/server/storage-r2';
 
 export type TtdKategori = 'guru' | 'tamu';
 
@@ -44,6 +52,13 @@ export async function saveSignatureFile(
 	if (!buf.length) {
 		throw new Error('Tanda tangan kosong.');
 	}
+
+	if (isR2Configured()) {
+		const key = buildR2Key(`ttd/${kategori}`, filename);
+		const { publicUrl } = await uploadBufferToR2(key, buf, 'image/png');
+		return publicUrl;
+	}
+
 	const dir = path.join(DATA_DIR, kategori);
 	await fs.mkdir(dir, { recursive: true });
 	await fs.writeFile(path.join(dir, filename), buf);
@@ -51,6 +66,10 @@ export async function saveSignatureFile(
 }
 
 export async function readSignatureFile(relPath: string): Promise<Buffer | null> {
+	if (!relPath) return null;
+	if (isPublicUrl(relPath)) {
+		return fetchR2Buffer(relPath);
+	}
 	const safe = safeRelPath(relPath);
 	if (!safe) return null;
 	try {
@@ -61,6 +80,11 @@ export async function readSignatureFile(relPath: string): Promise<Buffer | null>
 }
 
 export async function deleteSignatureFile(relPath: string): Promise<void> {
+	if (!relPath) return;
+	if (isPublicUrl(relPath)) {
+		await deleteFromR2(relPath);
+		return;
+	}
 	const safe = safeRelPath(relPath);
 	if (!safe) return;
 	await fs.rm(path.join(DATA_DIR, safe), { force: true }).catch(() => {});

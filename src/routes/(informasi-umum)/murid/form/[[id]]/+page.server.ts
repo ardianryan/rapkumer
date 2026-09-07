@@ -3,6 +3,13 @@ import path from 'node:path';
 import db from '$lib/server/db/index.js';
 import { tableAlamat, tableKelas, tableMurid, tableWaliMurid } from '$lib/server/db/schema.js';
 import { uploadsDir } from '$lib/server/data-dirs';
+import {
+	isR2Configured,
+	buildR2Key,
+	uploadBufferToR2,
+	deleteFromR2,
+	isPublicUrl
+} from '$lib/server/storage-r2';
 import { unflattenFormData } from '$lib/utils.js';
 import { error, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
@@ -78,7 +85,7 @@ export const actions = {
 					await fs.stat(path.join(dir, candidate));
 					existsOnDisk = true;
 				} catch {
-					existsOnDisk = false;
+					// file does not exist on disk
 				}
 				if (!usedByOther && !existsOnDisk) return candidate;
 				i += 1;
@@ -214,30 +221,59 @@ export const actions = {
 		// non-fatal: murid record is already saved, foto filename retried next save.
 		if (uploadedFile && uploadedFile.size && formMurid.id) {
 			const buffer = Buffer.from(await uploadedFile.arrayBuffer());
-			const dir = uploadsDir();
-			await fs.mkdir(dir, { recursive: true });
-			const ext = uploadedFile.type === 'image/png' ? '.png' : '.jpg';
+			const ext = uploadedFile.type === 'image/png' ? '.png' : uploadedFile.type === 'image/webp' ? '.webp' : '.jpg';
 			const base = slugifyName(formMurid.nama || `murid-${formMurid.id}`);
-			const filename = await generateUniqueFilename(db, base, ext, dir, formMurid.id);
-			const filePath = path.join(dir, filename);
-			try {
-				await fs.writeFile(filePath, buffer, { mode: 0o644 });
-				await db.update(tableMurid).set({ foto: filename }).where(eq(tableMurid.id, formMurid.id));
-				formMurid.foto = filename;
-				// remove old file only after the new file is in place
-				if (oldFoto && oldFoto !== filename) {
+
+			if (isR2Configured()) {
+				const filename = `${base}_${Date.now()}${ext}`;
+				const key = buildR2Key('murid', filename);
+				try {
+					const { publicUrl } = await uploadBufferToR2(key, buffer, uploadedFile.type || 'image/jpeg');
+					await db.update(tableMurid).set({ foto: publicUrl }).where(eq(tableMurid.id, formMurid.id));
+					formMurid.foto = publicUrl;
+
+					if (oldFoto) {
+						if (isPublicUrl(oldFoto)) {
+							await deleteFromR2(oldFoto);
+						} else {
+							try {
+								await fs.unlink(path.join(uploadsDir(), oldFoto));
+							} catch {
+								// ignore
+							}
+						}
+					}
+				} catch (err) {
+					console.error('Gagal mengunggah foto murid ke R2:', err);
+				}
+			} else {
+				const dir = uploadsDir();
+				await fs.mkdir(dir, { recursive: true });
+				const filename = await generateUniqueFilename(db, base, ext, dir, formMurid.id);
+				const filePath = path.join(dir, filename);
+				try {
+					await fs.writeFile(filePath, buffer, { mode: 0o644 });
+					await db.update(tableMurid).set({ foto: filename }).where(eq(tableMurid.id, formMurid.id));
+					formMurid.foto = filename;
+					// remove old file only after the new file is in place
+					if (oldFoto && oldFoto !== filename) {
+						if (isPublicUrl(oldFoto)) {
+							await deleteFromR2(oldFoto);
+						} else {
+							try {
+								await fs.unlink(path.join(uploadsDir(), oldFoto));
+							} catch {
+								// ignore
+							}
+						}
+					}
+				} catch (err) {
+					console.error('Gagal menulis file foto murid', err);
 					try {
-						await fs.unlink(path.join(uploadsDir(), oldFoto));
+						await fs.unlink(filePath);
 					} catch {
 						// ignore
 					}
-				}
-			} catch (err) {
-				console.error('Gagal menulis file foto murid', err);
-				try {
-					await fs.unlink(filePath);
-				} catch {
-					// ignore
 				}
 			}
 		}

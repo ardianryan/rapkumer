@@ -120,9 +120,10 @@ export function isValidTime(value: string): boolean {
 	return timeRegex.test(value);
 }
 
-// Resolve a stored signature value (legacy data URL or rel file path) to an <img> src.
+// Resolve a stored signature value (legacy data URL, public R2 URL, or rel file path) to an <img> src.
 export function signatureDisplaySrc(value: string | null | undefined): string | null {
 	if (!value) return null;
+	if (value.startsWith('http://') || value.startsWith('https://')) return value;
 	if (value.startsWith('data:image/')) return value;
 	return `/api/ttd/${value}`;
 }
