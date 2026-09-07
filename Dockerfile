@@ -8,8 +8,8 @@ FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
-# Enable pnpm via corepack
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Enable pnpm v9 (matches pnpm-lock.yaml lockfileVersion 9.0)
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # Install dependencies (utilizing layer caching)
 COPY package.json pnpm-lock.yaml ./

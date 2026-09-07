@@ -75,5 +75,15 @@
 		"puppeteer-core": "^25.3.0",
 		"qrcode": "^1.5.4",
 		"unzipper": "^0.12.5"
+	},
+	"packageManager": "pnpm@9.15.9",
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"@libsql/client",
+			"core-js",
+			"es5-ext",
+			"esbuild",
+			"puppeteer"
+		]
 	}
 }
