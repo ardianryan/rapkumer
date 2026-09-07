@@ -123,6 +123,12 @@
 							<span class="text-base-content/60">Mentor &amp; Advisor</span>
 						</a>
 					</li>
+					<li>
+						<a href="https://github.com/ardianryan" target="_blank" rel="noreferrer">
+							<span class="font-semibold">Ryan Ardian</span>
+							<span class="text-base-content/60">Rebuild UI/UX &amp; Sistem Autentikasi</span>
+						</a>
+					</li>
 				</ul>
 
 				<h3 class="card-title mt-1">Tester</h3>
@@ -187,6 +193,11 @@
 					<span class="badge badge-primary badge-soft badge-sm">UI &amp; UX</span>
 					<p class="mt-2 font-semibold">Noffie Suryanti Mandasari, S.Pd.</p>
 					<p class="text-base-content/70 text-sm">Ide dan saran pengembangan antarmuka.</p>
+				</div>
+				<div class="bg-base-200 rounded-box p-4">
+					<span class="badge badge-info badge-soft badge-sm">Rebuild &amp; Auth</span>
+					<p class="mt-2 font-semibold">Ryan Ardian</p>
+					<p class="text-base-content/70 text-sm">Rebuild UI/UX dan sistem autentikasi.</p>
 				</div>
 				<div class="bg-base-200 rounded-box p-4">
 					<span class="badge badge-secondary badge-soft badge-sm">Asesmen</span>
