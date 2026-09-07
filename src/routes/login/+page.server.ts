@@ -15,6 +15,7 @@ import db from '$lib/server/db';
 import { tableKelas, tableMataPelajaran } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { fail, redirect } from '@sveltejs/kit';
+import { getZitadelConfig } from '$lib/server/zitadel';
 import type { Actions, PageServerLoad } from './$types';
 
 function resolveRedirectTarget(value: string | null) {

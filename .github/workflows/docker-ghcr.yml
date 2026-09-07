@@ -1,6 +1,6 @@
 name: Build and Push to GHCR (zitadel branch)
 
-on:
+'on':
   push:
     branches:
       - zitadel

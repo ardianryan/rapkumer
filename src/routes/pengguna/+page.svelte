@@ -9,10 +9,10 @@
 	let { data } = $props();
 
 	// derive user item type from incoming load data to keep typings simple
-	type UserItem = typeof data.users extends Array<infer U> ? U : unknown;
+	type UserItem = typeof data.users extends Array<infer U> ? U : Record<string, unknown>;
 
 	// local reactive users copy so UI updates instantly without full reload
-	type LocalUser = (typeof data.users extends Array<infer U> ? U : any) & {
+	type LocalUser = UserItem & {
 		isNew?: boolean;
 		nama?: string;
 		dapodikPtkId?: string | null;
@@ -140,12 +140,11 @@
 									msg = (pb.error as Record<string, unknown>).message as string;
 								else msg = JSON.stringify(pb);
 							} else {
-								const text = await res.text().catch(() => 'Gagal');
-								msg = text;
+								const text = await res.text().catch(() => '');
+								if (text.trim()) msg = text;
 							}
 						} catch {
-							const text = await res.text().catch(() => 'Gagal');
-							msg = text;
+							// keep default msg
 						}
 						try {
 							if (
