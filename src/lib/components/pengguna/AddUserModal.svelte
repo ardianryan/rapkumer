@@ -19,10 +19,15 @@
 			id: number;
 			username: string;
 			pegawaiName?: string | null;
+			dapodikPtkId?: string | null;
 			type?: string;
 			sekolahId?: number | null;
 			mataPelajaranIds?: number[];
 			kelasIds?: number[];
+			sso?: {
+				ptkId?: string | null;
+				[key: string]: unknown;
+			} | null;
 		} | null;
 	}>();
 
@@ -30,6 +35,7 @@
 
 	let nama = $state('');
 	let username = $state('');
+	let dapodikPtkId = $state('');
 	let password = $state('');
 	let type = $state('user');
 	// Multi-mapel: simpan sebagai Set of checked mata pelajaran IDs
@@ -88,6 +94,7 @@
 			if (editUser) {
 				nama = editUser.pegawaiName ?? '';
 				username = editUser.username ?? '';
+				dapodikPtkId = editUser.dapodikPtkId ?? editUser.sso?.ptkId ?? '';
 				type = editUser.type ?? 'user';
 				sekolahId = editUser.sekolahId ?? '';
 				mataPelajaranIds = new Set(editUser.mataPelajaranIds ?? []);
@@ -95,6 +102,7 @@
 			} else {
 				nama = '';
 				username = '';
+				dapodikPtkId = '';
 				type = 'user';
 				mataPelajaranIds = new Set<number>();
 				kelasIds = new Set<number>();
@@ -180,6 +188,7 @@
 		form.set('username', username || '');
 		form.set('password', password || '');
 		form.set('nama', nama || '');
+		form.set('dapodikPtkId', dapodikPtkId.trim());
 		form.set('type', type || 'user');
 		// Send multiple mapel as JSON array
 		form.set('mataPelajaranIds', JSON.stringify(Array.from(mataPelajaranIds)));
@@ -199,6 +208,7 @@
 					...body,
 					username: body.user?.username ?? username,
 					displayName: body.displayName ?? nama,
+					dapodikPtkId: body.dapodikPtkId ?? (dapodikPtkId.trim() || null),
 					mataPelajaranIds: body.mataPelajaranIds ?? Array.from(mataPelajaranIds),
 					kelasIds: body.kelasIds ?? Array.from(kelasIds),
 					user: body.user ?? {
@@ -369,6 +379,21 @@
 						placeholder="Contoh: Bruce Wayne, Bat."
 					/>
 					<p class="label text-wrap">Nama lengkap pengguna dan gelar (tampil pada daftar)</p>
+				</fieldset>
+
+				<!-- PTK ID Dapodik -->
+				<fieldset class="fieldset">
+					<legend class="fieldset-legend">PTK ID (Dapodik)</legend>
+					<input
+						id="add-user-ptk-id"
+						type="text"
+						class="input dark:bg-base-200 w-full dark:border-none font-mono text-sm"
+						bind:value={dapodikPtkId}
+						placeholder="Contoh: 1faad84c-f1a5-404d-849b-4e8bf0a7ab82"
+					/>
+					<p class="label text-wrap">
+						Opsional: UUID PTK dari Dapodik untuk pencocokan otomatis akun saat login via SSO ZITADEL.
+					</p>
 				</fieldset>
 
 				<!-- Role -->

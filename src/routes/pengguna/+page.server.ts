@@ -464,6 +464,7 @@ export async function load({ url, locals }) {
 			type: u.type,
 			pegawaiId: u.pegawaiId,
 			pegawaiName: tablePegawai.nama,
+			dapodikPtkId: tablePegawai.dapodikPtkId,
 			kelasId: u.kelasId,
 			kelasName: tableKelas.nama,
 			passwordUpdatedAt: u.passwordUpdatedAt,
@@ -621,7 +622,11 @@ export async function load({ url, locals }) {
 		if (uid > 0) {
 			(user as Record<string, unknown>).mataPelajaranIds = userMapelMap.get(uid) ?? [];
 			(user as Record<string, unknown>).kelasIds = userKelasMap.get(uid) ?? [];
-			(user as Record<string, unknown>).sso = userZitadelMap.get(uid) ?? null;
+			const ssoRecord = userZitadelMap.get(uid) ?? null;
+			(user as Record<string, unknown>).sso = ssoRecord;
+			if (!(user as Record<string, unknown>).dapodikPtkId && ssoRecord?.ptkId) {
+				(user as Record<string, unknown>).dapodikPtkId = ssoRecord.ptkId;
+			}
 		}
 	}
 
@@ -767,16 +772,23 @@ export const actions = {
 			return fail(400, { message: passwordError });
 		}
 
+		const dapodikPtkId = form.get('dapodikPtkId') ? String(form.get('dapodikPtkId')).trim() : null;
+
 		try {
 			const { hash, salt } = hashPassword(password);
 			const timestamp = new Date().toISOString();
 			// if a nama was provided, create a pegawai row and link the user to it
 			let pegawaiId: number | null = null;
-			if (nama) {
+			if (nama || dapodikPtkId) {
 				// `nip` is required by the schema; use empty string when not provided
 				const [p] = await db
 					.insert(tablePegawai)
-					.values({ nama, nip: '' })
+					.values({
+						nama: nama || username,
+						nip: '',
+						dapodikPtkId: dapodikPtkId || null,
+						sekolahId: sekolahId ?? undefined
+					})
 					.returning({ id: tablePegawai.id });
 				if (p && typeof p.id === 'number') pegawaiId = p.id;
 			}
@@ -909,6 +921,7 @@ export const actions = {
 				success: true,
 				user: created,
 				displayName: nama,
+				dapodikPtkId: dapodikPtkId || null,
 				mataPelajaranIds: mataPelajaranIds,
 				kelasIds: kelasIds
 			};
@@ -948,6 +961,9 @@ export const actions = {
 		}
 
 		if (!username) return fail(400, { message: 'Username wajib diisi.' });
+
+		const dapodikPtkIdRaw = form.get('dapodikPtkId');
+		const dapodikPtkId = typeof dapodikPtkIdRaw === 'string' ? dapodikPtkIdRaw.trim() : undefined;
 
 		let mataPelajaranIds: number[] = [];
 		const mpRaw = form.get('mataPelajaranIds');
@@ -1025,18 +1041,41 @@ export const actions = {
 					await tx.update(u).set(updateData).where(eq(u.id, id));
 				}
 
-				// Update pegawai nama if provided
-				if (nama && existing.pegawaiId) {
-					await tx
-						.update(tablePegawai)
-						.set({ nama })
-						.where(eq(tablePegawai.id, existing.pegawaiId));
-				} else if (nama && !existing.pegawaiId) {
+				// Update pegawai nama and dapodikPtkId if provided
+				if (existing.pegawaiId) {
+					const pegUpdate: Record<string, unknown> = {};
+					if (nama) pegUpdate.nama = nama;
+					if (dapodikPtkId !== undefined) pegUpdate.dapodikPtkId = dapodikPtkId || null;
+					if (Object.keys(pegUpdate).length > 0) {
+						await tx
+							.update(tablePegawai)
+							.set(pegUpdate)
+							.where(eq(tablePegawai.id, existing.pegawaiId));
+					}
+				} else if (nama || dapodikPtkId) {
 					const [p] = await tx
 						.insert(tablePegawai)
-						.values({ nama, nip: '' })
+						.values({
+							nama: nama || username,
+							nip: '',
+							dapodikPtkId: dapodikPtkId || null,
+							sekolahId: sekolahId ?? undefined
+						})
 						.returning({ id: tablePegawai.id });
 					if (p) await tx.update(u).set({ pegawaiId: p.id }).where(eq(u.id, id));
+				}
+
+				// Sync with ZITADEL SSO record if user is connected
+				if (dapodikPtkId !== undefined) {
+					const zitadel = await tx.query.tableAuthZitadelUser.findFirst({
+						where: eq(tableAuthZitadelUser.userId, id)
+					});
+					if (zitadel) {
+						await tx
+							.update(tableAuthZitadelUser)
+							.set({ ptkId: dapodikPtkId || null })
+							.where(eq(tableAuthZitadelUser.userId, id));
+					}
 				}
 
 				// Sync many-to-many: delete existing then re-insert
@@ -1087,6 +1126,7 @@ export const actions = {
 				success: true,
 				user: updated,
 				displayName: nama,
+				dapodikPtkId: dapodikPtkId !== undefined ? dapodikPtkId || null : undefined,
 				mataPelajaranIds,
 				kelasIds
 			};

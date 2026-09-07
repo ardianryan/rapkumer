@@ -15,6 +15,7 @@
 	type LocalUser = (typeof data.users extends Array<infer U> ? U : any) & {
 		isNew?: boolean;
 		nama?: string;
+		dapodikPtkId?: string | null;
 		mataPelajaranId?: number | null;
 		mataPelajaranIds?: number[];
 		kelasIds?: number[];
@@ -315,6 +316,14 @@
 							...users[idx],
 							username: body.user?.username ?? body.username ?? users[idx].username,
 							pegawaiName: body.displayName ?? users[idx].pegawaiName,
+							dapodikPtkId: body.dapodikPtkId !== undefined ? body.dapodikPtkId : users[idx].dapodikPtkId,
+							sso: users[idx].sso
+								? {
+										...users[idx].sso,
+										ptkId:
+											body.dapodikPtkId !== undefined ? body.dapodikPtkId : users[idx].sso.ptkId
+								  }
+								: users[idx].sso,
 							type: newType,
 							roles: [typeLabels[newType] ?? newType],
 							mataPelajaranIds: body.mataPelajaranIds ?? users[idx].mataPelajaranIds,
@@ -340,6 +349,8 @@
 						type: newType,
 						roles: [typeLabels[newType] ?? newType],
 						pegawaiName: body.displayName || serverUser?.username || (body.username ?? 'user'),
+						dapodikPtkId: body.dapodikPtkId ?? null,
+						sso: null,
 						pegawaiId: null,
 						kelasId: null,
 						kelasName: null,

@@ -10,7 +10,7 @@
 	{#if u.sso}
 		<div
 			class="flex items-center gap-1.5"
-			title={`PTK ID: ${u.sso.ptkId || '-'} | NIP: ${u.sso.nip || '-'}`}
+			title={`PTK ID: ${u.sso.ptkId || u.dapodikPtkId || '-'} | NIP: ${u.sso.nip || '-'}`}
 		>
 			<span class="badge badge-success badge-soft badge-sm font-semibold text-[11px] gap-1">
 				<span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
@@ -18,7 +18,14 @@
 			</span>
 		</div>
 	{:else}
-		<span class="badge badge-ghost badge-sm text-[11px] text-base-content/60"> Lokal </span>
+		<div class="flex items-center gap-1.5" title={u.dapodikPtkId ? `PTK ID: ${u.dapodikPtkId}` : undefined}>
+			<span class="badge badge-ghost badge-sm text-[11px] text-base-content/60"> Lokal </span>
+			{#if u.dapodikPtkId}
+				<span class="badge badge-info badge-soft badge-xs text-[10px]" title={`PTK ID: ${u.dapodikPtkId}`}>
+					PTK ID
+				</span>
+			{/if}
+		</div>
 	{/if}
 </td>
 <td>
