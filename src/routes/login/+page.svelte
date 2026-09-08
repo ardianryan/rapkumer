@@ -221,7 +221,8 @@
 				</h2>
 				<p class="text-xs sm:text-sm text-base-content/65">
 					{#if data.sso?.enabled}
-						Silakan masuk ke Portal Administrasi Guru menggunakan akun SSO sekolah atau formulir login manual
+						Silakan masuk ke Portal Administrasi Guru menggunakan akun SSO sekolah atau formulir
+						login manual
 					{:else}
 						Silakan masukkan nama pengguna dan kata sandi akun Anda untuk melanjutkan
 					{/if}
@@ -249,9 +250,7 @@
 						href={data.sso.loginUrl}
 						class="btn btn-primary h-12 rounded-xl font-bold text-xs sm:text-sm tracking-wide w-full transition-all flex items-center justify-center gap-2.5 text-white shadow-md shadow-primary/25 hover:shadow-lg hover:shadow-primary/35 active:scale-[0.98]"
 					>
-						<div
-							class="h-6 w-6 rounded-lg bg-white/20 flex items-center justify-center shrink-0"
-						>
+						<div class="h-6 w-6 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
 							<Icon name="key" class="h-3.5 w-3.5 text-white" />
 						</div>
 						<span>{data.sso.buttonText}</span>
@@ -266,7 +265,11 @@
 						class="bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-500 hover:text-primary dark:text-slate-400 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 rounded-lg py-1 hover:bg-slate-50 dark:hover:bg-slate-800"
 						onclick={() => (showManualLogin = !showManualLogin)}
 					>
-						<span>{showManualLogin ? 'Sembunyikan Login Manual' : 'Atau Masuk dengan Username & Kata Sandi'}</span>
+						<span
+							>{showManualLogin
+								? 'Sembunyikan Login Manual'
+								: 'Atau Masuk dengan Username & Kata Sandi'}</span
+						>
 						<Icon name={showManualLogin ? 'up' : 'down'} class="h-3.5 w-3.5" />
 					</button>
 				</div>
@@ -361,8 +364,8 @@
 											<span>Bantuan Akun & Kata Sandi</span>
 										</div>
 										<p class="leading-relaxed opacity-90">
-											Silakan hubungi <strong>Admin IT / Kurikulum Sekolah</strong> untuk mereset kata sandi
-											atau memperbarui data akun GTK Anda.
+											Silakan hubungi <strong>Admin IT / Kurikulum Sekolah</strong> untuk mereset kata
+											sandi atau memperbarui data akun GTK Anda.
 										</p>
 									</div>
 								{/if}

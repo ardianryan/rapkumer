@@ -7,6 +7,7 @@ import {
 	tableMataPelajaran,
 	tableAuthUserMataPelajaran,
 	tableAuthUserKelas,
+	tableAuthUserPembelajaran,
 	tableAuthZitadelUser,
 	tableMurid,
 	tableSemester
@@ -572,7 +573,7 @@ export async function load({ url, locals }) {
 	const allUserIds = users
 		.map((r) => r.id)
 		.filter((id): id is number => typeof id === 'number' && id > 0);
-	const [userMapelRows, userKelasRows, userZitadelRows] = allUserIds.length
+	const [userMapelRows, userKelasRows, userZitadelRows, userPembelajaranRows] = allUserIds.length
 		? await Promise.all([
 				db
 					.select({
@@ -603,9 +604,21 @@ export async function load({ url, locals }) {
 					.catch((err) => {
 						console.warn('[pengguna] Failed to query auth_zitadel_user:', err);
 						return [];
+					}),
+				db
+					.select({
+						userId: tableAuthUserPembelajaran.authUserId,
+						kelasId: tableAuthUserPembelajaran.kelasId,
+						mataPelajaranId: tableAuthUserPembelajaran.mataPelajaranId
+					})
+					.from(tableAuthUserPembelajaran)
+					.where(inArray(tableAuthUserPembelajaran.authUserId, allUserIds))
+					.catch((err) => {
+						console.warn('[pengguna] Failed to query auth_user_pembelajaran:', err);
+						return [];
 					})
 			])
-		: [[], [], []];
+		: [[], [], [], []];
 
 	const userMapelMap = new Map<number, number[]>();
 	for (const row of userMapelRows) {
@@ -619,17 +632,27 @@ export async function load({ url, locals }) {
 		arr.push(row.kelasId);
 		userKelasMap.set(row.userId, arr);
 	}
+	const userPembelajaranMap = new Map<
+		number,
+		Array<{ kelasId: number; mataPelajaranId: number }>
+	>();
+	for (const row of userPembelajaranRows) {
+		const arr = userPembelajaranMap.get(row.userId) ?? [];
+		arr.push({ kelasId: row.kelasId, mataPelajaranId: row.mataPelajaranId });
+		userPembelajaranMap.set(row.userId, arr);
+	}
 	const userZitadelMap = new Map<number, (typeof userZitadelRows)[0]>();
 	for (const row of userZitadelRows) {
 		userZitadelMap.set(row.userId, row);
 	}
 
-	// Attach mapelIds/kelasIds/sso to each user for edit modal & table display
+	// Attach mapelIds/kelasIds/pembelajaran/sso to each user for edit modal & table display
 	for (const user of users) {
 		const uid = user.id as number;
 		if (uid > 0) {
 			(user as Record<string, unknown>).mataPelajaranIds = userMapelMap.get(uid) ?? [];
 			(user as Record<string, unknown>).kelasIds = userKelasMap.get(uid) ?? [];
+			(user as Record<string, unknown>).pembelajaranList = userPembelajaranMap.get(uid) ?? [];
 			const ssoRecord = userZitadelMap.get(uid) ?? null;
 			(user as Record<string, unknown>).sso = ssoRecord;
 			if (!(user as Record<string, unknown>).dapodikPtkId && ssoRecord?.ptkId) {
@@ -911,6 +934,27 @@ export const actions = {
 				}
 			}
 
+			// Insert penugasan presisi pembelajaran (auth_user_pembelajaran)
+			for (const mapelId of mataPelajaranIds) {
+				const mp = await db.query.tableMataPelajaran.findFirst({
+					where: eq(tableMataPelajaran.id, mapelId),
+					columns: { id: true, kelasId: true }
+				});
+				if (mp?.kelasId) {
+					try {
+						await db.insert(tableAuthUserPembelajaran).values({
+							authUserId: created.id,
+							kelasId: mp.kelasId,
+							mataPelajaranId: mp.id,
+							createdAt: timestamp,
+							updatedAt: timestamp
+						});
+					} catch (err) {
+						if (!String(err).includes('UNIQUE')) throw err;
+					}
+				}
+			}
+
 			console.info(
 				`[pengguna] Created user via action: ${username} -> id=${created.id}, mapels=${mataPelajaranIds.length}, kelas=${kelasIds.length}`
 			);
@@ -1117,6 +1161,30 @@ export const actions = {
 						if (!String(err).includes('UNIQUE')) throw err;
 					}
 				}
+
+				// Sync auth_user_pembelajaran
+				await tx
+					.delete(tableAuthUserPembelajaran)
+					.where(eq(tableAuthUserPembelajaran.authUserId, id));
+				for (const mpId of mataPelajaranIds) {
+					const mp = await tx.query.tableMataPelajaran.findFirst({
+						where: eq(tableMataPelajaran.id, mpId),
+						columns: { id: true, kelasId: true }
+					});
+					if (mp?.kelasId) {
+						try {
+							await tx.insert(tableAuthUserPembelajaran).values({
+								authUserId: id,
+								kelasId: mp.kelasId,
+								mataPelajaranId: mp.id,
+								createdAt: ts,
+								updatedAt: ts
+							});
+						} catch (err) {
+							if (!String(err).includes('UNIQUE')) throw err;
+						}
+					}
+				}
 			});
 
 			// Return updated user
@@ -1234,5 +1302,37 @@ export const actions = {
 
 		await db.delete(tableAuthZitadelUser).where(eq(tableAuthZitadelUser.userId, userId));
 		return { success: true, message: 'Tautan akun SSO berhasil diputuskan.' };
+	},
+
+	bulk_reset_permissions: async ({ request }) => {
+		authority('user_set_permissions');
+		const formData = await request.formData();
+		const userIdsRaw = formData.get('userIds');
+		let userIds: number[];
+		try {
+			userIds = JSON.parse(String(userIdsRaw || '[]'));
+		} catch {
+			return fail(400, { message: 'Data user tidak valid.' });
+		}
+		if (!Array.isArray(userIds) || !userIds.length) {
+			return fail(400, { message: 'Pilih setidaknya satu pengguna.' });
+		}
+
+		const targetUsers = await db.query.tableAuthUser.findMany({
+			where: inArray(tableAuthUser.id, userIds),
+			columns: { id: true, type: true }
+		});
+
+		const ts = new Date().toISOString();
+		for (const u of targetUsers) {
+			if (u.type === 'admin') continue;
+			const defaults = defaultPermissionsByType[u.type] ?? [];
+			await db
+				.update(tableAuthUser)
+				.set({ permissions: defaults, updatedAt: ts })
+				.where(eq(tableAuthUser.id, u.id));
+		}
+
+		return { success: true, count: targetUsers.length };
 	}
 };

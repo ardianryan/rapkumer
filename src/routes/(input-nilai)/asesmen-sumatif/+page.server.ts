@@ -211,7 +211,7 @@ export async function load({ parent, url, depends, locals }) {
 					(norm.startsWith('pendidikan agama') && norm !== normalizeText(AGAMA_BASE_SUBJECT)) ||
 					(norm.startsWith('pendalaman kitab suci') && norm !== normalizeText(PKS_BASE_SUBJECT));
 			}
-		} else if (maybeUser.mataPelajaranId) {
+		} else if (maybeUser?.mataPelajaranId) {
 			// Fallback to legacy single mapel
 			try {
 				const assigned = await db.query.tableMataPelajaran.findFirst({

@@ -6,9 +6,7 @@
 
 	let isCustomizing = $state(false);
 
-	const isTendik = $derived(
-		(data.zitadelUser?.role ?? '').trim().toLowerCase() === 'tendik'
-	);
+	const isTendik = $derived((data.zitadelUser?.role ?? '').trim().toLowerCase() === 'tendik');
 	const hasDapodikPegawai = $derived(Boolean(data.pegawai));
 
 	// State pemilihan mandiri (khusus guru)
@@ -50,7 +48,9 @@
 </script>
 
 <svelte:head>
-	<title>{isTendik ? 'Onboarding Tenaga Kependidikan' : 'Konfirmasi Penugasan Guru'} - Rapkumer</title>
+	<title
+		>{isTendik ? 'Onboarding Tenaga Kependidikan' : 'Konfirmasi Penugasan Guru'} - Rapkumer</title
+	>
 </svelte:head>
 
 <div class="min-h-screen w-full bg-slate-50 dark:bg-slate-950 py-10 px-4 sm:px-6 lg:px-8">
@@ -71,7 +71,9 @@
 							<span class="badge badge-success badge-sm font-semibold text-[11px] text-white">
 								● SSO Terhubung
 							</span>
-							<span class="badge badge-outline badge-sm font-semibold text-[11px] uppercase tracking-wider">
+							<span
+								class="badge badge-outline badge-sm font-semibold text-[11px] uppercase tracking-wider"
+							>
 								{data.zitadelUser?.role || (isTendik ? 'Tendik' : 'Guru')}
 							</span>
 							{#if data.pegawai?.nip}
@@ -100,8 +102,12 @@
 
 			<!-- Banner jika profil belum terhubung dengan data Dapodik -->
 			{#if !hasDapodikPegawai}
-				<div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/50 flex items-start gap-3">
-					<div class="p-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+				<div
+					class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/50 flex items-start gap-3"
+				>
+					<div
+						class="p-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"
+					>
 						<Icon name="alert" class="h-5 w-5" />
 					</div>
 					<div class="text-xs space-y-1">
@@ -109,11 +115,14 @@
 							Akun Belum Ditemukan di Data Dapodik Sekolah
 						</p>
 						<p class="text-amber-700 dark:text-amber-300 leading-relaxed">
-							PTK ID atau data kepegawaian Anda belum terdaftar di sinkronisasi Dapodik Rapkumer sekolah ini.
+							PTK ID atau data kepegawaian Anda belum terdaftar di sinkronisasi Dapodik Rapkumer
+							sekolah ini.
 							{#if isTendik}
-								Sebagai Tenaga Kependidikan (Tendik), Anda dapat langsung masuk. Pengaturan penugasan dan hak akses lanjutan akan diatur oleh Admin Sekolah.
+								Sebagai Tenaga Kependidikan (Tendik), Anda dapat langsung masuk. Pengaturan
+								penugasan dan hak akses lanjutan akan diatur oleh Admin Sekolah.
 							{:else}
-								Anda tetap dapat mengatur penugasan mata pelajaran dan kelas secara mandiri di bawah ini agar dapat langsung mulai bekerja.
+								Anda tetap dapat mengatur penugasan mata pelajaran dan kelas secara mandiri di bawah
+								ini agar dapat langsung mulai bekerja.
 							{/if}
 						</p>
 					</div>
@@ -121,10 +130,12 @@
 			{:else}
 				<p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-w-3xl">
 					{#if isTendik}
-						Akun SSO Anda berhasil terhubung dengan data profil di sistem Rapkumer. Anda terdaftar sebagai <strong>Tenaga Kependidikan (Tendik)</strong>.
+						Akun SSO Anda berhasil terhubung dengan data profil di sistem Rapkumer. Anda terdaftar
+						sebagai <strong>Tenaga Kependidikan (Tendik)</strong>.
 					{:else}
-						Akun SSO Anda berhasil terhubung dengan data profil di sistem Rapkumer. Sebelum melanjutkan
-						ke Dashboard, mohon periksa apakah daftar <strong>Mata Pelajaran</strong> dan
+						Akun SSO Anda berhasil terhubung dengan data profil di sistem Rapkumer. Sebelum
+						melanjutkan ke Dashboard, mohon periksa apakah daftar <strong>Mata Pelajaran</strong>
+						dan
 						<strong>Kelas</strong> yang Anda ampu di bawah ini sudah sesuai.
 					{/if}
 				</p>
@@ -143,7 +154,9 @@
 			<div
 				class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-10 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-6 text-center"
 			>
-				<div class="mx-auto h-16 w-16 rounded-2xl bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+				<div
+					class="mx-auto h-16 w-16 rounded-2xl bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center"
+				>
 					<Icon name="users" class="h-8 w-8" />
 				</div>
 				<div class="max-w-md mx-auto space-y-2">
@@ -152,7 +165,8 @@
 					</h2>
 					<p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
 						Tenaga Kependidikan tidak memiliki penugasan mata pelajaran atau kelas pembelajaran.
-						Seluruh hak akses menu administratif ditentukan dan diatur secara terpusat oleh Admin Sekolah.
+						Seluruh hak akses menu administratif ditentukan dan diatur secara terpusat oleh Admin
+						Sekolah.
 					</p>
 				</div>
 
@@ -261,7 +275,8 @@
 						Apakah data penugasan di atas sudah sesuai?
 					</h3>
 					<p class="text-xs text-slate-500 dark:text-slate-400">
-						Jika belum cocok atau masih kosong, Anda dapat memilih mata pelajaran serta kelas secara mandiri.
+						Jika belum cocok atau masih kosong, Anda dapat memilih mata pelajaran serta kelas secara
+						mandiri.
 					</p>
 				</div>
 
@@ -414,4 +429,3 @@
 		{/if}
 	</div>
 </div>
-

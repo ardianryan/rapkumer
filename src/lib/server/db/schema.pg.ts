@@ -8,6 +8,7 @@
 
 import { relations } from 'drizzle-orm';
 import {
+	type AnyPgColumn,
 	boolean,
 	customType,
 	index,
@@ -155,7 +156,7 @@ export const tablePegawai = pgTable('pegawai', {
 	nip: text().notNull(),
 	// Sekolah pemilik pegawai (null utk placeholder/belum ditetapkan). Dipakai
 	// dapodik sync utk memisahkan data GTK antar sekolah.
-	sekolahId: integer().references(() => tableSekolah.id),
+	sekolahId: integer().references((): AnyPgColumn => tableSekolah.id),
 	// Referensi Dapodik
 	dapodikPtkId: text(),
 	nuptk: text(),
@@ -180,7 +181,7 @@ export const tableSekolah = pgTable('sekolah', {
 	website: text(),
 	email: text().notNull(),
 	kepalaSekolahId: integer()
-		.references(() => tablePegawai.id)
+		.references((): AnyPgColumn => tablePegawai.id)
 		.notNull(),
 	lokasiTandaTangan: text(),
 	// Referensi Dapodik
@@ -608,6 +609,31 @@ export const tableAuthUserKelas = pgTable(
 	]
 );
 
+// Join table untuk penugasan presisi: auth_user -> kelas -> mata_pelajaran
+// Menjamin mapel guru terkunci per kelas dan tidak bocor ke kelas lain
+export const tableAuthUserPembelajaran = pgTable(
+	'auth_user_pembelajaran',
+	{
+		id: serial().primaryKey(),
+		authUserId: integer()
+			.references(() => tableAuthUser.id, { onDelete: 'cascade' })
+			.notNull(),
+		kelasId: integer()
+			.references(() => tableKelas.id, { onDelete: 'cascade' })
+			.notNull(),
+		mataPelajaranId: integer()
+			.references(() => tableMataPelajaran.id, { onDelete: 'cascade' })
+			.notNull(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.authUserId, table.kelasId, table.mataPelajaranId),
+		index('auth_user_pembelajaran_user_idx').on(table.authUserId),
+		index('auth_user_pembelajaran_kelas_idx').on(table.kelasId),
+		index('auth_user_pembelajaran_mapel_idx').on(table.mataPelajaranId)
+	]
+);
+
 export const tableMataPelajaran = pgTable(
 	'mata_pelajaran',
 	{
@@ -900,16 +926,23 @@ export const tableAsesmenEkstrakurikuler = pgTable(
 	]
 );
 
-export const tableKokurikuler = pgTable('kokurikuler', {
-	id: serial().primaryKey(),
-	kelasId: integer()
-		.references(() => tableKelas.id)
-		.notNull(),
-	kode: text().notNull().unique(),
-	dimensi: jsonb().$type<string[]>().notNull(),
-	tujuan: text().notNull(),
-	...audit
-});
+export const tableKokurikuler = pgTable(
+	'kokurikuler',
+	{
+		id: serial().primaryKey(),
+		kelasId: integer()
+			.references(() => tableKelas.id)
+			.notNull(),
+		kode: text().notNull(),
+		dimensi: jsonb().$type<string[]>().notNull(),
+		tujuan: text().notNull(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.kelasId, table.kode),
+		index('kokurikuler_kelas_idx').on(table.kelasId)
+	]
+);
 
 export const tableEkstrakurikulerRelations = relations(tableEkstrakurikuler, ({ one, many }) => ({
 	kelas: one(tableKelas, {

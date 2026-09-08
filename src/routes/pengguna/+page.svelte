@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import { showModal, updateModal } from '$lib/components/global-modal.svelte';
 	import { toast } from '$lib/components/toast.svelte';
 	import AlertWarning from '$lib/components/alert-warning.svelte';
@@ -63,6 +64,36 @@
 		const idx = selectedIds.indexOf(id);
 		if (idx === -1) selectedIds = [...selectedIds, id];
 		else selectedIds = selectedIds.filter((x) => x !== id);
+	}
+
+	function handleBulkResetPermissions() {
+		showModal({
+			title: 'Reset Hak Akses Standar',
+			body: `Yakin ingin mereset hak akses ${selectedIds.length} pengguna terpilih ke hak akses standar peran masing-masing?`,
+			onPositive: {
+				label: 'Reset Hak Akses',
+				icon: 'repeat',
+				action: async ({ close }: { close: () => void }) => {
+					const form = new FormData();
+					form.set('userIds', JSON.stringify(selectedIds));
+					const res = await fetch('?/bulk_reset_permissions', { method: 'POST', body: form });
+					if (res.ok) {
+						toast({
+							message: `Berhasil mereset hak akses ${selectedIds.length} pengguna ke standar peran`,
+							type: 'success'
+						});
+						close();
+						selectedIds = [];
+						await invalidateAll();
+						users = data.users ?? [];
+					} else {
+						toast({ message: 'Gagal mereset hak akses', type: 'error' });
+					}
+				}
+			},
+			onNegative: { label: 'Batal', icon: 'close' },
+			dismissible: true
+		});
 	}
 
 	async function handleDelete() {
@@ -212,7 +243,12 @@
 			<div class="space-y-2">
 				<h1 class="text-2xl font-bold">Daftar pengguna</h1>
 			</div>
-			<UsersHeader {selectedIds} onDelete={handleDelete} onAdd={handleAdd} />
+			<UsersHeader
+				{selectedIds}
+				onDelete={handleDelete}
+				onResetPermissions={handleBulkResetPermissions}
+				onAdd={handleAdd}
+			/>
 		</header>
 
 		<!-- Filter Tabs: Semua / Lokal / SSO Auth -->

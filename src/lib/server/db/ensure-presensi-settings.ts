@@ -77,8 +77,11 @@ export async function ensurePresensiSettingsSchema() {
 			sql: `SELECT DISTINCT il.name FROM pragma_index_list('${TABLE}') il JOIN pragma_index_info(il.name) ii ON 1=1 WHERE il."unique" = 1 GROUP BY il.name HAVING COUNT(ii.name) = 1 AND MAX(CASE WHEN ii.name = 'sekolah_id' THEN 1 ELSE 0 END) = 1`
 		});
 		const rows = idxList.rows || [];
-		for (const row of rows) {
-			const name = String(row?.name ?? row?.[0] ?? '');
+		for (const rawRow of rows) {
+			const row = rawRow as Record<string, unknown> | unknown[];
+			const name = String(
+				(row as Record<string, unknown>)?.name ?? (Array.isArray(row) ? row[0] : '')
+			);
 			if (name && !name.includes('tahun_ajaran_id')) {
 				try {
 					await db.$client.execute(`DROP INDEX IF EXISTS "${name}"`);

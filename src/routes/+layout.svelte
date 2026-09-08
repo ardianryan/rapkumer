@@ -189,11 +189,18 @@
 	const isPresensiMuridPage = $derived(page.url.pathname.startsWith('/presensi-murid'));
 	const isJurnalMengajarPage = $derived(page.url.pathname.startsWith('/jurnal-mengajar'));
 	const isCetakPage = $derived(page.url.pathname.startsWith('/cetak'));
+	const isKokurikulerPage = $derived(
+		page.url.pathname.startsWith('/asesmen-kokurikuler') ||
+			page.url.pathname.startsWith('/kokurikuler')
+	);
 
 	const disableInteraction = $derived(
 		data.user?.type === 'user' &&
 			isReadonlyPage &&
-			!((isPresensiMuridPage || isJurnalMengajarPage || isCetakPage) && userIsGuruMapel)
+			!(
+				(isPresensiMuridPage || isJurnalMengajarPage || isCetakPage || isKokurikulerPage) &&
+				userIsGuruMapel
+			)
 	);
 
 	async function stopServer() {

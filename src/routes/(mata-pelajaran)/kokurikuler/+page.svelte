@@ -18,6 +18,7 @@
 			kokurikuler: Array<Kokurikuler & { dimensi: DimensiProfilLulusanKey[] }>;
 			dimensiPilihan: typeof profilPelajarPancasilaDimensions;
 			tableReady: boolean;
+			availableKelas?: Array<{ id: number; nama: string; fase: string | null }>;
 		};
 	} = $props();
 
@@ -182,6 +183,7 @@
 	action={modalAction}
 	kelasId={data.kelasId}
 	tableReady={data.tableReady}
+	availableKelas={data.availableKelas ?? []}
 	{canManage}
 	{isEditMode}
 	{modalItem}

@@ -5,6 +5,7 @@ import {
 	tableAuthUser,
 	tableAuthUserKelas,
 	tableAuthUserMataPelajaran,
+	tableAuthUserPembelajaran,
 	tableAuthZitadelUser,
 	tableKelas,
 	tableMataPelajaran,
@@ -162,6 +163,29 @@ export const actions: Actions = {
 					authUserId: userId,
 					kelasId
 				});
+			}
+
+			// 3. Update relasi presisi pembelajaran (auth_user_pembelajaran)
+			await db
+				.delete(tableAuthUserPembelajaran)
+				.where(eq(tableAuthUserPembelajaran.authUserId, userId));
+
+			for (const mapelId of mapelIds) {
+				const mp = await db.query.tableMataPelajaran.findFirst({
+					where: eq(tableMataPelajaran.id, mapelId),
+					columns: { id: true, kelasId: true }
+				});
+				if (mp?.kelasId) {
+					try {
+						await db.insert(tableAuthUserPembelajaran).values({
+							authUserId: userId,
+							kelasId: mp.kelasId,
+							mataPelajaranId: mp.id
+						});
+					} catch {
+						// ignore duplicate
+					}
+				}
 			}
 
 			// Set primary mapel jika ada

@@ -1,16 +1,21 @@
 import db from '$lib/server/db';
-import { tableAuthUserMataPelajaran, tableMataPelajaran } from '$lib/server/db/schema';
+import {
+	tableAuthUser,
+	tableAuthUserMataPelajaran,
+	tableAuthUserPembelajaran,
+	tableMataPelajaran
+} from '$lib/server/db/schema';
 import { agamaMapelNames, agamaParentName, pksMapelNames, pksParentName } from '$lib/statics';
 import { and, eq, inArray, or, type SQL } from 'drizzle-orm';
 
 // Pusat cek akses mapel untuk akun tipe "user" (guru mapel).
 // Aturan:
-// 1. ID mapel yang di-assign (auth_user_mata_pelajaran + legacy kolom).
-// 2. Nama mapel yang di-assign (lintas kelas/semester, nama normalized sama).
-// 3. Keluarga nama agama/PKS: varian di-assign → membuka nama induknya.
-// 4. Sub pembelajaran: child (dapodikIndukPembelajaranId) yang terikat ke
-//    pembelajaran induk milik guru (kelas sama) otomatis ikut diakses —
-//    ID dan namanya (nama ikut agar pindah kelas tetap jalan).
+// 1. Penugasan presisi per kelas: mata_pelajaran.pengampuId = pegawaiId ATAU auth_user_pembelajaran.
+// 2. ID mapel yang di-assign (auth_user_mata_pelajaran + legacy kolom) sebagai fallback.
+// 3. Nama mapel yang di-assign (hanya jika fallback aktif).
+// 4. Keluarga nama agama/PKS: varian di-assign → membuka nama induknya.
+// 5. Sub pembelajaran: child (dapodikIndukPembelajaranId) yang terikat ke
+//    pembelajaran induk milik guru (kelas sama) otomatis ikut diakses.
 
 /** Cek apakah user perlu difilter hanya ke mapel yang di-assign.
  *  - tipe 'user' → selalu filter.
@@ -64,15 +69,104 @@ export async function getAksesMapelUser(
 	user: {
 		id: number;
 		mataPelajaranId?: number | null;
+		pegawaiId?: number | null;
 	},
 	targetKelasId?: number | null
 ): Promise<AksesMapel> {
+	// 1. Resolve pegawaiId jika belum disediakan
+	let pegawaiId = user.pegawaiId;
+	if (pegawaiId === undefined && user.id) {
+		const u = await db.query.tableAuthUser.findFirst({
+			columns: { pegawaiId: true },
+			where: eq(tableAuthUser.id, user.id)
+		});
+		pegawaiId = u?.pegawaiId ?? null;
+	}
+
+	// 2. Jika targetKelasId diberikan, prioritaskan pengecekan presisi per kelas
+	if (targetKelasId) {
+		// A. Dari penugasan presisi auth_user_pembelajaran
+		const pembelajarans = await db.query.tableAuthUserPembelajaran.findMany({
+			columns: { mataPelajaranId: true },
+			where: and(
+				eq(tableAuthUserPembelajaran.authUserId, user.id),
+				eq(tableAuthUserPembelajaran.kelasId, targetKelasId)
+			)
+		});
+
+		// B. Dari pengampu langsung di tabel mata_pelajaran (sinkron Dapodik)
+		const pengampus = pegawaiId
+			? await db.query.tableMataPelajaran.findMany({
+					columns: { id: true },
+					where: and(
+						eq(tableMataPelajaran.kelasId, targetKelasId),
+						eq(tableMataPelajaran.pengampuId, pegawaiId)
+					)
+				})
+			: [];
+
+		const targetMapelIds = new Set<number>([
+			...pembelajarans.map((p) => p.mataPelajaranId),
+			...pengampus.map((p) => p.id)
+		]);
+
+		// Jika ditemukan penugasan presisi untuk kelas ini, HANYA gunakan mapel kelas ini!
+		if (targetMapelIds.size > 0) {
+			const intiRows = await db.query.tableMataPelajaran.findMany({
+				columns: { id: true, kelasId: true, nama: true, dapodikPembelajaranId: true },
+				where: inArray(tableMataPelajaran.id, Array.from(targetMapelIds))
+			});
+
+			const ids = new Set(targetMapelIds);
+			const names = new Set<string>();
+			const rawNames = new Set<string>();
+			for (const row of intiRows) {
+				names.add(norm(row.nama));
+				rawNames.add((row.nama ?? '').trim());
+				const parent = familyParentName(row.nama);
+				if (parent) names.add(parent);
+			}
+
+			// Sub pembelajaran untuk kelas ini
+			const subParents = intiRows.filter((row) => row.dapodikPembelajaranId);
+			if (subParents.length) {
+				const pasangan = subParents.map((row): SQL =>
+					and(
+						eq(tableMataPelajaran.kelasId, targetKelasId),
+						eq(tableMataPelajaran.dapodikIndukPembelajaranId, row.dapodikPembelajaranId!)
+					)!
+				);
+				const subs = await db.query.tableMataPelajaran.findMany({
+					columns: { id: true, nama: true },
+					where: or(...pasangan)
+				});
+				for (const sub of subs) {
+					ids.add(sub.id);
+					names.add(norm(sub.nama));
+					rawNames.add((sub.nama ?? '').trim());
+				}
+			}
+
+			return { ids, names, rawNames };
+		}
+	}
+
+	// 3. Fallback jika tidak ada targetKelasId atau user belum memiliki data pembelajaran presisi
 	const assigned = await db.query.tableAuthUserMataPelajaran.findMany({
 		columns: { mataPelajaranId: true },
 		where: eq(tableAuthUserMataPelajaran.authUserId, user.id)
 	});
 	const ids = new Set(assigned.map((row) => row.mataPelajaranId));
 	if (user.mataPelajaranId) ids.add(user.mataPelajaranId);
+
+	// Tambahkan juga mapel dari pengampuId jika ada
+	if (pegawaiId) {
+		const pengampusAll = await db.query.tableMataPelajaran.findMany({
+			columns: { id: true },
+			where: eq(tableMataPelajaran.pengampuId, pegawaiId)
+		});
+		for (const p of pengampusAll) ids.add(p.id);
+	}
 
 	if (!ids.size) return { ids, names: new Set(), rawNames: new Set() };
 
@@ -90,9 +184,6 @@ export async function getAksesMapelUser(
 		if (parent) names.add(parent);
 	}
 
-	// Sub pembelajaran: child terikat ke pembelajaran induk milik guru.
-	// When targetKelasId is given, only expand sub-mapel for that kelas so
-	// names from other kelas don't leak into the filter.
 	const subParents = targetKelasId
 		? intiRows.filter((row) => row.dapodikPembelajaranId && row.kelasId === targetKelasId)
 		: intiRows.filter((row) => row.dapodikPembelajaranId);
@@ -118,9 +209,9 @@ export async function getAksesMapelUser(
 }
 
 export async function bolehAksesMapel(
-	user: { id: number; mataPelajaranId?: number | null },
-	mapel: Pick<MapelInti, 'id' | 'nama'>
+	user: { id: number; mataPelajaranId?: number | null; pegawaiId?: number | null },
+	mapel: Pick<MapelInti, 'id' | 'nama'> & { kelasId?: number | null }
 ): Promise<boolean> {
-	const akses = await getAksesMapelUser(user);
+	const akses = await getAksesMapelUser(user, mapel.kelasId);
 	return akses.ids.has(mapel.id) || akses.names.has(norm(mapel.nama));
 }

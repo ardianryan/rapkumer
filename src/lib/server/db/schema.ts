@@ -1,5 +1,6 @@
 import { relations } from 'drizzle-orm';
 import {
+	type AnySQLiteColumn,
 	blob,
 	index,
 	int,
@@ -137,7 +138,7 @@ export const tablePegawai = sqliteTable('pegawai', {
 	nip: text().notNull(),
 	// Sekolah pemilik pegawai (null utk placeholder/belum ditetapkan). Dipakai
 	// dapodik sync utk memisahkan data GTK antar sekolah.
-	sekolahId: int().references(() => tableSekolah.id),
+	sekolahId: int().references((): AnySQLiteColumn => tableSekolah.id),
 	// Referensi Dapodik
 	dapodikPtkId: text(),
 	nuptk: text(),
@@ -162,7 +163,7 @@ export const tableSekolah = sqliteTable('sekolah', {
 	website: text(),
 	email: text().notNull(),
 	kepalaSekolahId: int()
-		.references(() => tablePegawai.id)
+		.references((): AnySQLiteColumn => tablePegawai.id)
 		.notNull(),
 	lokasiTandaTangan: text(),
 	// Referensi Dapodik
@@ -590,6 +591,31 @@ export const tableAuthUserKelas = sqliteTable(
 	]
 );
 
+// Join table untuk penugasan presisi: auth_user -> kelas -> mata_pelajaran
+// Menjamin mapel guru terkunci per kelas dan tidak bocor ke kelas lain
+export const tableAuthUserPembelajaran = sqliteTable(
+	'auth_user_pembelajaran',
+	{
+		id: int().primaryKey({ autoIncrement: true }),
+		authUserId: int()
+			.references(() => tableAuthUser.id, { onDelete: 'cascade' })
+			.notNull(),
+		kelasId: int()
+			.references(() => tableKelas.id, { onDelete: 'cascade' })
+			.notNull(),
+		mataPelajaranId: int()
+			.references(() => tableMataPelajaran.id, { onDelete: 'cascade' })
+			.notNull(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.authUserId, table.kelasId, table.mataPelajaranId),
+		index('auth_user_pembelajaran_user_idx').on(table.authUserId),
+		index('auth_user_pembelajaran_kelas_idx').on(table.kelasId),
+		index('auth_user_pembelajaran_mapel_idx').on(table.mataPelajaranId)
+	]
+);
+
 export const tableMataPelajaran = sqliteTable(
 	'mata_pelajaran',
 	{
@@ -882,16 +908,23 @@ export const tableAsesmenEkstrakurikuler = sqliteTable(
 	]
 );
 
-export const tableKokurikuler = sqliteTable('kokurikuler', {
-	id: int().primaryKey({ autoIncrement: true }),
-	kelasId: int()
-		.references(() => tableKelas.id)
-		.notNull(),
-	kode: text().notNull().unique(),
-	dimensi: text({ mode: 'json' }).$type<string[]>().notNull(),
-	tujuan: text().notNull(),
-	...audit
-});
+export const tableKokurikuler = sqliteTable(
+	'kokurikuler',
+	{
+		id: int().primaryKey({ autoIncrement: true }),
+		kelasId: int()
+			.references(() => tableKelas.id)
+			.notNull(),
+		kode: text().notNull(),
+		dimensi: text({ mode: 'json' }).$type<string[]>().notNull(),
+		tujuan: text().notNull(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.kelasId, table.kode),
+		index('kokurikuler_kelas_idx').on(table.kelasId)
+	]
+);
 
 export const tableEkstrakurikulerRelations = relations(tableEkstrakurikuler, ({ one, many }) => ({
 	kelas: one(tableKelas, {

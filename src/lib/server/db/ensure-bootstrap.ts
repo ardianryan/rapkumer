@@ -24,6 +24,7 @@ import { ensureLoginAttemptsSchema } from './ensure-login-attempts';
 import { ensurePermissionMigration } from './ensure-permission-migration';
 import { ensurePresensiSettingsSchema } from './ensure-presensi-settings';
 import { ensureZitadelSchema } from './ensure-zitadel';
+import { ensurePembelajaranSchema } from './ensure-pembelajaran';
 import { resetEnsuredSchemas } from './ensure-helper';
 
 let startupEnsuresDone = false;
@@ -63,6 +64,7 @@ export async function runStartupEnsures() {
 	await ensurePermissionMigration();
 	await ensureKepalaSekolahAccounts();
 	await ensureZitadelSchema();
+	await ensurePembelajaranSchema();
 	startupEnsuresDone = true;
 }
 

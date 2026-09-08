@@ -26,7 +26,8 @@
 		tujuanInput,
 		onTujuanChange,
 		onClose,
-		onSuccess
+		onSuccess,
+		availableKelas = []
 	} = $props<{
 		open: boolean;
 		title: string;
@@ -45,9 +46,15 @@
 		onTujuanChange: (value: string) => void;
 		onClose: () => void;
 		onSuccess: (payload: { form: HTMLFormElement }) => void;
+		availableKelas?: Array<{ id: number; nama: string; fase: string | null }>;
 	}>();
 
 	let submitting = $state(false);
+	const otherClasses = $derived(
+		(availableKelas ?? []).filter(
+			(k: { id: number; nama: string; fase: string | null }) => k.id !== kelasId
+		)
+	);
 </script>
 
 {#if open}
@@ -71,63 +78,86 @@
 					onsuccess={onSuccess}
 					submitStateChange={(v) => (submitting = v)}
 				>
-					{#snippet children()}
-						<input name="kelasId" value={kelasId ?? ''} hidden />
-						{#if isEditMode && modalItem}
-							<input name="id" value={modalItem.id} hidden />
-						{/if}
+					<input name="kelasId" value={kelasId ?? ''} hidden />
+					{#if isEditMode && modalItem}
+						<input name="id" value={modalItem.id} hidden />
+					{/if}
 
-						<div class="space-y-2">
-							<p class="font-semibold">Pilih Dimensi Profil Lulusan</p>
-							<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-								{#each dimensionOptions as dimensi (dimensi.key)}
-									<label class="flex cursor-pointer flex-row gap-2">
+					{#if !isEditMode && otherClasses.length > 0}
+						<div class="space-y-2 rounded-lg bg-base-200/60 p-3 dark:bg-base-300/40">
+							<p class="text-sm font-semibold">Terapkan ke Kelas Lain Sekaligus (Opsional)</p>
+							<p class="text-xs opacity-75">
+								Centang kelas paralel yang juga menggunakan tema ini agar tidak perlu input ulang:
+							</p>
+							<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+								{#each otherClasses as k (k.id)}
+									<label class="flex cursor-pointer items-center gap-2 text-xs">
 										<input
 											type="checkbox"
-											class="checkbox"
-											value={dimensi.key}
-											name="dimensi"
-											checked={selectedDimensions.includes(dimensi.key)}
-											onchange={(event) =>
-												onToggleDimension(dimensi.key, event.currentTarget.checked)}
-											aria-label={dimensi.label}
+											name="targetKelasIds"
+											value={k.id}
+											class="checkbox checkbox-xs"
 										/>
-										<div class="flex flex-col">
-											<span>{dimensi.label}</span>
-										</div>
+										<span
+											>{k.nama}
+											{#if k.fase}({k.fase}){/if}</span
+										>
 									</label>
 								{/each}
 							</div>
 						</div>
+					{/if}
 
-						<div class="space-y-2">
-							<p class="font-semibold">Kode</p>
-							<input
-								type="text"
-								class="input bg-base-200 dark:bg-base-300 w-full dark:border-none"
-								placeholder="Masukkan kode (contoh: KK-BAKU)"
-								name="kode"
-								value={kodeInput}
-								oninput={(event) => onKodeChange((event.currentTarget as HTMLInputElement).value)}
-								required
-								disabled={!canManage}
-								maxlength={20}
-							/>
+					<div class="space-y-2">
+						<p class="font-semibold">Pilih Dimensi Profil Lulusan</p>
+						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+							{#each dimensionOptions as dimensi (dimensi.key)}
+								<label class="flex cursor-pointer flex-row gap-2">
+									<input
+										type="checkbox"
+										class="checkbox"
+										value={dimensi.key}
+										name="dimensi"
+										checked={selectedDimensions.includes(dimensi.key)}
+										onchange={(event) =>
+											onToggleDimension(dimensi.key, event.currentTarget.checked)}
+										aria-label={dimensi.label}
+									/>
+									<div class="flex flex-col">
+										<span>{dimensi.label}</span>
+									</div>
+								</label>
+							{/each}
 						</div>
+					</div>
 
-						<div class="space-y-2">
-							<p class="font-semibold">Kegiatan Kokurikuler</p>
-							<textarea
-								class="textarea bg-base-200 dark:bg-base-300 h-28 w-full dark:border-none"
-								placeholder="Ketik kegiatan atau tema kegiatan kokurikuler"
-								name="kokurikuler"
-								value={tujuanInput}
-								oninput={(event) =>
-									onTujuanChange((event.currentTarget as HTMLTextAreaElement).value)}
-								required
-								disabled={!canManage}></textarea>
-						</div>
-					{/snippet}
+					<div class="space-y-2">
+						<p class="font-semibold">Kode</p>
+						<input
+							type="text"
+							class="input bg-base-200 dark:bg-base-300 w-full dark:border-none"
+							placeholder="Masukkan kode (contoh: KK-BAKU)"
+							name="kode"
+							value={kodeInput}
+							oninput={(event) => onKodeChange((event.currentTarget as HTMLInputElement).value)}
+							required
+							disabled={!canManage}
+							maxlength={20}
+						/>
+					</div>
+
+					<div class="space-y-2">
+						<p class="font-semibold">Kegiatan Kokurikuler</p>
+						<textarea
+							class="textarea bg-base-200 dark:bg-base-300 h-28 w-full dark:border-none"
+							placeholder="Ketik kegiatan atau tema kegiatan kokurikuler"
+							name="kokurikuler"
+							value={tujuanInput}
+							oninput={(event) =>
+								onTujuanChange((event.currentTarget as HTMLTextAreaElement).value)}
+							required
+							disabled={!canManage}></textarea>
+					</div>
 				</FormEnhance>
 			</div>
 

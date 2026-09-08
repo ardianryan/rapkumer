@@ -2,7 +2,7 @@ import db from '$lib/server/db';
 import { tableKelas, tableKokurikuler } from '$lib/server/db/schema';
 import { profilPelajarPancasilaDimensions, type DimensiProfilLulusanKey } from '$lib/statics';
 import { fail, redirect } from '@sveltejs/kit';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 
 const DIMENSION_KEY_SET = new Set<DimensiProfilLulusanKey>(
 	profilPelajarPancasilaDimensions.map((dimension) => dimension.key)
@@ -31,7 +31,7 @@ function isTableMissingError(error: unknown) {
 
 export async function load({ depends, parent }) {
 	depends('app:kokurikuler');
-	const { kelasAktif } = await parent();
+	const { kelasAktif, daftarKelas } = await parent();
 	const kelasId = kelasAktif?.id ?? null;
 
 	let kokurikulerRaw: Awaited<ReturnType<typeof db.query.tableKokurikuler.findMany>> = [];
@@ -56,6 +56,11 @@ export async function load({ depends, parent }) {
 	return {
 		kelasId,
 		tableReady,
+		availableKelas: (daftarKelas ?? []).map((k) => ({
+			id: k.id,
+			nama: k.nama,
+			fase: k.fase ?? null
+		})),
 		kokurikuler: kokurikulerRaw.map((item) => ({
 			...item,
 			dimensi: Array.isArray(item.dimensi)
@@ -86,6 +91,8 @@ export const actions = {
 		const dimensi = sanitizeDimensions(
 			formData.getAll('dimensi').map((value) => value?.toString() ?? '')
 		);
+		const targetKelasIdsRaw = formData.getAll('targetKelasIds');
+		const extraKelasIds = targetKelasIdsRaw.map(Number).filter((n) => Number.isInteger(n) && n > 0);
 
 		if (!kelasIdRaw) {
 			return fail(400, { fail: 'Kelas aktif tidak ditemukan' });
@@ -95,6 +102,8 @@ export const actions = {
 		if (!Number.isInteger(kelasId)) {
 			return fail(400, { fail: 'Kelas tidak valid' });
 		}
+
+		const allTargetKelasIds = Array.from(new Set([kelasId, ...extraKelasIds]));
 
 		// Server-side permission: wali_kelas may only add for their own kelas
 		if (locals?.user && (locals.user as unknown as { type?: string }).type === 'wali_kelas') {
@@ -135,18 +144,26 @@ export const actions = {
 		try {
 			const existing = await db.query.tableKokurikuler.findFirst({
 				columns: { id: true },
-				where: eq(tableKokurikuler.kode, kode)
+				where: and(eq(tableKokurikuler.kelasId, kelasId), eq(tableKokurikuler.kode, kode))
 			});
 			if (existing) {
-				return fail(400, { fail: 'Kode sudah digunakan' });
+				return fail(400, { fail: 'Kode sudah digunakan di kelas ini' });
 			}
 
-			await db.insert(tableKokurikuler).values({
-				kelasId,
-				kode,
-				dimensi,
-				tujuan
-			});
+			for (const targetId of allTargetKelasIds) {
+				const existInTarget = await db.query.tableKokurikuler.findFirst({
+					columns: { id: true },
+					where: and(eq(tableKokurikuler.kelasId, targetId), eq(tableKokurikuler.kode, kode))
+				});
+				if (!existInTarget) {
+					await db.insert(tableKokurikuler).values({
+						kelasId: targetId,
+						kode,
+						dimensi,
+						tujuan
+					});
+				}
+			}
 
 			return { message: 'Kokurikuler berhasil ditambahkan', kode };
 		} catch (error) {
@@ -159,60 +176,68 @@ export const actions = {
 
 	delete: async ({ request, locals }) => {
 		const formData = await request.formData();
-		const ids = Array.from(
-			new Set(
-				formData
-					.getAll('ids')
-					.map((id) => Number(id))
-					.filter((id): id is number => Number.isInteger(id) && id > 0)
-			)
-		);
+		const idRaw = formData.get('id');
+		const kelasIdRaw = formData.get('kelasId');
 
-		if (ids.length === 0) {
-			return fail(400, { fail: 'Pilih data kokurikuler yang akan dihapus' });
+		if (!idRaw) {
+			return fail(400, { fail: 'ID kokurikuler tidak ditemukan' });
+		}
+
+		const id = Number(idRaw);
+		if (!Number.isInteger(id) || id <= 0) {
+			return fail(400, { fail: 'ID kokurikuler tidak valid' });
+		}
+
+		if (!kelasIdRaw) {
+			return fail(400, { fail: 'Kelas aktif tidak ditemukan' });
+		}
+
+		const kelasId = Number(kelasIdRaw);
+		if (!Number.isInteger(kelasId)) {
+			return fail(400, { fail: 'Kelas tidak valid' });
+		}
+
+		// Server-side permission: wali_kelas may only delete from their own kelas
+		if (locals?.user && (locals.user as unknown as { type?: string }).type === 'wali_kelas') {
+			const u = locals.user as { kelasId?: number; permissions?: string[]; pegawaiId?: number };
+			const hasAccessOther = Array.isArray(u.permissions)
+				? u.permissions.includes('kelas_pindah')
+				: false;
+
+			let isOwnClass = false;
+			const userKelasId = u.kelasId;
+			if (userKelasId != null && Number.isInteger(Number(userKelasId))) {
+				isOwnClass = Number(userKelasId) === kelasId;
+			} else if (u.pegawaiId) {
+				const owned = await db.query.tableKelas.findFirst({
+					columns: { id: true },
+					where: and(eq(tableKelas.id, kelasId), eq(tableKelas.waliKelasId, u.pegawaiId))
+				});
+				isOwnClass = !!owned;
+			}
+
+			if (!isOwnClass && !hasAccessOther) {
+				throw redirect(303, `/forbidden?required=kelas_id`);
+			}
 		}
 
 		try {
-			// If caller is wali_kelas without akses_lain, ensure all target rows belong to their kelas
-			if (locals?.user && (locals.user as unknown as { type?: string }).type === 'wali_kelas') {
-				const u = locals.user as { kelasId?: number; permissions?: string[]; pegawaiId?: number };
-				const hasAccessOther = Array.isArray(u.permissions)
-					? u.permissions.includes('kelas_pindah')
-					: false;
+			const deleted = await db
+				.delete(tableKokurikuler)
+				.where(and(eq(tableKokurikuler.id, id), eq(tableKokurikuler.kelasId, kelasId)))
+				.returning({ id: tableKokurikuler.id });
 
-				if (!hasAccessOther) {
-					let allowedKelasId: number | null = null;
-					const userKelasId = u.kelasId;
-					if (userKelasId != null && Number.isInteger(Number(userKelasId))) {
-						allowedKelasId = Number(userKelasId);
-					} else if (u.pegawaiId) {
-						const owned = await db.query.tableKelas.findFirst({
-							columns: { id: true },
-							where: eq(tableKelas.waliKelasId, u.pegawaiId),
-							orderBy: asc(tableKelas.id)
-						});
-						allowedKelasId = owned?.id ?? null;
-					}
-
-					if (allowedKelasId != null) {
-						const rows = await db.query.tableKokurikuler.findMany({
-							columns: { id: true, kelasId: true },
-							where: inArray(tableKokurikuler.id, ids)
-						});
-						const other = rows.some((r) => r.kelasId !== allowedKelasId);
-						if (other) throw redirect(303, `/forbidden?required=kelas_id`);
-					}
-				}
+			if (!deleted.length) {
+				return fail(404, { fail: 'Kokurikuler tidak ditemukan atau sudah dihapus' });
 			}
-			await db.delete(tableKokurikuler).where(inArray(tableKokurikuler.id, ids));
+
+			return { message: 'Kokurikuler berhasil dihapus', id };
 		} catch (error) {
 			if (isTableMissingError(error)) {
 				return fail(500, { fail: TABLE_MISSING_MESSAGE });
 			}
 			throw error;
 		}
-
-		return { message: `${ids.length} kokurikuler berhasil dihapus` };
 	},
 	update: async ({ request, locals }) => {
 		const formData = await request.formData();
@@ -281,10 +306,10 @@ export const actions = {
 		try {
 			const existing = await db.query.tableKokurikuler.findFirst({
 				columns: { id: true },
-				where: eq(tableKokurikuler.kode, kode)
+				where: and(eq(tableKokurikuler.kelasId, kelasId), eq(tableKokurikuler.kode, kode))
 			});
 			if (existing && existing.id !== id) {
-				return fail(400, { fail: 'Kode sudah digunakan' });
+				return fail(400, { fail: 'Kode sudah digunakan di kelas ini' });
 			}
 
 			const updated = await db

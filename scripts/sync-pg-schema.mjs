@@ -20,6 +20,7 @@ let pgCode = source;
 const sqliteImportRegex = /import\s*\{([^}]+)\}\s*from\s*['"]drizzle-orm\/sqlite-core['"];?/;
 if (sqliteImportRegex.test(pgCode)) {
 	const replacement = `import {
+	type AnyPgColumn,
 	boolean,
 	customType,
 	index,
@@ -41,6 +42,9 @@ const bytea = customType<{ data: Buffer | Uint8Array; driverData: Buffer }>({
 });`;
 	pgCode = pgCode.replace(sqliteImportRegex, replacement);
 }
+
+// 1b. Replace AnySQLiteColumn with AnyPgColumn
+pgCode = pgCode.replace(/\bAnySQLiteColumn\b/g, 'AnyPgColumn');
 
 // 2. Convert table definition
 pgCode = pgCode.replace(/\bsqliteTable\s*\(/g, 'pgTable(');

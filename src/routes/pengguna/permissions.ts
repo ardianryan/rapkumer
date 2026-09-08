@@ -111,8 +111,10 @@ export const defaultPermissionsByType: Partial<Record<AuthUser['type'], UserPerm
 	],
 	user: [
 		'mata_pelajaran_intrakurikuler',
+		'mata_pelajaran_kokurikuler',
 		'input_nilai_asesmen_formatif',
 		'input_nilai_asesmen_sumatif',
+		'input_nilai_asesmen_kokurikuler',
 		'administrasi_absen',
 		'administrasi_jurnal_mengajar',
 		'administrasi_rekap_nilai',
@@ -183,6 +185,32 @@ export function resolveRoutePermission(pathname: string): UserPermission | null 
 	return null;
 }
 
+/**
+ * Mengambil himpunan izin efektif akun (gabungan default role + izin kustom khusus).
+ */
+export function getEffectivePermissions(
+	user?: Pick<AuthUser, 'permissions' | 'type'> | null
+): Set<UserPermission> {
+	if (!user) return new Set();
+	if (user.type === 'admin' || user.type === 'kepala_sekolah') {
+		return new Set(userPermissions);
+	}
+	const result = new Set<UserPermission>();
+	// Default permissions berdasarkan tipe peran akun
+	if (user.type && defaultPermissionsByType[user.type as AuthUser['type']]) {
+		for (const p of defaultPermissionsByType[user.type as AuthUser['type']]!) {
+			result.add(p);
+		}
+	}
+	// Izin khusus yang dicentang eksplisit untuk user ini
+	if (user.permissions && Array.isArray(user.permissions)) {
+		for (const p of user.permissions) {
+			result.add(p);
+		}
+	}
+	return result;
+}
+
 export function isAuthorizedUser(
 	allowedPermissions: UserPermission[],
 	// include 'type' so we can treat admins as authorized
@@ -190,10 +218,9 @@ export function isAuthorizedUser(
 ) {
 	if (!user) return false;
 	// Admins are authorized for everything by policy
-	// wali_kelas and wali_asuh are NOT admins and must check permissions
 	if ('type' in user && (user.type === 'admin' || user.type === 'kepala_sekolah')) return true;
-	const userPermissions = user.permissions || [];
-	return allowedPermissions.some((r) => userPermissions.includes(r));
+	const effective = getEffectivePermissions(user);
+	return allowedPermissions.some((r) => effective.has(r));
 }
 
 /**

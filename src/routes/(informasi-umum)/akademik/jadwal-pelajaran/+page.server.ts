@@ -123,7 +123,7 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 		kodeMapel: [...info.kodes].sort()
 	}));
 
-	const daftarKodeKokurikuler = daftarKokurikulerRows.map((k) => k.kode);
+	const daftarKodeKokurikuler = [...new Set(daftarKokurikulerRows.map((k) => k.kode))];
 
 	return {
 		meta: { title: 'Jadwal Pelajaran & Bell Sekolah' },
@@ -266,7 +266,9 @@ export const actions: Actions = {
 		const soundPath = path.join(soundDir, `${sekolahId}_custom_${kode}.mp3`);
 		try {
 			fs.unlinkSync(soundPath);
-		} catch {}
+		} catch {
+			// ignore
+		}
 
 		await db
 			.delete(tableKegiatanCustom)
@@ -318,7 +320,9 @@ export const actions: Actions = {
 			}
 			try {
 				fs.unlinkSync(path.join(soundDir, `${sekolahId}_custom_${kodeLama}.mp3`));
-			} catch {}
+			} catch {
+				// ignore
+			}
 			const buffer = Buffer.from(await soundFile.arrayBuffer());
 			fs.mkdirSync(soundDir, { recursive: true });
 			fs.writeFileSync(path.join(soundDir, `${sekolahId}_custom_${kode}.mp3`), buffer);
@@ -327,7 +331,9 @@ export const actions: Actions = {
 		} else if (hapusSound) {
 			try {
 				fs.unlinkSync(path.join(soundDir, `${sekolahId}_custom_${kodeLama}.mp3`));
-			} catch {}
+			} catch {
+				// ignore
+			}
 			soundFileName = null;
 			soundMimeType = null;
 		}
@@ -338,7 +344,9 @@ export const actions: Actions = {
 					path.join(soundDir, `${sekolahId}_custom_${kodeLama}.mp3`),
 					path.join(soundDir, `${sekolahId}_custom_${kode}.mp3`)
 				);
-			} catch {}
+			} catch {
+				// ignore
+			}
 		}
 
 		const updateData: Record<string, unknown> = { nama, kode, durasi };
