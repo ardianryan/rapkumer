@@ -950,7 +950,8 @@ export const actions = {
 							updatedAt: timestamp
 						});
 					} catch (err) {
-						if (!String(err).includes('UNIQUE')) throw err;
+						const msg = String(err).toLowerCase();
+						if (!msg.includes('unique') && !msg.includes('duplicate')) throw err;
 					}
 				}
 			}
@@ -1181,7 +1182,8 @@ export const actions = {
 								updatedAt: ts
 							});
 						} catch (err) {
-							if (!String(err).includes('UNIQUE')) throw err;
+							const msg = String(err).toLowerCase();
+							if (!msg.includes('unique') && !msg.includes('duplicate')) throw err;
 						}
 					}
 				}

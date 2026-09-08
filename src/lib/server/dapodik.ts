@@ -9,6 +9,7 @@ import {
 	tableAuthUser,
 	tableAuthUserKelas,
 	tableAuthUserMataPelajaran,
+	tableAuthUserPembelajaran,
 	tableDapodikMataPelajaran,
 	tableDapodikPembelajaran,
 	tableDapodikSettings,
@@ -1103,6 +1104,11 @@ async function ensureGuruAccounts(sekolahId: number, sections: DapodikSectionLog
 		const existingKelasLinks = new Set(
 			(await db.select().from(tableAuthUserKelas)).map((l) => `${l.authUserId}:${l.kelasId}`)
 		);
+		const existingPembelajaranLinks = new Set(
+			(await db.select().from(tableAuthUserPembelajaran)).map(
+				(l) => `${l.authUserId}:${l.kelasId}:${l.mataPelajaranId}`
+			)
+		);
 		const linkCount = new Map<number, number>();
 		let linked = 0;
 
@@ -1158,6 +1164,24 @@ async function ensureGuruAccounts(sekolahId: number, sections: DapodikSectionLog
 			if (!userId) continue;
 			const key = `${userId}:${m.id}`;
 			linkCount.set(userId, (linkCount.get(userId) ?? 0) + 1);
+
+			const kelasId = mapelIdToKelas.get(m.id);
+			if (kelasId) {
+				const pKey = `${userId}:${kelasId}:${m.id}`;
+				if (!existingPembelajaranLinks.has(pKey)) {
+					try {
+						await db.insert(tableAuthUserPembelajaran).values({
+							authUserId: userId,
+							kelasId,
+							mataPelajaranId: m.id
+						});
+						existingPembelajaranLinks.add(pKey);
+					} catch {
+						// ignore duplicate
+					}
+				}
+			}
+
 			if (existingMapelLinks.has(key)) continue;
 			await db
 				.insert(tableAuthUserMataPelajaran)
@@ -1225,6 +1249,19 @@ async function ensureGuruAccounts(sekolahId: number, sections: DapodikSectionLog
 					);
 					if (!match) continue;
 					const key = `${userId}:${match.id}`;
+					const pKey = `${userId}:${kelasId}:${match.id}`;
+					if (!existingPembelajaranLinks.has(pKey)) {
+						try {
+							await db.insert(tableAuthUserPembelajaran).values({
+								authUserId: userId,
+								kelasId,
+								mataPelajaranId: match.id
+							});
+							existingPembelajaranLinks.add(pKey);
+						} catch {
+							// ignore duplicate
+						}
+					}
 					if (existingMapelLinks.has(key)) continue;
 					await db
 						.insert(tableAuthUserMataPelajaran)

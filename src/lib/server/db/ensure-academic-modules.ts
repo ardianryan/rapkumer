@@ -98,11 +98,12 @@ export async function ensureAcademicModulesSchema() {
 		`CREATE TABLE IF NOT EXISTS kokurikuler (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			kelas_id INTEGER NOT NULL REFERENCES kelas(id),
-			kode TEXT NOT NULL UNIQUE,
+			kode TEXT NOT NULL,
 			dimensi TEXT NOT NULL,
 			tujuan TEXT NOT NULL,
 			created_at TEXT NOT NULL,
-			updated_at TEXT
+			updated_at TEXT,
+			UNIQUE(kelas_id, kode)
 		)`,
 		// --- Keasramaan ---
 		`CREATE TABLE IF NOT EXISTS keasramaan (
