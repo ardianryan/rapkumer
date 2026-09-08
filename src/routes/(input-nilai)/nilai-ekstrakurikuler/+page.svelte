@@ -80,6 +80,13 @@
 	let searchTimer: ReturnType<typeof setTimeout> | undefined;
 	let isDownloadingTemplate = $state(false);
 	let isImportingFile = $state(false);
+
+	// State Auto-Fill e-Rapor Ekskul
+	let showAutofillModal = $state(false);
+	let selectedAutofillFile = $state<File | null>(null);
+	let isAutofilling = $state(false);
+	let autofillError = $state<string | null>(null);
+
 	const kelasAktif = $derived(page.data.kelasAktif ?? null);
 	const kelasAktifLabel = $derived.by(() => {
 		if (!kelasAktif) return null;
@@ -287,6 +294,60 @@
 		if (!trimmed) return '';
 		return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 	}
+
+	async function handleAutofillSubmit(e: Event) {
+		e.preventDefault();
+		if (!selectedAutofillFile) {
+			toast('Pilih file Excel template e-Rapor terlebih dahulu.', 'error');
+			return;
+		}
+
+		isAutofilling = true;
+		autofillError = null;
+
+		try {
+			const formData = new FormData();
+			formData.append('file', selectedAutofillFile);
+
+			const res = await fetch('/api/erapor-sma/autofill-ekskul', {
+				method: 'POST',
+				body: formData
+			});
+
+			if (!res.ok) {
+				const errJson = await res.json().catch(() => ({}));
+				throw new Error(errJson.error || 'Gagal memproses autofill template e-Rapor.');
+			}
+
+			const blob = await res.blob();
+			const downloadUrl = window.URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = downloadUrl;
+
+			const disposition = res.headers.get('Content-Disposition');
+			let filename = `${selectedAutofillFile.name.replace(/\.[^/.]+$/, '')}_terisi.xlsx`;
+			if (disposition && disposition.includes('filename=')) {
+				const match = disposition.match(/filename="?([^"]+)"?/);
+				if (match && match[1]) filename = match[1];
+			}
+
+			link.download = filename;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			window.URL.revokeObjectURL(downloadUrl);
+
+			showAutofillModal = false;
+			selectedAutofillFile = null;
+			toast('File template e-Rapor Ekstrakurikuler berhasil diisi dan diunduh!', 'success');
+		} catch (err: unknown) {
+			const msg = err instanceof Error ? err.message : String(err);
+			autofillError = msg;
+			toast(msg, 'error');
+		} finally {
+			isAutofilling = false;
+		}
+	}
 </script>
 
 <div class="card bg-base-100 rounded-lg border border-none p-4 shadow-md">
@@ -310,6 +371,7 @@
 		disabled={!selectedEkstrakHasTujuan || !canEdit}
 		onDownload={handleDownloadTemplate}
 		onImport={handleFileImport}
+		onAutofill={() => (showAutofillModal = true)}
 	/>
 
 	<div class="flex flex-col items-center gap-2 sm:flex-row">
@@ -444,4 +506,81 @@
 			{/each}
 		</div>
 	{/if}
+</div>
+
+<!-- MODAL: AUTO-FILL E-RAPOR SMA EKSTRAKURIKULER -->
+<input
+	id="autofill-ekskul-modal"
+	type="checkbox"
+	class="modal-toggle"
+	bind:checked={showAutofillModal}
+	hidden
+/>
+<div
+	class="modal"
+	aria-hidden={!showAutofillModal}
+	onclick={(e) => {
+		if (e.target === e.currentTarget && !isAutofilling) showAutofillModal = false;
+	}}
+>
+	<div class="modal-box max-w-lg">
+		<h3 class="text-lg font-bold">Auto-Fill Format e-Rapor SMA - Ekstrakurikuler</h3>
+		<p class="text-base-content/70 text-sm">
+			Unggah file template kosongan dari aplikasi e-Rapor SMA (<code
+				class="text-primary font-mono text-xs">f_nilai_ekskulwalas_...xlsx</code
+			>
+			untuk jalur Wali Kelas atau
+			<code class="text-primary font-mono text-xs">f_nilai_ekskulguru_...xlsx</code> untuk Pembina). Sistem
+			Rapkumer akan otomatis menyuntikkan Nilai (1..4) dan kalimat deskripsi capaian.
+		</p>
+
+		<form onsubmit={handleAutofillSubmit} class="mt-4 space-y-4">
+			<fieldset class="fieldset">
+				<legend class="fieldset-legend font-semibold">Pilih File Template e-Rapor (.xlsx)</legend>
+				<input
+					type="file"
+					accept=".xlsx"
+					class="file-input bg-base-200 dark:bg-base-300 w-full dark:border-none"
+					disabled={isAutofilling}
+					onchange={(e) => {
+						const target = e.target as HTMLInputElement;
+						if (target.files && target.files.length > 0) {
+							selectedAutofillFile = target.files[0];
+						}
+					}}
+				/>
+			</fieldset>
+
+			{#if autofillError}
+				<div class="alert alert-soft alert-error text-xs">
+					<Icon name="error" />
+					<span>{autofillError}</span>
+				</div>
+			{/if}
+
+			<div class="modal-action mt-6 flex justify-end gap-2">
+				<button
+					type="button"
+					class="btn btn-ghost"
+					onclick={() => (showAutofillModal = false)}
+					disabled={isAutofilling}
+				>
+					Batal
+				</button>
+				<button
+					type="submit"
+					class="btn btn-primary gap-2"
+					disabled={!selectedAutofillFile || isAutofilling}
+				>
+					{#if isAutofilling}
+						<span class="loading loading-spinner loading-xs"></span>
+						<span>Memproses...</span>
+					{:else}
+						<Icon name="download" />
+						<span>Isi & Unduh Excel</span>
+					{/if}
+				</button>
+			</div>
+		</form>
+	</div>
 </div>

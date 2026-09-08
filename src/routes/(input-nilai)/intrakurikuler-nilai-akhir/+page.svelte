@@ -416,7 +416,10 @@
 							</td>
 							<td class="text-xs max-w-xs">
 								{#if siswa.tpPerluPeningkatan}
-									<span class="badge badge-soft badge-warning text-amber-900 dark:text-amber-200 badge-xs font-semibold mr-1">R</span>
+									<span
+										class="badge badge-soft badge-warning text-amber-900 dark:text-amber-200 badge-xs font-semibold mr-1"
+										>R</span
+									>
 									<span>{siswa.tpPerluPeningkatan}</span>
 								{:else}
 									<span class="text-base-content/40">—</span>
