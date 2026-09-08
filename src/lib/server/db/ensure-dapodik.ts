@@ -29,10 +29,12 @@ const COLUMNS: Array<{ table: string; column: string; type: string }> = [
 	},
 	{ table: 'mata_pelajaran', column: 'dapodik_pembelajaran_id', type: 'text' },
 	{ table: 'mata_pelajaran', column: 'dapodik_mata_pelajaran_id', type: 'text' },
+	{ table: 'mata_pelajaran', column: 'dapodik_rombongan_belajar_id', type: 'text' },
 	{ table: 'mata_pelajaran', column: 'dapodik_induk_pembelajaran_id', type: 'text' },
 	{ table: 'mata_pelajaran', column: 'nama_lokal', type: 'text' },
 	// Nomor urut tampil mapel (tabel intrakurikuler & cetak rapor).
 	{ table: 'mata_pelajaran', column: 'urutan', type: 'integer' },
+	{ table: 'murid_mata_pelajaran', column: 'dapodik_anggota_rombel_id', type: 'text' },
 	{ table: TABLE, column: 'npsn', type: 'text' }
 ];
 

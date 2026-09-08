@@ -657,6 +657,8 @@ export const tableMataPelajaran = pgTable(
 		// Referensi Dapodik
 		dapodikPembelajaranId: text(),
 		dapodikMataPelajaranId: text(),
+		// Rombel Dapodik asal (mis. UUID rombel pilihan jenis 16). NULL = rombel kelas reguler.
+		dapodikRombonganBelajarId: text(),
 		// Pembelajaran induk pilihan (Sub Pembelajaran) saat kirim matev ke Dapodik.
 		dapodikIndukPembelajaranId: text(),
 		...audit
@@ -883,6 +885,8 @@ export const tableMuridMataPelajaran = pgTable(
 			.references(() => tableMataPelajaran.id, { onDelete: 'cascade' })
 			.notNull(),
 		nilaiKosong: integer().notNull().default(0),
+		// UUID keanggotaan siswa di rombel Dapodik asal (mis. rombel pilihan jenis 16)
+		dapodikAnggotaRombelId: text(),
 		...audit
 	},
 	(table) => [

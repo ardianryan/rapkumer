@@ -550,25 +550,58 @@ Untuk menjamin eksekusi berjalan mulus dan aman tanpa regresi, implementasi dila
 Untuk memastikan sistem aman dijalankan di lingkungan produksi (sekolah nyata dengan puluhan ribu rekaman data), serangkaian lapisan perlindungan dan otomigrasi telah diterapkan secara ketat:
 
 ### A. Jaminan Kunci Mutex Otomigrasi Thread-Safe (`ensure-bootstrap.ts`)
+
 - **Masalah Potensial**: Saat aplikasi dinyalakan ulang (_cold start_) dan menerima beberapa permintaan bersamaan (_concurrent traffic_), fungsi migrasi bisa berjalan ganda yang berisiko memicu `SQLITE_BUSY: database is locked` atau deadlock di PostgreSQL.
 - **Solusi**: Diterapkan `startupEnsuresPromise` mutex lock. Setiap pemanggilan `runStartupEnsures()` yang datang bersamaan akan menunggu instans _promise_ yang sama persis hingga tuntas, menjamin eksekusi tepat satu kali (_strictly idempotent & thread-safe_).
 
 ### B. Perlindungan Startup Middleware (`hooks.server.ts`)
+
 - Mengintegrasikan `startupGuard` ke dalam urutan middleware utama (`sequence(startupGuard, csrfGuard, authGuard, cookieParser)`).
 - Menjamin seluruh tabel, kolom baru, indeks, dan migrasi relasional telah 100% siap sebelum permintaan pengguna pertama diproses. Begitu migrasi awal selesai, overhead pemeriksaan berikutnya adalah 0 milidetik.
 
 ### C. Paritas Ganda SQLite & PostgreSQL (`schema.ts` & `schema.pg.ts`)
+
 - Rapkumer mendukung SQLite lokal (`data/database.sqlite3`) dan database terdistribusi PostgreSQL.
 - Seluruh definisi skema baru (seperti `auth_user_pembelajaran` dan `murid_mata_pelajaran`) disinkronkan secara identik melalui `scripts/sync-pg-schema.mjs`.
 - Semua klausa `onConflictDoUpdate` menggunakan target kolom unik yang presisi dan valid (`tableDapodikPembelajaran.pembelajaranId`) guna menghindari eror PostgreSQL terkait target konflik yang tidak cocok.
 
 ### D. Prinsip Migrasi Non-Destruktif (Zero Data Loss)
+
 - Tidak ada operasi penghapusan kolom (`DROP COLUMN`) atau penghapusan tabel lama (`DROP TABLE`).
 - Kolom timestamp `createdAt` dan `updatedAt` selalu disediakan secara otomatis untuk menjaga integritas data audit.
 - Migrasi data lama dari `auth_user_mata_pelajaran` ke tabel penugasan presisi `auth_user_pembelajaran` berjalan mulus secara otomatis di latar belakang tanpa menghapus relasi yang sudah ada.
 
 ---
 
+## 16. Kepatuhan Penuh Kirim Nilai ke Dapodik untuk Mata Pelajaran Pilihan (Fase F SMA/SMK)
+
+Untuk menjamin alur kirim nilai balik ke Dapodik (`/nilai-akhir/kirim-dapodik` dan `runDapodikKirim` di `src/lib/server/dapodik.ts`) berjalan 100% patuh terhadap spesifikasi resmi WebService Dapodik desktop:
+
+### A. Anatomi Relasi Rombel Pilihan (Jenis Rombel 16) di Dapodik
+1. **Pemisahan Identitas Rombongan Belajar**:
+   - Di Dapodik, mata pelajaran reguler (Wajib & Mulok) bernaung di bawah Rombel Reguler (`jenis_rombel = 1`).
+   - Sedangkan mata pelajaran pilihan Fase F (Fisika, Kimia, Biologi, Ekonomi, Sosiologi, Geografi, dll.) didaftarkan operator Dapodik di bawah **Rombongan Belajar Pilihan (`jenis_rombel = 16`)**.
+2. **Kesesuaian Target `postMatevRapor`**:
+   - Di `postMatevRapor`, payload wajib menyertakan `rombongan_belajar_id`, `pembelajaran_id`, dan `mata_pelajaran_id`.
+   - Untuk mapel pilihan, `rombongan_belajar_id` diarahkan tepat ke UUID Rombel Pilihan Dapodik asal (`tableMataPelajaran.dapodikRombonganBelajarId`), atau mempertahankan `rombongan_belajar_id` yang terdaftar pada `getMatevNilai`.
+   - Mencegah penolakan integritas relasional di Dapodik dan menjamin mata evaluasi muncul tepat di rombel pilihan pada aplikasi Dapodik desktop.
+3. **Kesesuaian `anggota_rombel_id` pada `postNilai`**:
+   - Di Dapodik, setiap siswa memiliki `anggota_rombel_id` yang berbeda untuk setiap rombel yang diikutinya (UUID keanggotaan di rombel reguler berbeda dengan UUID keanggotaan di rombel pilihan jenis 16).
+   - Nilai rapor di database Dapodik (`nilai.nilai_rapor`) terikat via relasi foreign key `anggota_rombel_id` ke tabel `pembelajaran.anggota_rombel`.
+   - Rapkumer menyimpan `dapodikAnggotaRombelId` spesifik rombel pilihan di `tableMuridMataPelajaran`, sehingga saat `postNilai` dijalankan, nilai mapel pilihan dikirim menggunakan `anggota_rombel_id` rombel pilihan siswa. Nilai langsung tampil sempurna saat operator membuka rombel pilihan di Dapodik desktop.
+
+### B. Proteksi dan Eliminasi Nilai Semu (Zero Phantom Scores)
+- **Penyaringan Keikutsertaan Siswa**:
+  Sebelum baris nilai dikirim, sistem memvalidasi apakah siswa benar-benar terdaftar di `tableMuridMataPelajaran` untuk mapel pilihan terkait. Siswa dari rombel reguler yang tidak mengambil mapel pilihan tersebut tidak akan dikirimkan nilai, mencegah terjadinya data sampah atau penolakan transaksi dari Dapodik.
+- **Pencegahan Matev Kosong**:
+  Jika dalam satu kelas reguler tidak ada satu pun siswa yang mengambil suatu mapel pilihan, mata pelajaran tersebut secara otomatis dilewati dari daftar kandidat matev (`allCandidates`), mirip dengan optimasi pemilihan varian agama (PAPB).
+
+### C. Mekanisme Self-Healing Otomatis
+- Saat proses kirim nilai berlangsung, fungsi `fetchPembelajaranRombel` sekaligus membaca seluruh rombel pilihan jenis 16 dari endpoint `getRombonganBelajar`.
+- Jika ada siswa atau mapel pilihan yang belum sempat memiliki referensi UUID rombel/anggota di database lokal, sistem secara otomatis menyelesaikan (*resolve*) pemetaannya secara instan di latar belakang dan memperbarui database lokal.
+
+---
+
 ### Penutup
 
-Pembaruan ini menggabungkan keunggulan fleksibilitas Rapkumer dengan kemudahan operasional e-Rapor AIO, menjadikannya solusi administrasi kurikulum merdeka terbaik untuk sekolah skala kecil maupun sekolah besar berkapasitas 36 rombel dengan standar keamanan basis data tingkat produksi.
+Pembaruan ini menggabungkan keunggulan fleksibilitas Rapkumer dengan kemudahan operasional e-Rapor AIO, menjadikannya solusi administrasi kurikulum merdeka terbaik untuk sekolah skala kecil maupun sekolah besar berkapasitas 36 rombel dengan standar keamanan basis data tingkat produksi dan kepatuhan penuh terhadap WebService Dapodik.
