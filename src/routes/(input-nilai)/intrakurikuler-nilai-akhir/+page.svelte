@@ -66,11 +66,15 @@
 
 			// Jika belum terkunci, hitung preview live berdasarkan input bobot
 			if (!siswa.isLocked) {
-				const fVal = siswa.formatifScore ?? siswa.sumatifScore ?? 0;
-				const sVal = siswa.sumatifScore ?? siswa.formatifScore ?? 0;
-				if (totalBobot > 0) {
-					previewNilai =
-						Math.round(((fVal * bobotFormatif + sVal * bobotSumatif) / totalBobot) * 100) / 100;
+				if (siswa.formatifScore == null && siswa.sumatifScore == null) {
+					previewNilai = null;
+				} else {
+					const fVal = siswa.formatifScore ?? siswa.sumatifScore ?? 0;
+					const sVal = siswa.sumatifScore ?? siswa.formatifScore ?? 0;
+					if (totalBobot > 0) {
+						previewNilai =
+							Math.round(((fVal * bobotFormatif + sVal * bobotSumatif) / totalBobot) * 100) / 100;
+					}
 				}
 			}
 
@@ -303,7 +307,9 @@
 						?.sumatif}%)
 				</span>
 			{:else}
-				<span class="badge badge-soft badge-warning gap-1.5 py-3 px-3">
+				<span
+					class="badge badge-soft badge-warning text-amber-900 dark:text-amber-200 gap-1.5 py-3 px-3 font-medium"
+				>
 					<Icon name="alert" /> Belum Dikunci (Draft Bobot F: {bobotFormatif}%, S: {bobotSumatif}%)
 				</span>
 			{/if}
@@ -388,11 +394,17 @@
 								{formatScore(siswa.sumatifScore)}
 							</td>
 							<td class="text-center">
-								<span
-									class="font-bold text-base {siswa.isLocked ? 'text-primary' : 'text-warning'}"
-								>
-									{formatScore(siswa.previewNilai)}
-								</span>
+								{#if siswa.previewNilai != null}
+									<span
+										class="font-bold text-base {siswa.isLocked
+											? 'text-primary'
+											: 'text-base-content'}"
+									>
+										{formatScore(siswa.previewNilai)}
+									</span>
+								{:else}
+									<span class="text-base-content/40 font-normal">—</span>
+								{/if}
 							</td>
 							<td class="text-xs max-w-xs">
 								{#if siswa.tpOptimal}
@@ -404,7 +416,7 @@
 							</td>
 							<td class="text-xs max-w-xs">
 								{#if siswa.tpPerluPeningkatan}
-									<span class="badge badge-soft badge-warning badge-xs font-semibold mr-1">R</span>
+									<span class="badge badge-soft badge-warning text-amber-900 dark:text-amber-200 badge-xs font-semibold mr-1">R</span>
 									<span>{siswa.tpPerluPeningkatan}</span>
 								{:else}
 									<span class="text-base-content/40">—</span>
@@ -412,9 +424,9 @@
 							</td>
 							<td class="text-center">
 								{#if siswa.isLocked}
-									<span class="badge badge-soft badge-success badge-sm">Terkunci</span>
+									<span class="badge badge-soft badge-success badge-sm font-medium">Terkunci</span>
 								{:else}
-									<span class="badge badge-soft badge-warning badge-sm">Draft</span>
+									<span class="badge badge-soft badge-neutral badge-sm font-medium">Draft</span>
 								{/if}
 							</td>
 						</tr>
