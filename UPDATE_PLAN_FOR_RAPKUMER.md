@@ -191,22 +191,41 @@ if (targetKelasId) {
 
 ## 5. Rekomendasi Pembaruan Modul Kokurikuler (P5) Multi-Kelas
 
-### A. Antarmuka Pemilihan Multi-Kelas (`form-modal.svelte`)
+### A. Antarmuka Pemilihan Multi-Kelas & Smart Filter Jenjang (`form-modal.svelte`)
 
-Tambahkan properti `availableKelas` ke modal form kokurikuler. Saat mode tambah kegiatan (`!isEditMode`), tampilkan checklist kelas paralel dalam fase yang sama:
+Posisi pemilihan rombel diletakkan di **bagian bawah** form (setelah pengisian dimensi, kode, dan tema kokurikuler), bukan di paling atas, agar alur pengisian lebih alami. Selain itu, dilengkapi dengan **Smart Filter Jenjang** yang mengenali format kelas (baik `X 1`, `X-1`, `10-1`, `XI-MIPA`, dsb.):
 
 ```svelte
+<!-- Smart Filter Jenjang & Checklist Kelas di Bagian Bawah Form -->
 {#if !isEditMode && otherClasses.length > 0}
-	<div class="space-y-2 rounded-lg bg-base-200/60 p-3">
-		<p class="text-sm font-semibold">Terapkan ke Kelas Lain Sekaligus (Opsional)</p>
-		<p class="text-xs opacity-75">
-			Centang kelas paralel yang juga menggunakan tema ini agar tidak perlu input ulang:
-		</p>
+	<div class="space-y-3 rounded-2xl border border-base-300 bg-base-200/50 p-4">
+		<div class="flex items-center justify-between">
+			<h4 class="font-bold text-sm">Terapkan ke Kelas Lain Sekaligus</h4>
+			<div class="flex gap-1.5">
+				<button type="button" class="btn btn-xs btn-outline btn-primary" onclick={selectAllDisplayed}>
+					Pilih Semua Kelas ({selectedJenjang})
+				</button>
+				<button type="button" class="btn btn-xs btn-ghost text-error" onclick={unselectAll}>
+					Batal
+				</button>
+			</div>
+		</div>
+
+		<!-- Filter Jenjang Otomatis (X, XI, XII, dll) -->
+		<div class="flex gap-1.5">
+			{#each jenjangOptions as j}
+				<button class="btn btn-xs {selectedJenjang === j ? 'btn-primary' : 'btn-ghost'}" onclick={() => selectedJenjang = j}>
+					{j === 'Semua' ? 'Semua Jenjang' : `Jenjang ${j}`}
+				</button>
+			{/each}
+		</div>
+
+		<!-- Grid Checklist Kelas -->
 		<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-			{#each otherClasses as k (k.id)}
-				<label class="flex cursor-pointer items-center gap-2 text-xs">
-					<input type="checkbox" name="targetKelasIds" value={k.id} class="checkbox checkbox-xs" />
+			{#each displayedClasses as k (k.id)}
+				<label class="flex items-center justify-between p-2 border rounded-xl cursor-pointer">
 					<span>{k.nama}</span>
+					<input type="checkbox" name="targetKelasIds" value={k.id} class="checkbox checkbox-xs" />
 				</label>
 			{/each}
 		</div>
