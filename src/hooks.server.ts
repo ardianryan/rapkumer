@@ -388,10 +388,15 @@ function parseAsBytes(value: string | undefined, fallback = '512K') {
 	return Number(numeric) * multiplier;
 }
 
+const startupGuard: Handle = async ({ event, resolve }) => {
+	await runStartupEnsures();
+	return resolve(event);
+};
+
 // Compose the middleware sequence but ensure every internal `resolve` call
 // uses the `bodySizeLimit` derived from `process.env.BODY_SIZE_LIMIT` so
 // parsing limits follow the .env configuration in dev and prod.
-const _composed = sequence(csrfGuard, authGuard, cookieParser);
+const _composed = sequence(startupGuard, csrfGuard, authGuard, cookieParser);
 export const handle: Handle = async ({ event, resolve }) => {
 	const bodySizeLimit = parseAsBytes(process.env.BODY_SIZE_LIMIT, '512K');
 	// Expose the parsed limit on `locals` so other server-side code can

@@ -21,6 +21,7 @@
 12. [Rekomendasi Antarmuka "Kelola Pembelajaran per Mata Pelajaran" (Gaya e-Rapor AIO)](#12-rekomendasi-antarmuka-kelola-pembelajaran-per-mata-pelajaran-gaya-e-rapor-aio)
 13. [Analisis Kritis: Motivasi Arsitektur Awal vs. Realitas Sekolah Besar](#13-analisis-kritis-motivasi-arsitektur-awal-vs-realitas-sekolah-besar)
 14. [Rencana Aksi Implementasi Bertahap](#14-rencana-aksi-implementasi-bertahap)
+15. [Keamanan Basis Data & Otomigrasi Siap Produksi (Production Database Safety)](#15-keamanan-basis-data--otomigrasi-siap-produksi-production-database-safety)
 
 ---
 
@@ -404,6 +405,7 @@ Di sekolah dengan 8–12 rombel per jenjang (misal X-1 s.d. X-12), guru mata pel
 ### A. Temuan Lapangan: Kelas XII-7 Hanya Berisi 11 Mapel Wajib
 
 Pada pengujian nyata di SMAN 1 Gedeg untuk kelas **XII-7** (`/intrakurikuler?kelas_id=25`), ditemukan kejanggalan:
+
 - Hanya ada **11 mata pelajaran** yang muncul di tabel Intrakurikuler, dan semuanya bertipe **"Mata Pelajaran Wajib"** (Bahasa Indonesia, Bahasa Inggris, Matematika Umum, Sejarah, PAI, PJOK, Pendidikan Pancasila, Seni Budaya, Mulok Bahasa Daerah, P5, dan BP/BK).
 - **Tidak ada satu pun Mata Pelajaran Pilihan** (Fisika, Kimia, Biologi, Ekonomi, Sosiologi, Geografi, Matematika Lanjut, dsb.).
 - Pada pemilih kelas di navbar, juga **tidak ada pilihan rombel peminatan**.
@@ -416,12 +418,13 @@ Setelah ditelusuri langsung ke kode sumber sinkronisasi Dapodik Rapkumer ([src/l
 // Hanya rombel reguler (jenis_rombel 1); 16 = mapel pilihan, 51 = ekskul.
 const jenis = intOrNull(row['jenis_rombel']) ?? 1;
 if (jenis !== 1) {
-    skipped++;
-    continue; // <--- KODE ASLI RAPKUMER YANG MEMBUANG MAPEL & ROMBEL PILIHAN!
+	skipped++;
+	continue; // <--- KODE ASLI RAPKUMER YANG MEMBUANG MAPEL & ROMBEL PILIHAN!
 }
 ```
 
 #### Mengapa Hal Ini Terjadi?
+
 1. **Standar Dapodik SMA Kurikulum Merdeka (Fase F)**:
    Di aplikasi Dapodik, rombongan belajar dibagi menjadi beberapa tipe:
    - `jenis_rombel = 1`: **Rombel Reguler** (X-1 s.d. XII-12)
@@ -454,21 +457,24 @@ if (jenis !== 1) {
 
 Berdasarkan perbandingan langsung dengan implementasi nyata di SMAN 1 Gedeg:
 
-| Aspek | e-Rapor SMA Resmi Kemdikdas | e-Rapor AIO (`arapor.smage.my.id`) | Desain Baru Rapkumer |
-|---|---|---|---|
-| **Struktur Tampilan** | Satu tabel raksasa campur aduk seluruh kelas & mapel | Terpusat per **Mata Pelajaran** | **Tab Switch**: Per Kelas Aktif & Per Mata Pelajaran |
-| **Alur Pemetaan** | Pop-up modal satu per satu (pilih kelas $\rightarrow$ pilih mapel $\rightarrow$ pilih guru $\rightarrow$ simpan) | Filter dropdown mapel di atas $\rightarrow$ daftar seluruh rombel paralel muncul | Filter dropdown mapel di atas $\rightarrow$ tabel matriks rombel paralel se-sekolah |
-| **Penugasan Guru** | Klik modal satu per satu (36 kali) | Dropdown langsung di baris tabel | Dropdown inline langsung di baris tabel |
-| **Efisiensi Operator** | Sangat lambat dan memicu kelelahan input | Sangat cepat, bersih, dan mudah diawasi | Sangat cepat, terintegrasi dengan akun login guru |
+| Aspek                  | e-Rapor SMA Resmi Kemdikdas                                                                                      | e-Rapor AIO (`arapor.smage.my.id`)                                               | Desain Baru Rapkumer                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Struktur Tampilan**  | Satu tabel raksasa campur aduk seluruh kelas & mapel                                                             | Terpusat per **Mata Pelajaran**                                                  | **Tab Switch**: Per Kelas Aktif & Per Mata Pelajaran                                |
+| **Alur Pemetaan**      | Pop-up modal satu per satu (pilih kelas $\rightarrow$ pilih mapel $\rightarrow$ pilih guru $\rightarrow$ simpan) | Filter dropdown mapel di atas $\rightarrow$ daftar seluruh rombel paralel muncul | Filter dropdown mapel di atas $\rightarrow$ tabel matriks rombel paralel se-sekolah |
+| **Penugasan Guru**     | Klik modal satu per satu (36 kali)                                                                               | Dropdown langsung di baris tabel                                                 | Dropdown inline langsung di baris tabel                                             |
+| **Efisiensi Operator** | Sangat lambat dan memicu kelelahan input                                                                         | Sangat cepat, bersih, dan mudah diawasi                                          | Sangat cepat, terintegrasi dengan akun login guru                                   |
 
 ### B. Rancangan Antarmuka di Rapkumer:
 
 #### 1. Tab Navigasi di Halaman Intrakurikuler (`/intrakurikuler`)
+
 Di bagian atas halaman, tambahkan tab beralih yang intuitif:
+
 - **Tab 1: `📋 Per Kelas ({kelasAktif})`** (Tampilan standar yang sudah ada untuk melihat mapel rombel aktif).
 - **Tab 2: `🌐 Per Mata Pelajaran (Gaya AIO)`** (Tampilan baru untuk distribusi dan pemetaan se-sekolah).
 
 #### 2. Komponen Tampilan Gaya AIO:
+
 - **Filter Atas**:
   - Dropdown **Pilih Mata Pelajaran** (menampilkan seluruh mapel unik dari Dapodik: PAI, Matematika Umum, Fisika, Biologi, Kimia, Koding dan Kecerdasan Artifisial, dsb.).
   - Filter cepat **Tingkat/Jenjang**: `[Semua]`, `[Kelas X]`, `[Kelas XI]`, `[Kelas XII]`.
@@ -484,7 +490,8 @@ Di bagian atas halaman, tambahkan tab beralih yang intuitif:
   - **"Simpan Perubahan Penugasan"**: Menyimpan seluruh penugasan guru secara atomik.
 
 #### 3. Otomasi Penugasan ke Akun Guru:
-Saat admin mengganti dropdown pengampu di baris kelas X-4 menjadi Guru B dan menyimpannya, sistem di latar belakang **otomatis mengupdate hak akses akun Guru B** (`tableAuthUserPembelajaran`). Guru B dapat langsung login dan menginput nilai/presensi tanpa admin perlu masuk ke menu *Manajemen Pengguna*.
+
+Saat admin mengganti dropdown pengampu di baris kelas X-4 menjadi Guru B dan menyimpannya, sistem di latar belakang **otomatis mengupdate hak akses akun Guru B** (`tableAuthUserPembelajaran`). Guru B dapat langsung login dan menginput nilai/presensi tanpa admin perlu masuk ke menu _Manajemen Pengguna_.
 
 ---
 
@@ -538,6 +545,30 @@ Untuk menjamin eksekusi berjalan mulus dan aman tanpa regresi, implementasi dila
 
 ---
 
+## 15. Keamanan Basis Data & Otomigrasi Siap Produksi (Production Database Safety)
+
+Untuk memastikan sistem aman dijalankan di lingkungan produksi (sekolah nyata dengan puluhan ribu rekaman data), serangkaian lapisan perlindungan dan otomigrasi telah diterapkan secara ketat:
+
+### A. Jaminan Kunci Mutex Otomigrasi Thread-Safe (`ensure-bootstrap.ts`)
+- **Masalah Potensial**: Saat aplikasi dinyalakan ulang (_cold start_) dan menerima beberapa permintaan bersamaan (_concurrent traffic_), fungsi migrasi bisa berjalan ganda yang berisiko memicu `SQLITE_BUSY: database is locked` atau deadlock di PostgreSQL.
+- **Solusi**: Diterapkan `startupEnsuresPromise` mutex lock. Setiap pemanggilan `runStartupEnsures()` yang datang bersamaan akan menunggu instans _promise_ yang sama persis hingga tuntas, menjamin eksekusi tepat satu kali (_strictly idempotent & thread-safe_).
+
+### B. Perlindungan Startup Middleware (`hooks.server.ts`)
+- Mengintegrasikan `startupGuard` ke dalam urutan middleware utama (`sequence(startupGuard, csrfGuard, authGuard, cookieParser)`).
+- Menjamin seluruh tabel, kolom baru, indeks, dan migrasi relasional telah 100% siap sebelum permintaan pengguna pertama diproses. Begitu migrasi awal selesai, overhead pemeriksaan berikutnya adalah 0 milidetik.
+
+### C. Paritas Ganda SQLite & PostgreSQL (`schema.ts` & `schema.pg.ts`)
+- Rapkumer mendukung SQLite lokal (`data/database.sqlite3`) dan database terdistribusi PostgreSQL.
+- Seluruh definisi skema baru (seperti `auth_user_pembelajaran` dan `murid_mata_pelajaran`) disinkronkan secara identik melalui `scripts/sync-pg-schema.mjs`.
+- Semua klausa `onConflictDoUpdate` menggunakan target kolom unik yang presisi dan valid (`tableDapodikPembelajaran.pembelajaranId`) guna menghindari eror PostgreSQL terkait target konflik yang tidak cocok.
+
+### D. Prinsip Migrasi Non-Destruktif (Zero Data Loss)
+- Tidak ada operasi penghapusan kolom (`DROP COLUMN`) atau penghapusan tabel lama (`DROP TABLE`).
+- Kolom timestamp `createdAt` dan `updatedAt` selalu disediakan secara otomatis untuk menjaga integritas data audit.
+- Migrasi data lama dari `auth_user_mata_pelajaran` ke tabel penugasan presisi `auth_user_pembelajaran` berjalan mulus secara otomatis di latar belakang tanpa menghapus relasi yang sudah ada.
+
+---
+
 ### Penutup
 
-Pembaruan ini menggabungkan keunggulan fleksibilitas Rapkumer dengan kemudahan operasional e-Rapor AIO, menjadikannya solusi administrasi kurikulum merdeka terbaik untuk sekolah skala kecil maupun sekolah besar berkapasitas 36 rombel.
+Pembaruan ini menggabungkan keunggulan fleksibilitas Rapkumer dengan kemudahan operasional e-Rapor AIO, menjadikannya solusi administrasi kurikulum merdeka terbaik untuk sekolah skala kecil maupun sekolah besar berkapasitas 36 rombel dengan standar keamanan basis data tingkat produksi.

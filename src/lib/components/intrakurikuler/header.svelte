@@ -9,6 +9,9 @@
 		importTooltip,
 		isImportDisabled,
 		onOpenImport,
+		onOpenSalinParalel,
+		isSalinParalelDisabled = false,
+		salinParalelTooltip = undefined,
 		showAgamaSelect,
 		isAgamaSelectLocked = false,
 		agamaSelectId,
@@ -71,23 +74,51 @@
 		{/if}
 	</h2>
 
-	<button
-		class="btn btn-soft w-full shadow-none max-sm:hidden sm:w-auto sm:max-w-40"
-		type="button"
-		onclick={() => onOpenImport && onOpenImport()}
-		disabled={isImportDisabled}
-		title={importTooltip}
-	>
-		<Icon name="import" />
-		Import TP
-	</button>
+	<div class="flex items-center gap-2 max-sm:hidden">
+		{#if onOpenSalinParalel}
+			<button
+				class="btn btn-soft w-full shadow-none sm:w-auto"
+				type="button"
+				onclick={() => onOpenSalinParalel && onOpenSalinParalel()}
+				disabled={isSalinParalelDisabled}
+				title={salinParalelTooltip || 'Salin TP ke kelas paralel'}
+			>
+				<Icon name="copy" />
+				Salin TP
+			</button>
+		{/if}
+
+		<button
+			class="btn btn-soft w-full shadow-none sm:w-auto sm:max-w-40"
+			type="button"
+			onclick={() => onOpenImport && onOpenImport()}
+			disabled={isImportDisabled}
+			title={importTooltip}
+		>
+			<Icon name="import" />
+			Import TP
+		</button>
+	</div>
 </div>
 
-<div class="mb-2 grid grid-cols-2 gap-2 sm:hidden">
+<div class="mb-2 grid grid-cols-3 gap-2 sm:hidden">
 	<button class="btn btn-soft shadow-none" type="button" onclick={() => onBack?.()}>
 		<Icon name="left" />
 		Kembali
 	</button>
+
+	{#if onOpenSalinParalel}
+		<button
+			class="btn btn-soft shadow-none"
+			type="button"
+			onclick={() => onOpenSalinParalel && onOpenSalinParalel()}
+			disabled={isSalinParalelDisabled}
+			title={salinParalelTooltip || 'Salin TP ke kelas paralel'}
+		>
+			<Icon name="copy" />
+			Salin
+		</button>
+	{/if}
 
 	<button
 		class="btn btn-soft shadow-none"

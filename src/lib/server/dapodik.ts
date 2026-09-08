@@ -18,6 +18,7 @@ import {
 	tableMataPelajaran,
 	tableMurid,
 	tableMuridEkstrakurikuler,
+	tableMuridMataPelajaran,
 	tablePegawai,
 	tableSemester,
 	tableSekolah,
@@ -442,6 +443,9 @@ export async function runDapodikSync(options: {
 	// 10. Ekstrakurikuler — rombel jenis 51 di getRombonganBelajar (endpoint
 	//     getEkskul tidak tersedia / 404 pada build Dapodik desktop).
 	await syncEkskul(muridIndex, rombelLoad.rows, sections);
+
+	// 10b. Mata Pelajaran Pilihan — rombel jenis 16 di getRombonganBelajar (Fase F SMA/SMK).
+	await syncMapelPilihan(muridIndex, rombelLoad.rows, ptkIndex, sections);
 
 	// 11. Referensi mata pelajaran nasional (getMataPelajaran) — cache lokal untuk
 	//     pemetaan mapel buatan sekolah ke ID Dapodik saat posting nilai.
@@ -2235,6 +2239,190 @@ async function syncEkskul(
 			label: 'Ekstrakurikuler',
 			status: 'dilewati',
 			detail: `${(e as Error).message} — isi ekstrakurikuler secara manual.`
+		});
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Section: mata pelajaran pilihan (rombongan belajar jenis 16 Fase F SMA/SMK)
+// ---------------------------------------------------------------------------
+
+async function syncMapelPilihan(
+	muridIndex: MuridIndex,
+	rombelRows: Row[],
+	ptkIndex: PegawaiIndex,
+	sections: DapodikSectionLog[]
+) {
+	try {
+		const pilihanRombels = rombelRows.filter((row) => intOrNull(row['jenis_rombel']) === 16);
+		if (pilihanRombels.length === 0) {
+			sections.push({
+				label: 'Mata Pelajaran Pilihan',
+				status: 'dilewati',
+				detail: 'Tidak ada rombel mata pelajaran pilihan pada Dapodik.'
+			});
+			return;
+		}
+
+		let mapelCreated = 0;
+		let membersLinked = 0;
+
+		for (const row of pilihanRombels) {
+			const pbRows = rowsOf(row['pembelajaran']);
+			for (const pb of pbRows) {
+				const namaMapel = str(pb, 'nama_mata_pelajaran') ?? str(pb, 'nama');
+				if (!namaMapel) continue;
+				const pembelajaranId = str(pb, 'pembelajaran_id');
+				const mataPelajaranId = str(pb, 'mata_pelajaran_id');
+				const ptkId = str(pb, 'ptk_id');
+				const pengampuId = ptkIndex.resolve(ptkId);
+
+				// Kelompokkan anggota per kelas reguler asal murid
+				const perKelas = new Map<number, number[]>();
+				for (const member of rowsOf(row['anggota_rombel'])) {
+					const pdId = str(member, 'peserta_didik_id');
+					const murid = pdId ? muridIndex.byDapodik.get(pdId) : null;
+					if (!murid?.kelasId) continue;
+					const list = perKelas.get(murid.kelasId) ?? [];
+					list.push(murid.id);
+					perKelas.set(murid.kelasId, list);
+				}
+
+				const now = new Date().toISOString();
+				for (const [kelasId, muridIds] of perKelas) {
+					// Catat ke dapodik_pembelajaran agar mirror / kirim nilai sinkron
+					if (pembelajaranId && mataPelajaranId) {
+						await db
+							.insert(tableDapodikPembelajaran)
+							.values({
+								kelasId,
+								pembelajaranId,
+								mataPelajaranId,
+								nama: namaMapel,
+								createdAt: now,
+								updatedAt: now
+							})
+							.onConflictDoUpdate({
+								target: tableDapodikPembelajaran.pembelajaranId,
+								set: {
+									kelasId,
+									nama: sql`excluded.nama`,
+									mataPelajaranId: sql`excluded.mata_pelajaran_id`,
+									updatedAt: now
+								}
+							});
+					}
+
+					// Cari atau buat mapel berjenis 'pilihan' di kelas ini
+					let mapel = await db.query.tableMataPelajaran.findFirst({
+						where: and(
+							eq(tableMataPelajaran.kelasId, kelasId),
+							eq(tableMataPelajaran.nama, namaMapel)
+						)
+					});
+
+					if (!mapel) {
+						const [{ maxUrutan }] = await db
+							.select({ maxUrutan: sql<number>`coalesce(max(${tableMataPelajaran.urutan}), 0)` })
+							.from(tableMataPelajaran)
+							.where(eq(tableMataPelajaran.kelasId, kelasId));
+
+						const inserted = await db
+							.insert(tableMataPelajaran)
+							.values({
+								kelasId,
+								nama: namaMapel,
+								jenis: 'pilihan',
+								kode: '',
+								urutan: (maxUrutan ?? 0) + 1,
+								dapodikPembelajaranId: pembelajaranId,
+								dapodikMataPelajaranId: mataPelajaranId,
+								createdAt: now,
+								updatedAt: now,
+								...(pengampuId ? { pengampuId } : {})
+							})
+							.returning({ id: tableMataPelajaran.id });
+
+						if (inserted[0]) {
+							mapel = await db.query.tableMataPelajaran.findFirst({
+								where: eq(tableMataPelajaran.id, inserted[0].id)
+							});
+							mapelCreated++;
+						}
+					} else {
+						// Perbarui jenis jadi pilihan dan binding Dapodik jika belum terhubung
+						await db
+							.update(tableMataPelajaran)
+							.set({
+								jenis: 'pilihan',
+								updatedAt: now,
+								...(pembelajaranId ? { dapodikPembelajaranId: pembelajaranId } : {}),
+								...(mataPelajaranId ? { dapodikMataPelajaranId: mataPelajaranId } : {}),
+								...(pengampuId ? { pengampuId } : {})
+							})
+							.where(eq(tableMataPelajaran.id, mapel.id));
+					}
+
+					if (!mapel) continue;
+
+					// Daftarkan siswa peminat ke tableMuridMataPelajaran
+					for (const muridId of muridIds) {
+						const exists = await db.query.tableMuridMataPelajaran.findFirst({
+							where: and(
+								eq(tableMuridMataPelajaran.muridId, muridId),
+								eq(tableMuridMataPelajaran.mataPelajaranId, mapel.id)
+							)
+						});
+						if (!exists) {
+							await db.insert(tableMuridMataPelajaran).values({
+								muridId,
+								mataPelajaranId: mapel.id,
+								createdAt: now,
+								updatedAt: now
+							});
+							membersLinked++;
+						}
+					}
+
+					// Otomatis tautkan izin mengajar guru pengampu ke auth_user_pembelajaran
+					if (pengampuId) {
+						const teacherUser = await db.query.tableAuthUser.findFirst({
+							where: eq(tableAuthUser.pegawaiId, pengampuId)
+						});
+						if (teacherUser) {
+							const existsPembelajaran = await db.query.tableAuthUserPembelajaran.findFirst({
+								where: and(
+									eq(tableAuthUserPembelajaran.authUserId, teacherUser.id),
+									eq(tableAuthUserPembelajaran.kelasId, kelasId),
+									eq(tableAuthUserPembelajaran.mataPelajaranId, mapel.id)
+								)
+							});
+							if (!existsPembelajaran) {
+								await db.insert(tableAuthUserPembelajaran).values({
+									authUserId: teacherUser.id,
+									kelasId,
+									mataPelajaranId: mapel.id,
+									createdAt: now,
+									updatedAt: now
+								});
+							}
+						}
+					}
+				}
+			}
+		}
+
+		sections.push({
+			label: 'Mata Pelajaran Pilihan',
+			status: 'ok',
+			detail: `${pilihanRombels.length} rombel pilihan diproses, ${mapelCreated} mapel pilihan baru, ${membersLinked} peserta didik ditautkan.`
+		});
+	} catch (e) {
+		console.error('[dapodik] syncMapelPilihan gagal:', e);
+		sections.push({
+			label: 'Mata Pelajaran Pilihan',
+			status: 'dilewati',
+			detail: `${(e as Error).message} — atur mapel pilihan secara manual.`
 		});
 	}
 }

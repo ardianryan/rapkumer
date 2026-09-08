@@ -28,48 +28,61 @@ import { ensurePembelajaranSchema } from './ensure-pembelajaran';
 import { resetEnsuredSchemas } from './ensure-helper';
 
 let startupEnsuresDone = false;
+let startupEnsuresPromise: Promise<void> | null = null;
 
 /**
  * Apply the startup schema/bootstrap migrations. Idempotent: runs only once per
  * process unless `resetStartupEnsures()` is called first (e.g. after importing
  * an older database file so the imported DB is migrated too).
+ * Thread-safe: concurrent callers await the same in-flight promise.
  */
 export async function runStartupEnsures() {
 	if (startupEnsuresDone) return;
-	await ensureCoreSchema();
-	await ensureAcademicModulesSchema();
-	await ensureJadwalBellSchema();
-	await ensurePresensiSettingsSchema();
-	await ensureLoginAttemptsSchema();
-	await ensureBukuTamuSettingsSchema();
-	await ensureAiSettingsSchema();
-	await ensureUserAiSettingsSchema();
-	await ensureDapodikSchema();
-	// Tabel fitur akademik yang sebelumnya hanya di-ensure per-route — daftarkan di
-	// sini agar DB segar/reset selalu punya skema lengkap tanpa perlu `pnpm db:push`.
-	await ensureAbsensiSchema();
-	await ensureAsesmenFormatifSchema();
-	await ensureAsesmenKokurikulerSchema();
-	await ensureAsesmenSumatifSchema();
-	await ensureAsesmenEkstrakurikulerSchema();
-	await ensureBukuTamuSchema();
-	await ensureCatatanWaliSchema();
-	await ensureDinasLuarSchema();
-	await ensureJurnalMengajarSchema();
-	await ensureKetidakhadiranHarianSchema();
-	await ensureKetidakhadiranRaporSchema();
-	await ensurePresensiGuruSchema();
-	await ensureSppdSchema();
-	await ensureDefaultAdmin();
-	await ensurePermissionMigration();
-	await ensureKepalaSekolahAccounts();
-	await ensureZitadelSchema();
-	await ensurePembelajaranSchema();
-	startupEnsuresDone = true;
+	if (startupEnsuresPromise) return startupEnsuresPromise;
+
+	startupEnsuresPromise = (async () => {
+		try {
+			await ensureCoreSchema();
+			await ensureAcademicModulesSchema();
+			await ensureJadwalBellSchema();
+			await ensurePresensiSettingsSchema();
+			await ensureLoginAttemptsSchema();
+			await ensureBukuTamuSettingsSchema();
+			await ensureAiSettingsSchema();
+			await ensureUserAiSettingsSchema();
+			await ensureDapodikSchema();
+			// Tabel fitur akademik yang sebelumnya hanya di-ensure per-route — daftarkan di
+			// sini agar DB segar/reset selalu punya skema lengkap tanpa perlu `pnpm db:push`.
+			await ensureAbsensiSchema();
+			await ensureAsesmenFormatifSchema();
+			await ensureAsesmenKokurikulerSchema();
+			await ensureAsesmenSumatifSchema();
+			await ensureAsesmenEkstrakurikulerSchema();
+			await ensureBukuTamuSchema();
+			await ensureCatatanWaliSchema();
+			await ensureDinasLuarSchema();
+			await ensureJurnalMengajarSchema();
+			await ensureKetidakhadiranHarianSchema();
+			await ensureKetidakhadiranRaporSchema();
+			await ensurePresensiGuruSchema();
+			await ensureSppdSchema();
+			await ensureDefaultAdmin();
+			await ensurePermissionMigration();
+			await ensureKepalaSekolahAccounts();
+			await ensureZitadelSchema();
+			await ensurePembelajaranSchema();
+			startupEnsuresDone = true;
+		} finally {
+			startupEnsuresPromise = null;
+		}
+	})();
+
+	return startupEnsuresPromise;
 }
 
 /** Reset the bootstrap cache so `runStartupEnsures()` re-runs against the current DB. */
 export function resetStartupEnsures() {
 	startupEnsuresDone = false;
+	startupEnsuresPromise = null;
 	resetEnsuredSchemas();
 }

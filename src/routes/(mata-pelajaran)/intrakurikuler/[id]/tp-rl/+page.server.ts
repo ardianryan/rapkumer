@@ -8,9 +8,9 @@ import {
 	tableAuthUser
 } from '$lib/server/db/schema.js';
 import { agamaMapelNames, agamaMapelOptions, pksMapelNames, pksMapelOptions } from '$lib/statics';
-import { unflattenFormData } from '$lib/utils';
+import { parseJenjangKelas, sortKelasNatural, unflattenFormData } from '$lib/utils';
 import { fail } from '@sveltejs/kit';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { readBufferToAoA } from '$lib/utils/excel.js';
 import { redirect } from '@sveltejs/kit';
 import { authority } from '../../../../pengguna/utils.server';
@@ -58,7 +58,7 @@ export async function load({ depends, params, parent }) {
 	await ensureAgamaMapelForClasses([mapel.kelasId]);
 	await ensurePksMapelForClasses([mapel.kelasId]);
 
-	let tujuanPembelajaran = [];
+	let tujuanPembelajaran;
 
 	let agamaOptions: Array<{
 		id: number;
@@ -309,6 +309,38 @@ export async function load({ depends, params, parent }) {
 		})()
 	);
 
+	// Ambil kelas paralel yang memiliki mata pelajaran yang sama
+	const currentJenjang = parseJenjangKelas(mapel.kelas?.nama ?? '');
+	const allOtherMapels = await db.query.tableMataPelajaran.findMany({
+		where: and(
+			eq(tableMataPelajaran.nama, mapel.nama),
+			sql`${tableMataPelajaran.id} != ${mapel.id}`
+		),
+		with: {
+			kelas: true,
+			tujuanPembelajaran: {
+				columns: { id: true }
+			}
+		}
+	});
+
+	const kelasParalelList = allOtherMapels
+		.filter(
+			(m) =>
+				m.kelas &&
+				m.kelas.sekolahId === mapel.kelas?.sekolahId &&
+				m.kelas.semesterId === mapel.kelas?.semesterId
+		)
+		.map((m) => ({
+			kelasId: m.kelasId,
+			namaKelas: m.kelas.nama,
+			mapelId: m.id,
+			totalTp: m.tujuanPembelajaran.length,
+			jenjang: parseJenjangKelas(m.kelas.nama),
+			isSameJenjang: parseJenjangKelas(m.kelas.nama) === currentJenjang
+		}))
+		.sort((a, b) => sortKelasNatural({ nama: a.namaKelas }, { nama: b.namaKelas }));
+
 	return {
 		tujuanPembelajaran,
 		agamaOptions,
@@ -319,6 +351,8 @@ export async function load({ depends, params, parent }) {
 		agamaSelectDisabled: agamaSelectDisabledValue,
 		lockedAgamaSelectionId: assignedLocalMapelId ?? assignedGlobalId,
 		userHasMultiAgama,
+		kelasParalelList,
+		currentJenjang,
 		meta: { title: `Tujuan Pembelajaran - ${mapel.nama}` }
 	};
 }
@@ -833,5 +867,62 @@ export const actions = {
 		}
 
 		return { message: parts.join(' '), longEntryCount };
+	},
+
+	async salin_tp({ params, request, locals }) {
+		const userType = (locals.user as { type?: string } | null)?.type;
+		if (
+			userType !== 'admin' &&
+			userType !== 'kepala_sekolah' &&
+			userType !== 'user' &&
+			userType !== 'wali_kelas' &&
+			userType !== 'wali_asuh'
+		) {
+			authority('mata_pelajaran_intrakurikuler');
+		}
+
+		const formData = await request.formData();
+		const sourceMapelId = Number(params.id);
+		const mode = formData.get('mode') === 'replace' ? 'replace' : 'merge';
+		const targetMapelIdsRaw = formData.getAll('targetMapelIds');
+		const targetMapelIds = targetMapelIdsRaw.map(Number).filter(Number.isFinite);
+
+		if (targetMapelIds.length === 0) {
+			return fail(400, { fail: 'Pilih minimal satu kelas tujuan.' });
+		}
+
+		// Ambil seluruh TP dari mapel sumber
+		const sourceTps = await db.query.tableTujuanPembelajaran.findMany({
+			where: eq(tableTujuanPembelajaran.mataPelajaranId, sourceMapelId),
+			orderBy: asc(tableTujuanPembelajaran.id)
+		});
+
+		if (sourceTps.length === 0) {
+			return fail(400, {
+				fail: 'Mata pelajaran sumber belum memiliki Tujuan Pembelajaran untuk disalin.'
+			});
+		}
+
+		await db.transaction(async (tx) => {
+			for (const targetId of targetMapelIds) {
+				if (mode === 'replace') {
+					await tx
+						.delete(tableTujuanPembelajaran)
+						.where(eq(tableTujuanPembelajaran.mataPelajaranId, targetId));
+				}
+
+				await tx.insert(tableTujuanPembelajaran).values(
+					sourceTps.map((tp) => ({
+						mataPelajaranId: targetId,
+						lingkupMateri: tp.lingkupMateri,
+						deskripsi: tp.deskripsi
+					}))
+				);
+			}
+		});
+
+		return {
+			message: `Berhasil menyalin ${sourceTps.length} Tujuan Pembelajaran ke ${targetMapelIds.length} kelas paralel.`
+		};
 	}
 };

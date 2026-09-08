@@ -3,6 +3,7 @@ import {
 	tableAsesmenFormatif,
 	tableMataPelajaran,
 	tableMurid,
+	tableMuridMataPelajaran,
 	tableTujuanPembelajaran
 } from '$lib/server/db/schema';
 import { ensureAsesmenFormatifSchema } from '$lib/server/db/ensure-asesmen-formatif';
@@ -25,9 +26,6 @@ const AGAMA_BASE_SUBJECT = 'Pendidikan Agama dan Budi Pekerti';
 const AGAMA_MAPEL_VALUE = 'agama';
 
 const PKS_BASE_SUBJECT = 'Pendalaman Kitab Suci';
-const AGAMA_VARIANT_NAMES = agamaMapelOptions
-	.filter((option) => option.key !== 'umum')
-	.map((option) => normalizeText(option.name));
 const PKS_VARIANT_NAMES = pksMapelOptions
 	.filter((option) => option.key !== 'umum')
 	.map((option) => normalizeText(option.name));
@@ -84,7 +82,7 @@ function buildSummarySentence(parts: ProgressSummaryPart[]): string | null {
 		const lingkup = part.lingkupMateri.toLowerCase();
 		return `${kategoriLabel} dalam materi ${lingkup} (${part.tuntas}/${part.totalTujuan} TP)`;
 	});
-	let sentence = '';
+	let sentence: string;
 	if (formatted.length === 1) {
 		sentence = formatted[0];
 	} else if (formatted.length === 2) {
@@ -126,7 +124,7 @@ export async function load({ parent, url, depends }) {
 	}
 
 	let mapelRecords = await db.query.tableMataPelajaran.findMany({
-		columns: { id: true, nama: true, namaLokal: true },
+		columns: { id: true, nama: true, namaLokal: true, jenis: true },
 		where: eq(tableMataPelajaran.kelasId, kelasAktif.id),
 		orderBy: asc(tableMataPelajaran.nama)
 	});
@@ -421,9 +419,23 @@ export async function load({ parent, url, depends }) {
 					}
 				: null;
 
+	let enrolledMuridIds: number[] | null = null;
+	if (selectedMapelRecord && selectedMapelRecord.jenis === 'pilihan') {
+		const enrolled = await db.query.tableMuridMataPelajaran.findMany({
+			where: eq(tableMuridMataPelajaran.mataPelajaranId, selectedMapelRecord.id),
+			columns: { muridId: true }
+		});
+		if (enrolled.length > 0) {
+			enrolledMuridIds = enrolled.map((e) => e.muridId);
+		}
+	}
+
 	const muridRecords = await db.query.tableMurid.findMany({
 		columns: { id: true, nama: true, agama: true },
-		where: eq(tableMurid.kelasId, kelasAktif.id),
+		where: and(
+			eq(tableMurid.kelasId, kelasAktif.id),
+			enrolledMuridIds ? inArray(tableMurid.id, enrolledMuridIds) : undefined
+		),
 		orderBy: asc(tableMurid.nama)
 	});
 

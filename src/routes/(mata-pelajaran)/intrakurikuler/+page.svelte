@@ -196,7 +196,9 @@
 </script>
 
 <div class="card bg-base-100 rounded-box border border-none p-4 shadow-md">
-	<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+	<div
+		class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between border-b border-base-200 pb-3"
+	>
 		<div>
 			<h2 class="text-xl font-bold">Daftar Mata Pelajaran Intrakurikuler</h2>
 			{#if kelasAktifLabel}
@@ -206,6 +208,15 @@
 					Pilih kelas di navbar untuk melihat mata pelajaran intrakurikuler.
 				</p>
 			{/if}
+		</div>
+
+		<div class="tabs tabs-boxed bg-base-200/80 p-1">
+			<a class="tab tab-active text-xs sm:text-sm font-semibold" href="/intrakurikuler">
+				📋 Per Rombel Aktif
+			</a>
+			<a class="tab text-xs sm:text-sm" href="/intrakurikuler/distribusi">
+				🌐 Per Mata Pelajaran (Gaya AIO)
+			</a>
 		</div>
 	</div>
 

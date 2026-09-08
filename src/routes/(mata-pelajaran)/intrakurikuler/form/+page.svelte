@@ -445,6 +445,25 @@
 					{/each}
 				</select>
 			</fieldset>
+			{#if !isAgamaGroup && !isPksGroup}
+				<div class="mt-1 p-3 rounded-xl bg-base-200/50 border border-base-300">
+					<label class="label cursor-pointer justify-start gap-3 p-0">
+						<input
+							type="checkbox"
+							name="propagate_sejenjang"
+							value="1"
+							class="checkbox checkbox-primary checkbox-sm"
+						/>
+						<div class="text-xs">
+							<span class="font-bold">Terapkan Pengaturan ini ke Seluruh Rombel Se-Jenjang</span>
+							<p class="text-base-content/60 text-[11px] leading-tight mt-0.5">
+								Otomatis menyamakan KKM, Kode Singkat, dan Jenis Mapel untuk mata pelajaran bernama
+								sama di semua kelas paralel.
+							</p>
+						</div>
+					</label>
+				</div>
+			{/if}
 			{#if mode === 'edit' && isAgamaParent}
 				<p class="text-base-content/70 mt-2 text-sm">
 					Perubahan KKM akan diterapkan ke semua varian mata pelajaran Pendidikan Agama dan Budi

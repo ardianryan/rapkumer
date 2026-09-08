@@ -2,7 +2,7 @@ import db from '$lib/server/db/index.js';
 import { normMapelName, resolveReferensiMapelId } from '$lib/server/dapodik';
 import { opsiMapelDapodik } from '$lib/server/dapodik-mapel-options';
 import { tableDapodikPembelajaran, tableKelas, tableMataPelajaran } from '$lib/server/db/schema';
-import { cookieNames, unflattenFormData } from '$lib/utils';
+import { cookieNames, parseJenjangKelas, unflattenFormData } from '$lib/utils';
 import { fail } from '@sveltejs/kit';
 import { and, eq, sql } from 'drizzle-orm';
 
@@ -28,6 +28,7 @@ export const actions = {
 			kkm?: string;
 			kode?: string;
 			induk_pembelajaran_id?: string;
+			propagate_sejenjang?: string;
 		}>(await request.formData());
 
 		const kelasIdCookie = cookies.get(cookieNames.ACTIVE_KELAS_ID);
@@ -46,7 +47,7 @@ export const actions = {
 		}
 
 		const kelasAktif = await db.query.tableKelas.findFirst({
-			columns: { id: true },
+			columns: { id: true, nama: true, semesterId: true },
 			where: and(eq(tableKelas.id, kelasId), eq(tableKelas.sekolahId, sekolahId))
 		});
 		if (!kelasAktif) {
@@ -138,6 +139,53 @@ export const actions = {
 			...(!mirror && indukRow ? { dapodikIndukPembelajaranId: indukRow.pembelajaranId } : {}),
 			...(dapodikMatpelId ? { dapodikMataPelajaranId: dapodikMatpelId } : {})
 		});
+
+		const propagateSejenjang =
+			formMapel.propagate_sejenjang === '1' || formMapel.propagate_sejenjang === 'true';
+		let propagatedCount = 0;
+		if (propagateSejenjang && kelasAktif.nama) {
+			const currentJenjang = parseJenjangKelas(kelasAktif.nama);
+			const otherClasses = await db.query.tableKelas.findMany({
+				where: and(
+					eq(tableKelas.sekolahId, sekolahId),
+					eq(tableKelas.semesterId, kelasAktif.semesterId)
+				)
+			});
+			const targetClasses = otherClasses.filter(
+				(k) => k.id !== kelasId && parseJenjangKelas(k.nama) === currentJenjang
+			);
+
+			for (const tc of targetClasses) {
+				const existInTc = await db.query.tableMataPelajaran.findFirst({
+					where: and(eq(tableMataPelajaran.kelasId, tc.id), eq(tableMataPelajaran.nama, nama))
+				});
+				if (existInTc) {
+					await db
+						.update(tableMataPelajaran)
+						.set({ jenis, kkm, ...(kode ? { kode } : {}) })
+						.where(eq(tableMataPelajaran.id, existInTc.id));
+				} else {
+					const [{ maxU }] = await db
+						.select({ maxU: sql<number>`coalesce(max(${tableMataPelajaran.urutan}), 0)` })
+						.from(tableMataPelajaran)
+						.where(eq(tableMataPelajaran.kelasId, tc.id));
+					await db.insert(tableMataPelajaran).values({
+						nama,
+						namaLokal: namaLokal || null,
+						jenis,
+						kkm,
+						kelasId: tc.id,
+						kode: kode || null,
+						urutan: (maxU ?? 0) + 1,
+						...(dapodikMatpelId ? { dapodikMataPelajaranId: dapodikMatpelId } : {})
+					});
+				}
+				propagatedCount++;
+			}
+		}
+
+		const propSuffix =
+			propagatedCount > 0 ? ` dan diterapkan ke ${propagatedCount} kelas se-jenjang` : '';
 		const suffix = mirror
 			? ' dan ter-binding ke pembelajaran Dapodik'
 			: indukRow
@@ -147,6 +195,6 @@ export const actions = {
 							: '; ID referensi mapel belum ditemukan, akan dilengkapi saat kirim'
 					}`
 				: '';
-		return { message: `Data mata pelajaran berhasil ditambah${suffix}` };
+		return { message: `Data mata pelajaran berhasil ditambah${suffix}${propSuffix}` };
 	}
 };

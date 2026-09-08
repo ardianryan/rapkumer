@@ -1,6 +1,11 @@
 import db from '$lib/server/db';
 import { ensureAsesmenSumatifSchema } from '$lib/server/db/ensure-asesmen-sumatif';
-import { tableAsesmenSumatif, tableMataPelajaran, tableMurid } from '$lib/server/db/schema';
+import {
+	tableAsesmenSumatif,
+	tableMataPelajaran,
+	tableMurid,
+	tableMuridMataPelajaran
+} from '$lib/server/db/schema';
 import { redirect } from '@sveltejs/kit';
 import { getAksesMapelUser, needsMapelFilter } from '$lib/server/mapel-access';
 import { labelVarianUntukMurid, muridAgamaKey } from '$lib/server/mapel-picker';
@@ -9,12 +14,6 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 
 const AGAMA_BASE_SUBJECT = 'Pendidikan Agama dan Budi Pekerti';
 const PKS_BASE_SUBJECT = 'Pendalaman Kitab Suci';
-const AGAMA_VARIANT_NAMES = agamaMapelOptions
-	.filter((option) => option.key !== 'umum')
-	.map((option) => normalizeText(option.name));
-const PKS_VARIANT_NAMES = pksMapelOptions
-	.filter((option) => option.key !== 'umum')
-	.map((option) => normalizeText(option.name));
 const AGAMA_MAPEL_VALUE = 'agama';
 const PKS_MAPEL_VALUE = 'pks';
 
@@ -156,7 +155,7 @@ export async function load({ parent, url, depends, locals }) {
 	}
 
 	let mapelRecords = await db.query.tableMataPelajaran.findMany({
-		columns: { id: true, nama: true, namaLokal: true },
+		columns: { id: true, nama: true, namaLokal: true, jenis: true },
 		where: eq(tableMataPelajaran.kelasId, kelasAktif.id),
 		orderBy: asc(tableMataPelajaran.nama)
 	});
@@ -347,8 +346,20 @@ export async function load({ parent, url, depends, locals }) {
 					}
 				: null;
 
+	let enrolledMuridIds: number[] | null = null;
+	if (selectedMapelRecord && selectedMapelRecord.jenis === 'pilihan') {
+		const enrolled = await db.query.tableMuridMataPelajaran.findMany({
+			where: eq(tableMuridMataPelajaran.mataPelajaranId, selectedMapelRecord.id),
+			columns: { muridId: true }
+		});
+		if (enrolled.length > 0) {
+			enrolledMuridIds = enrolled.map((e) => e.muridId);
+		}
+	}
+
 	const muridFilter = and(
 		eq(tableMurid.kelasId, kelasAktif.id),
+		enrolledMuridIds ? inArray(tableMurid.id, enrolledMuridIds) : undefined,
 		search ? sql`${tableMurid.nama} LIKE ${'%' + search + '%'} COLLATE NOCASE` : undefined
 	);
 

@@ -8,6 +8,7 @@
 	import DeleteGroupDialog from '$lib/components/tp-rl/delete-group-dialog.svelte';
 	import GenerateTpModal from '$lib/components/tp-rl/generate-tp-modal.svelte';
 	import ImportDialog from '$lib/components/tp-rl/import-dialog.svelte';
+	import SalinTpModal from '$lib/components/tp-rl/salin-tp-modal.svelte';
 	import GroupDisplayRow from '$lib/components/tp-rl/group-display-row.svelte';
 	import GroupFormRow from '$lib/components/tp-rl/group-form-row.svelte';
 	import type {
@@ -47,6 +48,7 @@
 	import { page } from '$app/state';
 	import SvelteURLSearchParams from '$lib/svelte-helpers/url-search-params';
 	let { data } = $props();
+	let salinTpModalOpen = $state(false);
 	const AGAMA_PARENT_NAME = 'Pendidikan Agama dan Budi Pekerti';
 	const PKS_PARENT_NAME = 'Pendalaman Kitab Suci';
 	const isAgamaParentMapel = $derived(data.mapel.nama === AGAMA_PARENT_NAME);
@@ -975,6 +977,14 @@
 		{isEditingBobot}
 		{hasGroups}
 		{toggleBobotEditing}
+		onOpenSalinParalel={() => (salinTpModalOpen = true)}
+		isSalinParalelDisabled={(data.tujuanPembelajaran?.length ?? 0) === 0 ||
+			(data.kelasParalelList?.length ?? 0) === 0}
+		salinParalelTooltip={(data.tujuanPembelajaran?.length ?? 0) === 0
+			? 'Isi minimal 1 TP terlebih dahulu untuk disalin'
+			: (data.kelasParalelList?.length ?? 0) === 0
+				? 'Tidak ada kelas paralel lain untuk mapel ini'
+				: 'Salin seluruh TP ke kelas paralel se-jenjang'}
 	/>
 	{#if requiresAgamaSelection && !hasActiveAgamaSelection}
 		<div class="alert alert-warning alert-soft my-2 flex items-center gap-2 text-sm">
@@ -1101,3 +1111,12 @@
 		onSuccess={handleDeleteGroupSuccess}
 	/>
 {/if}
+
+<SalinTpModal
+	bind:open={salinTpModalOpen}
+	mapelNama={data.mapel.nama}
+	currentKelasNama={data.mapel.kelas.nama}
+	currentJenjang={data.currentJenjang ?? ''}
+	totalTp={data.tujuanPembelajaran?.length ?? 0}
+	kelasList={data.kelasParalelList ?? []}
+/>

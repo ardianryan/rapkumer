@@ -1,9 +1,9 @@
 import db from '$lib/server/db/index.js';
 import { normMapelName } from '$lib/server/dapodik';
 import { opsiMapelDapodik } from '$lib/server/dapodik-mapel-options';
-import { tableDapodikPembelajaran, tableMataPelajaran } from '$lib/server/db/schema.js';
+import { tableDapodikPembelajaran, tableKelas, tableMataPelajaran } from '$lib/server/db/schema.js';
 import { agamaMapelNames, pksMapelNames } from '$lib/statics';
-import { unflattenFormData } from '$lib/utils';
+import { parseJenjangKelas, unflattenFormData } from '$lib/utils';
 import { fail } from '@sveltejs/kit';
 import { and, eq, inArray } from 'drizzle-orm';
 
@@ -46,6 +46,7 @@ export const actions = {
 			kkm?: string;
 			kode?: string;
 			induk_pembelajaran_id?: string;
+			propagate_sejenjang?: string;
 		}>(await request.formData());
 
 		const sekolahId = locals.sekolah?.id;
@@ -201,6 +202,44 @@ export const actions = {
 
 		await db.update(tableMataPelajaran).set(updates).where(eq(tableMataPelajaran.id, id));
 
-		return { message: `Data mata pelajaran berhasil diperbarui` };
+		const propagateSejenjang =
+			formMapel.propagate_sejenjang === '1' || formMapel.propagate_sejenjang === 'true';
+		let propagatedCount = 0;
+		if (propagateSejenjang && existing.kelas) {
+			const currentJenjang = parseJenjangKelas(existing.kelas.nama);
+			const otherClasses = await db.query.tableKelas.findMany({
+				where: and(
+					eq(tableKelas.sekolahId, sekolahId),
+					eq(tableKelas.semesterId, existing.kelas.semesterId)
+				)
+			});
+			const targetKelasIds = otherClasses
+				.filter((k) => k.id !== existing.kelasId && parseJenjangKelas(k.nama) === currentJenjang)
+				.map((k) => k.id);
+
+			if (targetKelasIds.length > 0) {
+				const bulkUpdates: Record<string, unknown> = {
+					jenis: jenisRaw,
+					kkm,
+					updatedAt: now
+				};
+				if (kode) bulkUpdates.kode = kode;
+
+				await db
+					.update(tableMataPelajaran)
+					.set(bulkUpdates)
+					.where(
+						and(
+							inArray(tableMataPelajaran.kelasId, targetKelasIds),
+							eq(tableMataPelajaran.nama, nama)
+						)
+					);
+				propagatedCount = targetKelasIds.length;
+			}
+		}
+
+		const suffixMsg =
+			propagatedCount > 0 ? ` dan diterapkan ke ${propagatedCount} kelas paralel se-jenjang` : '';
+		return { message: `Data mata pelajaran berhasil diperbarui${suffixMsg}` };
 	}
 };
