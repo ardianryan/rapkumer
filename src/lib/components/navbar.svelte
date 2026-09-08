@@ -48,13 +48,6 @@
 		return (user as UserLike)?.pegawaiName ?? (user as UserLike)?.username ?? null;
 	});
 
-	const isNonOwnClass = $derived.by(() => {
-		if (!user || user.type !== 'wali_kelas' || !kelasAktif?.id) return false;
-		const u = user as { kelasId?: number | null; ownKelasIds?: number[] | null };
-		const ownIds = u.ownKelasIds?.length ? u.ownKelasIds : u.kelasId != null ? [u.kelasId] : [];
-		return ownIds.length > 0 && !ownIds.includes(kelasAktif.id);
-	});
-
 	// Whether current user can stop the server (client-side guard)
 	// Allow users who explicitly have the `server_stop` permission, or
 	// any user of type 'admin' (administrators can stop the server by default).
@@ -68,6 +61,48 @@
 
 	import SvelteURLSearchParams from '$lib/svelte-helpers/url-search-params';
 	import { resolveHelpFile } from '$lib/help-maps';
+	import { parseJenjangKelas, sortKelasNatural } from '$lib/utils.js';
+
+	let searchQuery = $state('');
+	let selectedJenjang = $state('Semua');
+
+	type KelasItem = {
+		id: number;
+		nama: string;
+		fase: string | null;
+		waliKelas?: { id: number; nama: string } | null;
+	};
+
+	const sortedDaftarKelas = $derived.by(() => {
+		const list: KelasItem[] = [...(daftarKelas as KelasItem[])];
+		list.sort(sortKelasNatural);
+		return list;
+	});
+
+	const availableJenjangList = $derived.by(() => {
+		const set = new Set<string>();
+		for (const k of sortedDaftarKelas) {
+			set.add(parseJenjangKelas(k.nama));
+		}
+		return Array.from(set).sort((a, b) => sortKelasNatural(a, b));
+	});
+
+	const filteredDaftarKelas = $derived.by(() => {
+		let list = sortedDaftarKelas;
+		if (selectedJenjang !== 'Semua') {
+			list = list.filter((k) => parseJenjangKelas(k.nama) === selectedJenjang);
+		}
+		const q = searchQuery.trim().toLowerCase();
+		if (q) {
+			list = list.filter((k) => {
+				const nama = k.nama.toLowerCase();
+				const fase = (k.fase || '').toLowerCase();
+				const wali = (k.waliKelas?.nama || '').toLowerCase();
+				return nama.includes(q) || fase.includes(q) || wali.includes(q);
+			});
+		}
+		return list;
+	});
 
 	function buildKelasHref(kelasId: number) {
 		const params = new SvelteURLSearchParams(page.url.search);
@@ -103,6 +138,13 @@
 			},
 			onNegative: { label: 'Batal', icon: 'close' }
 		});
+	}
+
+	function onSelectKelas(e: MouseEvent) {
+		handleKelasClick(e);
+		if (document.activeElement instanceof HTMLElement) {
+			document.activeElement.blur();
+		}
 	}
 
 	/**
@@ -259,48 +301,106 @@
 			</li>
 
 			<!-- Dropdown ganti kelas aktif -->
-			<li>
+			<li class="ml-0.5">
 				<div class="dropdown dropdown-end">
 					<div
 						tabindex="0"
 						role="button"
 						title="Ganti kelas aktif"
-						class="badge badge-soft badge-primary font-semibold text-xs px-3 py-3 gap-1.5 cursor-pointer hover:opacity-90 transition-all shadow-xs"
+						class="btn btn-sm btn-soft btn-primary font-semibold text-xs px-2.5 sm:px-3 gap-1.5 rounded-full hover:shadow-xs transition-all border border-primary/20"
 					>
 						<Icon name="users" class="h-3.5 w-3.5" />
-						<span class="max-w-28 truncate">{excerpt(kelasAktifLabel, 14)}</span>
+						<span class="max-w-24 sm:max-w-36 truncate">{excerpt(kelasAktifLabel, 16)}</span>
 						<Icon name="select" class="h-3 w-3 opacity-70" />
 					</div>
 					<div
-						class="dropdown-content bg-base-100 border border-slate-200/80 dark:border-slate-800 z-50 mt-3 w-64 rounded-2xl p-3 shadow-xl focus:outline-none"
+						class="dropdown-content bg-base-100 border border-slate-200/80 dark:border-slate-800 z-50 mt-3 w-72 sm:w-80 rounded-2xl p-3 shadow-xl focus:outline-none"
 					>
-						<div class="px-2 py-1.5 border-b border-slate-200/60 dark:border-slate-800 mb-2">
-							<p class="text-xs font-bold text-base-content/80 uppercase tracking-wider">
+						<!-- Header -->
+						<div
+							class="flex items-center justify-between px-1 py-1 border-b border-slate-200/60 dark:border-slate-800 mb-2"
+						>
+							<span
+								class="text-xs font-bold text-base-content/80 uppercase tracking-wider flex items-center gap-1.5"
+							>
+								<Icon name="users" class="h-3.5 w-3.5 text-primary" />
 								Pilih Rombel / Kelas
-							</p>
+							</span>
+							{#if kelasAktif}
+								<span class="badge badge-xs badge-primary font-bold">{kelasAktif.nama}</span>
+							{/if}
 						</div>
-						{#if daftarKelas.length}
-							<div class="flex max-h-56 flex-col gap-1 overflow-y-auto pr-1">
-								{#each daftarKelas as kelas (kelas.id)}
-									{@const label = kelas.fase ? `${kelas.nama} - ${kelas.fase}` : kelas.nama}
+
+						<!-- Search Input -->
+						<div class="mb-2">
+							<div class="relative">
+								<input
+									type="text"
+									bind:value={searchQuery}
+									placeholder="Cari rombel..."
+									class="input input-sm input-bordered w-full rounded-xl pl-8 pr-7 text-xs bg-base-200/60 focus:bg-base-100"
+								/>
+								<div
+									class="absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/50 pointer-events-none"
+								>
+									<Icon name="search" class="h-3.5 w-3.5" />
+								</div>
+								{#if searchQuery}
+									<button
+										type="button"
+										class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-base-content/40 hover:text-base-content"
+										onclick={() => (searchQuery = '')}
+									>
+										✕
+									</button>
+								{/if}
+							</div>
+						</div>
+
+						<!-- Filter Jenjang Tabs -->
+						{#if availableJenjangList.length > 1}
+							<div class="flex flex-wrap gap-1 mb-2">
+								{#each ['Semua', ...availableJenjangList] as j (j)}
+									<button
+										type="button"
+										class="px-2.5 py-1 rounded-lg text-xs font-medium transition-all {selectedJenjang ===
+										j
+											? 'bg-primary text-primary-content font-bold shadow-xs'
+											: 'bg-base-200/70 hover:bg-base-200 text-base-content/70'}"
+										onclick={() => (selectedJenjang = j)}
+									>
+										{j}
+									</button>
+								{/each}
+							</div>
+						{/if}
+
+						<!-- List Kelas Grid -->
+						{#if filteredDaftarKelas.length}
+							<div class="grid grid-cols-2 gap-1.5 max-h-60 overflow-y-auto pr-1">
+								{#each filteredDaftarKelas as kelas (kelas.id)}
+									{@const label = kelas.nama}
 									<a
-										class="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all {kelasAktif?.id ===
+										class="flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-all {kelasAktif?.id ===
 										kelas.id
 											? 'bg-primary text-primary-content font-bold shadow-xs'
-											: 'hover:bg-base-200 text-base-content/80'}"
+											: 'hover:bg-base-200 text-base-content/80 border border-transparent hover:border-base-300'}"
 										href={buildKelasHref(kelas.id)}
-										onclick={handleKelasClick}
+										onclick={onSelectKelas}
+										title={kelas.fase ? `${kelas.nama} - ${kelas.fase}` : kelas.nama}
 									>
-										<span>{label}</span>
+										<span class="truncate">{label}</span>
 										{#if kelasAktif?.id === kelas.id}
-											<Icon name="check" class="h-3.5 w-3.5" />
+											<Icon name="check" class="h-3.5 w-3.5 shrink-0" />
 										{/if}
 									</a>
 								{/each}
 							</div>
 						{:else}
-							<p class="text-base-content/60 text-xs px-2 py-3">
-								Belum ada data kelas yang dapat dipilih.
+							<p class="text-base-content/60 text-xs px-2 py-4 text-center">
+								{searchQuery || selectedJenjang !== 'Semua'
+									? 'Tidak ada kelas yang cocok dengan filter.'
+									: 'Belum ada data kelas yang dapat dipilih.'}
 							</p>
 						{/if}
 					</div>

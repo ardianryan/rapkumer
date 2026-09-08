@@ -202,7 +202,11 @@ Posisi pemilihan rombel diletakkan di **bagian bawah** form (setelah pengisian d
 		<div class="flex items-center justify-between">
 			<h4 class="font-bold text-sm">Terapkan ke Kelas Lain Sekaligus</h4>
 			<div class="flex gap-1.5">
-				<button type="button" class="btn btn-xs btn-outline btn-primary" onclick={selectAllDisplayed}>
+				<button
+					type="button"
+					class="btn btn-xs btn-outline btn-primary"
+					onclick={selectAllDisplayed}
+				>
 					Pilih Semua Kelas ({selectedJenjang})
 				</button>
 				<button type="button" class="btn btn-xs btn-ghost text-error" onclick={unselectAll}>
@@ -214,7 +218,10 @@ Posisi pemilihan rombel diletakkan di **bagian bawah** form (setelah pengisian d
 		<!-- Filter Jenjang Otomatis (X, XI, XII, dll) -->
 		<div class="flex gap-1.5">
 			{#each jenjangOptions as j}
-				<button class="btn btn-xs {selectedJenjang === j ? 'btn-primary' : 'btn-ghost'}" onclick={() => selectedJenjang = j}>
+				<button
+					class="btn btn-xs {selectedJenjang === j ? 'btn-primary' : 'btn-ghost'}"
+					onclick={() => (selectedJenjang = j)}
+				>
 					{j === 'Semua' ? 'Semua Jenjang' : `Jenjang ${j}`}
 				</button>
 			{/each}

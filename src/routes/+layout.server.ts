@@ -8,7 +8,7 @@ import {
 	tableAuthUserMataPelajaran,
 	tablePresensiSettings
 } from '$lib/server/db/schema';
-import { cookieNames, findTitleByPath } from '$lib/utils.js';
+import { cookieNames, findTitleByPath, sortKelasNatural } from '$lib/utils.js';
 import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
@@ -228,6 +228,7 @@ export const load: LayoutServerLoad = async ({ url, locals, cookies, depends }) 
 				orderBy: asc(tableKelas.nama)
 			});
 		}
+		daftarKelas.sort(sortKelasNatural);
 	}
 
 	const kelasIdParam = url.searchParams.get('kelas_id');

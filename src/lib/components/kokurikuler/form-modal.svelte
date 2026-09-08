@@ -1,6 +1,7 @@
 <script lang="ts">
 	import FormEnhance from '$lib/components/form-enhance.svelte';
 	import Icon from '$lib/components/icon.svelte';
+	import { parseJenjangKelas, sortKelasNatural } from '$lib/utils';
 	import type { DimensiProfilLulusanKey } from '$lib/statics';
 	import type { KokurikulerRow } from './types';
 
@@ -54,39 +55,6 @@
 
 	let submitting = $state(false);
 
-	function parseJenjangKelas(nama: string): string {
-		const clean = (nama || '').trim();
-		const upper = clean.toUpperCase();
-
-		// Match starting with Roman numerals: XII, XI, IX, VIII, VII, VI, IV, V, III, II, I, X
-		const romanMatch = upper.match(
-			/^(?:KELAS\s+)?(XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X)(?:\b|[^A-Z]|$)/i
-		);
-		if (romanMatch) {
-			return romanMatch[1].toUpperCase();
-		}
-
-		// Match starting with numbers (10, 11, 12, 1..9)
-		const numMatch = upper.match(/^(?:KELAS\s+)?(1[0-2]|[1-9])(?:\b|\D|$)/i);
-		if (numMatch) {
-			const n = parseInt(numMatch[1], 10);
-			if (n === 10) return 'X';
-			if (n === 11) return 'XI';
-			if (n === 12) return 'XII';
-			if (n === 7) return 'VII';
-			if (n === 8) return 'VIII';
-			if (n === 9) return 'IX';
-			return String(n);
-		}
-
-		const wordRoman = upper.match(/\b(XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X)\b/i);
-		if (wordRoman) {
-			return wordRoman[1].toUpperCase();
-		}
-
-		return 'Lainnya';
-	}
-
 	const otherClasses = $derived<KelasWithJenjang[]>(
 		(availableKelas ?? [])
 			.filter((k: KelasItem) => k.id !== kelasId)
@@ -94,15 +62,11 @@
 				...k,
 				jenjang: parseJenjangKelas(k.nama)
 			}))
+			.sort(sortKelasNatural)
 	);
 
-	const activeClass = $derived((availableKelas ?? []).find((k: KelasItem) => k.id === kelasId));
-	const activeJenjang = $derived(activeClass ? parseJenjangKelas(activeClass.nama) : 'Semua');
-
 	const jenjangOptions = $derived.by<string[]>(() => {
-		const raw: string[] = Array.from(
-			new Set(otherClasses.map((k: KelasWithJenjang) => k.jenjang))
-		);
+		const raw: string[] = Array.from(new Set(otherClasses.map((k: KelasWithJenjang) => k.jenjang)));
 		const order = ['X', 'XI', 'XII', 'VII', 'VIII', 'IX', 'I', 'II', 'III', 'IV', 'V', 'VI'];
 		raw.sort((a: string, b: string) => {
 			const idxA = order.indexOf(a);

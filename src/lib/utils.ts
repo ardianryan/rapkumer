@@ -193,3 +193,79 @@ export function autoSubmit(form: HTMLFormElement) {
 		}
 	};
 }
+
+const ROMAN_NUMERAL_VALUES: Record<string, number> = {
+	I: 1,
+	II: 2,
+	III: 3,
+	IV: 4,
+	V: 5,
+	VI: 6,
+	VII: 7,
+	VIII: 8,
+	IX: 9,
+	X: 10,
+	XI: 11,
+	XII: 12
+};
+
+export function parseJenjangKelas(nama: string): string {
+	const clean = (nama || '').trim();
+	const upper = clean.toUpperCase();
+
+	// Match starting with Roman numerals: XII, XI, IX, VIII, VII, VI, IV, V, III, II, I, X
+	const romanMatch = upper.match(
+		/^(?:KELAS\s+)?(XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X)(?:\b|[^A-Z]|$)/i
+	);
+	if (romanMatch) {
+		return romanMatch[1].toUpperCase();
+	}
+
+	// Match starting with numbers (10, 11, 12, 1..9)
+	const numMatch = upper.match(/^(?:KELAS\s+)?(1[0-2]|[1-9])(?:\b|\D|$)/i);
+	if (numMatch) {
+		const n = parseInt(numMatch[1], 10);
+		if (n === 10) return 'X';
+		if (n === 11) return 'XI';
+		if (n === 12) return 'XII';
+		if (n === 7) return 'VII';
+		if (n === 8) return 'VIII';
+		if (n === 9) return 'IX';
+		return String(n);
+	}
+
+	const wordRoman = upper.match(/\b(XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X)\b/i);
+	if (wordRoman) {
+		return wordRoman[1].toUpperCase();
+	}
+
+	return 'Lainnya';
+}
+
+export function parseJenjangLevel(nama: string): number {
+	const upper = (nama || '').trim().toUpperCase();
+	const romanMatch = upper.match(
+		/^(?:KELAS\s+)?(XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X)(?:\b|[^A-Z]|$)/i
+	);
+	if (romanMatch) {
+		const r = romanMatch[1].toUpperCase();
+		return ROMAN_NUMERAL_VALUES[r] ?? 99;
+	}
+	const numMatch = upper.match(/^(?:KELAS\s+)?(1[0-2]|[1-9])(?:\b|\D|$)/i);
+	if (numMatch) {
+		return parseInt(numMatch[1], 10);
+	}
+	return 999;
+}
+
+export function sortKelasNatural(
+	a: string | { nama?: string },
+	b: string | { nama?: string }
+): number {
+	const namaA = typeof a === 'string' ? a : (a.nama ?? '');
+	const namaB = typeof b === 'string' ? b : (b.nama ?? '');
+	const lvlA = parseJenjangLevel(namaA);
+	const lvlB = parseJenjangLevel(namaB);
+	if (lvlA !== lvlB) return lvlA - lvlB;
+	return namaA.localeCompare(namaB, undefined, { numeric: true, sensitivity: 'base' });
+}
