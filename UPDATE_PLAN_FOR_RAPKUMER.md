@@ -16,6 +16,9 @@
 7. [Rekomendasi Manajemen Hak Akses Pengguna (RBAC & Bulk Action)](#7-rekomendasi-manajemen-hak-akses-pengguna-rbac--bulk-action)
 8. [Rincian Berkas dan Kode yang Diperbarui](#8-rincian-berkas-dan-kode-yang-diperbarui)
 9. [Hasil Uji Coba & Validasi Teknis](#9-hasil-uji-coba--validasi-teknis)
+10. [Rekomendasi Sinkronisasi TP & Kode Mapel Lintas Rombel Paralel](#10-rekomendasi-sinkronisasi-tp--kode-mapel-lintas-rombel-paralel)
+11. [Rekomendasi Pemetaan Siswa ke Mapel Pilihan (Fase F SMA/SMK)](#11-rekomendasi-pemetaan-siswa-ke-mapel-pilihan-fase-f-smasmk)
+12. [Analisis Kritis: Motivasi Arsitektur Awal vs. Realitas Sekolah Besar](#12-analisis-kritis-motivasi-arsitektur-awal-vs-realitas-sekolah-besar)
 
 ---
 
@@ -370,6 +373,75 @@ Rancangan dan kode ini telah diuji secara komprehensif pada lingkungan pengemban
 | **Integritas Sinkronisasi Dapodik** | Verifikasi kolom & ID Dapodik          |    **100% AMAN**    | Tidak ada tabel Dapodik yang diubah; ID pembelajaran Dapodik tetap utuh. |
 | **Pemisahan Mapel Guru**            | Skenario Guru multi-fase nyata         |     **SUKSES**      | Mapel terisolasi sempurna per kelas, tidak terjadi kebocoran nama mapel. |
 | **P5 Multi-Kelas**                  | Pembuatan projek kode sama di X-1..X-3 |     **SUKSES**      | Tidak ada bentrok database, nilai dapat diisi per kelas oleh guru.       |
+
+---
+
+## 10. Rekomendasi Sinkronisasi TP & Kode Mapel Lintas Rombel Paralel
+
+### A. Masalah Pengulangan Data Antar-Kelas Paralel
+
+Di sekolah dengan 8–12 rombel per jenjang (misal X-1 s.d. X-12), guru mata pelajaran mengajar silabus/ATP yang **identik** untuk seluruh kelas paralel. Namun karena tabel `mata_pelajaran` dan `tujuan_pembelajaran` terikat mati per `kelas_id`, timbul hambatan operasional:
+
+1. **Input TP Berulang**: Guru harus menginput/mengimpor Tujuan Pembelajaran dan Lingkup Materi sebanyak 10–12 kali untuk mata pelajaran yang sama persis.
+2. **Kode Singkat Mapel Terfragmentasi**: Kolom `kode` (misal `MAT`, `INF`) yang esensial untuk tampilan Jadwal Pelajaran dan Bell Sekolah otomatis harus diedit manual satu per satu di setiap rombel.
+
+### B. Solusi yang Direkomendasikan:
+
+1. **Fitur "Salin TP ke Kelas Paralel" (`/intrakurikuler/[id]/tp-rl`)**:
+   - Menambahkan tombol aksi `📋 Salin TP ke Kelas Lain` di halaman penyusunan Tujuan Pembelajaran.
+   - Menyediakan modal dialog pemilihan rombel tujuan dengan Smart Filter Jenjang (`parseJenjangKelas`) dan tombol `Pilih Semua Kelas Paralel`.
+   - Server action membaca seluruh Lingkup Materi dan TP dari mapel sumber, lalu menduplikasikannya ke record `mata_pelajaran` yang bernama sama pada kelas-kelas target.
+2. **Opsi "Terapkan Kode ke Seluruh Rombel Se-Jenjang" (`/intrakurikuler/form`)**:
+   - Saat admin atau guru menyimpan kode singkat mapel, sediakan opsi centang: `[✓] Terapkan kode ini ke mata pelajaran bernama sama di semua kelas jenjang ini`.
+   - Server secara otomatis melakukan bulk-update kolom `kode` pada seluruh mapel sejenis dalam satu angkatan.
+
+---
+
+## 11. Rekomendasi Pemetaan Siswa ke Mapel Pilihan (Fase F SMA/SMK)
+
+### A. Kondisi Saat Ini (Fitur Setengah Jalan)
+
+- **Yang Sudah Tersedia**: Enum `jenis: 'pilihan'` pada tabel `mata_pelajaran` sudah ada dan di lembar cetak rapor fisik sudah otomatis dikelompokkan ke dalam **Kelompok B: Mata Pelajaran Pilihan**.
+- **Tabel Basis Data yang Belum Terpakai**: Skema basis data sebenarnya sudah memiliki tabel `tableMuridMataPelajaran (murid_id, mata_pelajaran_id)`, namun tabel ini belum memiliki antarmuka (UI) dan logika penghubung di controller/server.
+- **Dampak di Lapangan**: Pada kelas XI dan XII SMA (Fase F), siswa memilih paket mapel yang berbeda. Saat guru mapel pilihan (misal: Fisika Lanjut) membuka menu penilaian kelas XI-1, sistem tetap memunculkan seluruh 36 siswa se-kelas, padahal yang mengambil mapel tersebut hanya 12 siswa. Sisanya 24 siswa harus dibiarkan kosong tanpa nilai.
+
+### B. Solusi yang Direkomendasikan:
+
+1. Menyediakan antarmuka checklist peserta didik pada menu mata pelajaran pilihan (Student Enrollment).
+2. Memfilter query `daftarMurid` pada menu `asesmen-sumatif` dan `formulir-asesmen` menggunakan relasi `tableMuridMataPelajaran`, sehingga guru mapel pilihan hanya disajikan data siswa yang benar-benar mengambil mata pelajaran tersebut.
+
+---
+
+## 12. Analisis Kritis: Motivasi Arsitektur Awal vs. Realitas Sekolah Besar
+
+Pertanyaan mendasar yang sering muncul dari pengguna lapangan:
+
+> _"Mengapa pengembang awal Rapkumer mendesain mata pelajaran dan TP terisolasi per kelas, bukannya dibuat terpusat di tingkat kurikulum sekolah?"_
+
+Berdasarkan penelusuran arsitektur kode dan sejarah evolusi proyek, berikut adalah diagnosis objektif motivasi pengembang awal beserta perbandingannya dengan realitas lapangan:
+
+### A. Motivasi & Asumsi Pengembang Awal:
+
+1. **Fokus Awal pada Sekolah Skala Kecil (1 Rombel per Tingkat)**:  
+   Rapkumer pada awalnya dikembangkan untuk sekolah swasta, Sekolah Rakyat, atau madrasah dengan skala 1 rombel per angkatan (1 kelas 7, 1 kelas 8, 1 kelas 9, atau SD kelas 1 s.d. 6). Pada model sekolah seperti ini, konsep "kelas paralel" tidak ada, sehingga mengaitkan mapel langsung ke `kelas_id` terasa sangat sederhana, cepat, dan tidak terasa berulang.
+2. **Kemerdekaan Silabus & Alur Belajar per Guru (Otonomi Kelas)**:  
+   Kurikulum Merdeka menekankan fleksibilitas bagi guru untuk menentukan alur materi sendiri. Pengembang awal mungkin berasumsi bahwa guru di kelas A dan guru di kelas B bisa memiliki target capaian TP yang berbeda, sehingga tiap rombel diberikan "kamar mandiri" untuk menyusun TP-nya masing-masing.
+3. **Penyederhanaan Query Database (Simplicity First)**:  
+   Dengan menaruh `kelas_id` langsung di tabel `mata_pelajaran`, query SQL menjadi sangat sederhana (`SELECT * FROM mata_pelajaran WHERE kelas_id = ?`). Pengembang tidak perlu merancang tabel katalog master mapel (`master_mata_pelajaran`), junction kurikulum, atau penanganan pewarisan silabus yang rumit.
+
+### B. Mengapa Desain Ini Menjadi Hambatan di Sekolah Besar?
+
+Ketika aplikasi ini diadopsi oleh sekolah menengah negeri (seperti SMAN 1 Gedeg dengan 36 rombel; 12 kelas paralel per angkatan), asumsi awal tersebut berbenturan dengan kenyataan:
+
+- Di sekolah besar, kurikulum bersifat seragam per jenjang.
+- Guru mengampu 8–12 kelas paralel sekaligus.
+- Ketiadaan mekanisme sinkronisasi/salin silabus memaksa guru dan admin mengulang entri ratusan data yang sama persis.
+
+### C. Pendekatan Solusi Pragmatis:
+
+Kita **tidak perlu merombak drastis struktur tabel yang sudah ada** (karena akan merusak kompatibilitas data lama dan sinkronisasi Dapodik). Solusi paling elegan adalah **menghadirkan jembatan aksi (Action Bridging)**:
+
+- Mempertahankan baris `mata_pelajaran` per kelas, namun menyediakan fitur **Salin/Sinkronisasi Otomatis Sekali Klik** dari satu rombel ke rombel-rombel paralel lainnya.
 
 ---
 
