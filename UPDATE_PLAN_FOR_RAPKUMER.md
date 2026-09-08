@@ -17,8 +17,10 @@
 8. [Rincian Berkas dan Kode yang Diperbarui](#8-rincian-berkas-dan-kode-yang-diperbarui)
 9. [Hasil Uji Coba & Validasi Teknis](#9-hasil-uji-coba--validasi-teknis)
 10. [Rekomendasi Sinkronisasi TP & Kode Mapel Lintas Rombel Paralel](#10-rekomendasi-sinkronisasi-tp--kode-mapel-lintas-rombel-paralel)
-11. [Rekomendasi Pemetaan Siswa ke Mapel Pilihan (Fase F SMA/SMK)](#11-rekomendasi-pemetaan-siswa-ke-mapel-pilihan-fase-f-smasmk)
-12. [Analisis Kritis: Motivasi Arsitektur Awal vs. Realitas Sekolah Besar](#12-analisis-kritis-motivasi-arsitektur-awal-vs-realitas-sekolah-besar)
+11. [Investigasi Ketiadaan Mapel Pilihan (Fase F) & Solusi Rombel Jenis 16 Dapodik](#11-investigasi-ketiadaan-mapel-pilihan-fase-f--solusi-rombel-jenis-16-dapodik)
+12. [Rekomendasi Antarmuka "Kelola Pembelajaran per Mata Pelajaran" (Gaya e-Rapor AIO)](#12-rekomendasi-antarmuka-kelola-pembelajaran-per-mata-pelajaran-gaya-e-rapor-aio)
+13. [Analisis Kritis: Motivasi Arsitektur Awal vs. Realitas Sekolah Besar](#13-analisis-kritis-motivasi-arsitektur-awal-vs-realitas-sekolah-besar)
+14. [Rencana Aksi Implementasi Bertahap](#14-rencana-aksi-implementasi-bertahap)
 
 ---
 
@@ -397,35 +399,109 @@ Di sekolah dengan 8–12 rombel per jenjang (misal X-1 s.d. X-12), guru mata pel
 
 ---
 
-## 11. Rekomendasi Pemetaan Siswa ke Mapel Pilihan (Fase F SMA/SMK)
+## 11. Investigasi Ketiadaan Mapel Pilihan (Fase F) & Solusi Rombel Jenis 16 Dapodik
 
-### A. Kondisi Saat Ini (Fitur Setengah Jalan)
+### A. Temuan Lapangan: Kelas XII-7 Hanya Berisi 11 Mapel Wajib
 
-- **Yang Sudah Tersedia**: Enum `jenis: 'pilihan'` pada tabel `mata_pelajaran` sudah ada dan di lembar cetak rapor fisik sudah otomatis dikelompokkan ke dalam **Kelompok B: Mata Pelajaran Pilihan**.
-- **Tabel Basis Data yang Belum Terpakai**: Skema basis data sebenarnya sudah memiliki tabel `tableMuridMataPelajaran (murid_id, mata_pelajaran_id)`, namun tabel ini belum memiliki antarmuka (UI) dan logika penghubung di controller/server.
-- **Dampak di Lapangan**: Pada kelas XI dan XII SMA (Fase F), siswa memilih paket mapel yang berbeda. Saat guru mapel pilihan (misal: Fisika Lanjut) membuka menu penilaian kelas XI-1, sistem tetap memunculkan seluruh 36 siswa se-kelas, padahal yang mengambil mapel tersebut hanya 12 siswa. Sisanya 24 siswa harus dibiarkan kosong tanpa nilai.
+Pada pengujian nyata di SMAN 1 Gedeg untuk kelas **XII-7** (`/intrakurikuler?kelas_id=25`), ditemukan kejanggalan:
+- Hanya ada **11 mata pelajaran** yang muncul di tabel Intrakurikuler, dan semuanya bertipe **"Mata Pelajaran Wajib"** (Bahasa Indonesia, Bahasa Inggris, Matematika Umum, Sejarah, PAI, PJOK, Pendidikan Pancasila, Seni Budaya, Mulok Bahasa Daerah, P5, dan BP/BK).
+- **Tidak ada satu pun Mata Pelajaran Pilihan** (Fisika, Kimia, Biologi, Ekonomi, Sosiologi, Geografi, Matematika Lanjut, dsb.).
+- Pada pemilih kelas di navbar, juga **tidak ada pilihan rombel peminatan**.
 
-### B. Solusi yang Direkomendasikan:
+### B. Akar Masalah di Balik Layar: Rapkumer Sengaja Men-Skip Rombel Jenis 16
 
-1. Menyediakan antarmuka checklist peserta didik pada menu mata pelajaran pilihan (Student Enrollment).
-2. Memfilter query `daftarMurid` pada menu `asesmen-sumatif` dan `formulir-asesmen` menggunakan relasi `tableMuridMataPelajaran`, sehingga guru mapel pilihan hanya disajikan data siswa yang benar-benar mengambil mata pelajaran tersebut.
+Setelah ditelusuri langsung ke kode sumber sinkronisasi Dapodik Rapkumer ([src/lib/server/dapodik.ts baris 1375–1380](file:///Users/ardianryan/Documents/rapkumer/src/lib/server/dapodik.ts#L1375-L1380)), ditemukan bukti penyebabnya:
+
+```ts
+// Hanya rombel reguler (jenis_rombel 1); 16 = mapel pilihan, 51 = ekskul.
+const jenis = intOrNull(row['jenis_rombel']) ?? 1;
+if (jenis !== 1) {
+    skipped++;
+    continue; // <--- KODE ASLI RAPKUMER YANG MEMBUANG MAPEL & ROMBEL PILIHAN!
+}
+```
+
+#### Mengapa Hal Ini Terjadi?
+1. **Standar Dapodik SMA Kurikulum Merdeka (Fase F)**:
+   Di aplikasi Dapodik, rombongan belajar dibagi menjadi beberapa tipe:
+   - `jenis_rombel = 1`: **Rombel Reguler** (X-1 s.d. XII-12)
+   - `jenis_rombel = 16`: **Rombel Mata Pelajaran Pilihan** (tempat operator Dapodik memasukkan rombel Fisika, Kimia, Biologi, Ekonomi, Koding, dll. untuk Fase F)
+   - `jenis_rombel = 51`: **Rombel Ekstrakurikuler**
+2. **Keterbatasan Asumsi Pengembang Awal**:
+   Pengembang awal Rapkumer merancang aplikasi ini dengan fokus pengujian pada jenjang **SD dan SMP**, di mana semua rombel bertipe reguler (`jenis_rombel = 1`). Akibatnya, pengembang menulis pengecualian kaku `if (jenis !== 1) continue;` tanpa menyediakan penanganan untuk rombel jenis 16.
+3. **Dampaknya**:
+   Seluruh rombel pilihan, mata pelajaran pilihan, guru pengampunya, serta data siswa anggota peminatnya **langsung dibuang saat proses sinkronisasi Dapodik**, sehingga tidak pernah sampai ke database lokal Rapkumer.
+
+### C. Solusi yang Direkomendasikan:
+
+1. **Buka Kunci Rombel Jenis 16 pada `syncRombel`**:
+   - Menghapus pembatasan `skipped continue` untuk `jenis_rombel === 16`.
+   - Mengekstrak data pembelajaran (nama mata pelajaran, guru pengampu, id pembelajaran Dapodik).
+   - Mengekstrak daftar peserta didik anggota rombel pilihan dari array `anggota_rombel`.
+2. **Petakan ke Rombel Reguler Siswa & `tableMuridMataPelajaran`**:
+   - Untuk setiap siswa di rombel pilihan, cari rombel regulernya (`tableMurid.kelasId`).
+   - Pastikan di kelas reguler tersebut terdapat baris `tableMataPelajaran` dengan `jenis: 'pilihan'`.
+   - Daftarkan siswa ke `tableMuridMataPelajaran (muridId, mataPelajaranId)`.
+3. **Filter Otomatis di Penilaian & Rapor**:
+   - Di menu `asesmen-sumatif` dan `asesmen-formatif`, filter siswa berdasarkan `tableMuridMataPelajaran` sehingga guru mapel pilihan hanya disajikan data siswa yang benar-benar mengambil mapel tersebut.
+   - Di cetak rapor (`preview-data.ts`), nilai mapel pilihan otomatis tercetak rapi di **Kelompok B (Mata Pelajaran Pilihan)**.
 
 ---
 
-## 12. Analisis Kritis: Motivasi Arsitektur Awal vs. Realitas Sekolah Besar
+## 12. Rekomendasi Antarmuka "Kelola Pembelajaran per Mata Pelajaran" (Gaya e-Rapor AIO)
+
+### A. Perbandingan Model Pengelolaan: e-Rapor Kemdikdas vs e-Rapor AIO
+
+Berdasarkan perbandingan langsung dengan implementasi nyata di SMAN 1 Gedeg:
+
+| Aspek | e-Rapor SMA Resmi Kemdikdas | e-Rapor AIO (`arapor.smage.my.id`) | Desain Baru Rapkumer |
+|---|---|---|---|
+| **Struktur Tampilan** | Satu tabel raksasa campur aduk seluruh kelas & mapel | Terpusat per **Mata Pelajaran** | **Tab Switch**: Per Kelas Aktif & Per Mata Pelajaran |
+| **Alur Pemetaan** | Pop-up modal satu per satu (pilih kelas $\rightarrow$ pilih mapel $\rightarrow$ pilih guru $\rightarrow$ simpan) | Filter dropdown mapel di atas $\rightarrow$ daftar seluruh rombel paralel muncul | Filter dropdown mapel di atas $\rightarrow$ tabel matriks rombel paralel se-sekolah |
+| **Penugasan Guru** | Klik modal satu per satu (36 kali) | Dropdown langsung di baris tabel | Dropdown inline langsung di baris tabel |
+| **Efisiensi Operator** | Sangat lambat dan memicu kelelahan input | Sangat cepat, bersih, dan mudah diawasi | Sangat cepat, terintegrasi dengan akun login guru |
+
+### B. Rancangan Antarmuka di Rapkumer:
+
+#### 1. Tab Navigasi di Halaman Intrakurikuler (`/intrakurikuler`)
+Di bagian atas halaman, tambahkan tab beralih yang intuitif:
+- **Tab 1: `📋 Per Kelas ({kelasAktif})`** (Tampilan standar yang sudah ada untuk melihat mapel rombel aktif).
+- **Tab 2: `🌐 Per Mata Pelajaran (Gaya AIO)`** (Tampilan baru untuk distribusi dan pemetaan se-sekolah).
+
+#### 2. Komponen Tampilan Gaya AIO:
+- **Filter Atas**:
+  - Dropdown **Pilih Mata Pelajaran** (menampilkan seluruh mapel unik dari Dapodik: PAI, Matematika Umum, Fisika, Biologi, Kimia, Koding dan Kecerdasan Artifisial, dsb.).
+  - Filter cepat **Tingkat/Jenjang**: `[Semua]`, `[Kelas X]`, `[Kelas XI]`, `[Kelas XII]`.
+- **Tabel Matriks Distribusi Rombel Paralel**:
+  - **Kolom No & Kelas**: Daftar kelas paralel (misal X-1 s.d. X-12 atau XI-1 s.d. XI-12).
+  - **Kolom Guru Pengampu**: Dropdown pemilih guru/pegawai langsung di baris tersebut.
+  - **Kolom Jenis Mapel**: Pilihan cepat (Wajib / Pilihan / Mulok).
+  - **Kolom Kode Singkat & KKM**: Input inline.
+  - **Kolom Status TP**: Indikator jumlah TP yang sudah diatur di kelas tersebut.
+- **Bilah Aksi Cepat (Bulk Action Bar)**:
+  - **"Terapkan Kode & KKM ke Semua Kelas"**: Mengisi serentak kode (misal `MAT`) dan KKM ke seluruh rombel paralel dalam 1 klik.
+  - **"Salin TP ke Seluruh Kelas Ini"**: Memilih salah satu kelas sebagai sumber (misal X-1), lalu mendistribusikan seluruh TP-nya ke X-2 s.d. X-12 secara instan.
+  - **"Simpan Perubahan Penugasan"**: Menyimpan seluruh penugasan guru secara atomik.
+
+#### 3. Otomasi Penugasan ke Akun Guru:
+Saat admin mengganti dropdown pengampu di baris kelas X-4 menjadi Guru B dan menyimpannya, sistem di latar belakang **otomatis mengupdate hak akses akun Guru B** (`tableAuthUserPembelajaran`). Guru B dapat langsung login dan menginput nilai/presensi tanpa admin perlu masuk ke menu *Manajemen Pengguna*.
+
+---
+
+## 13. Analisis Kritis: Motivasi Arsitektur Awal vs. Realitas Sekolah Besar
 
 Pertanyaan mendasar yang sering muncul dari pengguna lapangan:
 
 > _"Mengapa pengembang awal Rapkumer mendesain mata pelajaran dan TP terisolasi per kelas, bukannya dibuat terpusat di tingkat kurikulum sekolah?"_
 
-Berdasarkan penelusuran arsitektur kode dan sejarah evolusi proyek, berikut adalah diagnosis objektif motivasi pengembang awal beserta perbandingannya dengan realitas lapangan:
+Diagnosis objektif motivasi pengembang awal beserta perbandingannya dengan realitas lapangan:
 
 ### A. Motivasi & Asumsi Pengembang Awal:
 
 1. **Fokus Awal pada Sekolah Skala Kecil (1 Rombel per Tingkat)**:  
    Rapkumer pada awalnya dikembangkan untuk sekolah swasta, Sekolah Rakyat, atau madrasah dengan skala 1 rombel per angkatan (1 kelas 7, 1 kelas 8, 1 kelas 9, atau SD kelas 1 s.d. 6). Pada model sekolah seperti ini, konsep "kelas paralel" tidak ada, sehingga mengaitkan mapel langsung ke `kelas_id` terasa sangat sederhana, cepat, dan tidak terasa berulang.
 2. **Kemerdekaan Silabus & Alur Belajar per Guru (Otonomi Kelas)**:  
-   Kurikulum Merdeka menekankan fleksibilitas bagi guru untuk menentukan alur materi sendiri. Pengembang awal mungkin berasumsi bahwa guru di kelas A dan guru di kelas B bisa memiliki target capaian TP yang berbeda, sehingga tiap rombel diberikan "kamar mandiri" untuk menyusun TP-nya masing-masing.
+   Kurikulum Merdeka menekankan fleksibilitas bagi guru untuk menentukan alur materi sendiri. Pengembang awal berasumsi bahwa guru di kelas A dan guru di kelas B bisa memiliki target capaian TP yang berbeda, sehingga tiap rombel diberikan "kamar mandiri" untuk menyusun TP-nya masing-masing.
 3. **Penyederhanaan Query Database (Simplicity First)**:  
    Dengan menaruh `kelas_id` langsung di tabel `mata_pelajaran`, query SQL menjadi sangat sederhana (`SELECT * FROM mata_pelajaran WHERE kelas_id = ?`). Pengembang tidak perlu merancang tabel katalog master mapel (`master_mata_pelajaran`), junction kurikulum, atau penanganan pewarisan silabus yang rumit.
 
@@ -436,15 +512,32 @@ Ketika aplikasi ini diadopsi oleh sekolah menengah negeri (seperti SMAN 1 Gedeg 
 - Di sekolah besar, kurikulum bersifat seragam per jenjang.
 - Guru mengampu 8–12 kelas paralel sekaligus.
 - Ketiadaan mekanisme sinkronisasi/salin silabus memaksa guru dan admin mengulang entri ratusan data yang sama persis.
+- Pengabaian `jenis_rombel = 16` menyebabkan hilangnya mapel pilihan Fase F.
 
 ### C. Pendekatan Solusi Pragmatis:
 
 Kita **tidak perlu merombak drastis struktur tabel yang sudah ada** (karena akan merusak kompatibilitas data lama dan sinkronisasi Dapodik). Solusi paling elegan adalah **menghadirkan jembatan aksi (Action Bridging)**:
 
-- Mempertahankan baris `mata_pelajaran` per kelas, namun menyediakan fitur **Salin/Sinkronisasi Otomatis Sekali Klik** dari satu rombel ke rombel-rombel paralel lainnya.
+- Mempertahankan baris `mata_pelajaran` per kelas, namun menyediakan antarmuka **Kelola per Mata Pelajaran (Gaya e-Rapor AIO)** dan fitur **Salin TP Sekali Klik** ke seluruh rombel paralel.
+
+---
+
+## 14. Rencana Aksi Implementasi Bertahap
+
+Untuk menjamin eksekusi berjalan mulus dan aman tanpa regresi, implementasi dilakukan dalam 3 tahap berurutan:
+
+1. **Tahap 1: Pembukaan Kunci Rombel Jenis 16 (Mapel Pilihan) dari Dapodik**:
+   - Modifikasi `syncRombel` di `src/lib/server/dapodik.ts` agar rombel pilihan ditarik dan dipetakan ke rombel reguler siswa dengan `jenis: 'pilihan'`.
+   - Mengisi `tableMuridMataPelajaran` untuk peserta didik peminat.
+2. **Tahap 2: Antarmuka Tab "Per Mata Pelajaran" (Gaya e-Rapor AIO)**:
+   - Membuat tab switch di `src/routes/(mata-pelajaran)/intrakurikuler/+page.svelte`.
+   - Membuat halaman dan server handler `/intrakurikuler/distribusi` untuk mapping guru, kode, dan KKM serentak.
+3. **Tahap 3: Fitur Salin TP Massal ke Kelas Paralel**:
+   - Menambahkan tombol aksi dan modal dialog Salin TP di `/intrakurikuler/[id]/tp-rl`.
+   - Eksekusi transaksi duplikasi TP atomik di backend.
 
 ---
 
 ### Penutup
 
-Besar harapan kami agar rekomendasi dan rancangan kode ini dapat dipertimbangkan dan diadopsi ke dalam _mainline_ rilis resmi Rapkumer, sehingga ribuan guru dan admin sekolah di seluruh Indonesia dapat menikmati pengelolaan administrasi kurikulum merdeka yang semakin handal, fleksibel, dan terbebas dari kendala teknis.
+Pembaruan ini menggabungkan keunggulan fleksibilitas Rapkumer dengan kemudahan operasional e-Rapor AIO, menjadikannya solusi administrasi kurikulum merdeka terbaik untuk sekolah skala kecil maupun sekolah besar berkapasitas 36 rombel.
