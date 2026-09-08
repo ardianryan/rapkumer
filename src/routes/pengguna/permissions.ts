@@ -158,6 +158,7 @@ export const menuRoutePermissions: { path: string; permission: UserPermission }[
 	{ path: '/keasramaan', permission: 'mata_pelajaran_keasramaan' },
 	{ path: '/asesmen-formatif', permission: 'input_nilai_asesmen_formatif' },
 	{ path: '/asesmen-sumatif', permission: 'input_nilai_asesmen_sumatif' },
+	{ path: '/intrakurikuler-nilai-akhir', permission: 'input_nilai_asesmen_sumatif' },
 	{ path: '/asesmen-kokurikuler', permission: 'input_nilai_asesmen_kokurikuler' },
 	{ path: '/nilai-ekstrakurikuler', permission: 'input_nilai_nilai_ekstrakurikuler' },
 	{ path: '/asesmen-keasramaan', permission: 'input_nilai_asesmen_keasramaan' },

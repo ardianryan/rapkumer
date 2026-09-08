@@ -19,6 +19,7 @@ import {
 	tableMurid,
 	tableMuridEkstrakurikuler,
 	tableMuridMataPelajaran,
+	tableNilaiAkhirMapel,
 	tablePegawai,
 	tableSemester,
 	tableSekolah,
@@ -3286,7 +3287,27 @@ export async function runDapodikKirim(options: {
 	const muridIds = muridWithUuid.map((m) => m.id);
 	const mapelIds = allCandidates.map((c) => c.mapelId);
 
-	const nilaiRows =
+	// Ambil Nilai Akhir: Prioritaskan tableNilaiAkhirMapel (hasil generate & kunci di menu baru),
+	// dengan fallback ke tableAsesmenSumatif.nilaiAkhir jika belum dikunci di menu baru.
+	const lockedNilaiRows =
+		muridIds.length && mapelIds.length
+			? await db
+					.select({
+						muridId: tableNilaiAkhirMapel.muridId,
+						mataPelajaranId: tableNilaiAkhirMapel.mataPelajaranId,
+						nilaiAkhir: tableNilaiAkhirMapel.nilaiAkhir
+					})
+					.from(tableNilaiAkhirMapel)
+					.where(
+						and(
+							inArray(tableNilaiAkhirMapel.muridId, muridIds),
+							inArray(tableNilaiAkhirMapel.mataPelajaranId, mapelIds),
+							isNotNull(tableNilaiAkhirMapel.nilaiAkhir)
+						)
+					)
+			: [];
+
+	const sumatifNilaiRows =
 		muridIds.length && mapelIds.length
 			? await db
 					.select({
@@ -3303,6 +3324,18 @@ export async function runDapodikKirim(options: {
 						)
 					)
 			: [];
+
+	const nilaiMap = new Map<
+		string,
+		{ muridId: number; mataPelajaranId: number; nilaiAkhir: number | null }
+	>();
+	for (const row of sumatifNilaiRows) {
+		nilaiMap.set(`${row.muridId}|${row.mataPelajaranId}`, row);
+	}
+	for (const row of lockedNilaiRows) {
+		nilaiMap.set(`${row.muridId}|${row.mataPelajaranId}`, row);
+	}
+	const nilaiRows = Array.from(nilaiMap.values());
 
 	const anggotaByMurid = new Map(
 		muridWithUuid

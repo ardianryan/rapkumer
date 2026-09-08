@@ -578,6 +578,7 @@ Untuk memastikan sistem aman dijalankan di lingkungan produksi (sekolah nyata de
 Untuk menjamin alur kirim nilai balik ke Dapodik (`/nilai-akhir/kirim-dapodik` dan `runDapodikKirim` di `src/lib/server/dapodik.ts`) berjalan 100% patuh terhadap spesifikasi resmi WebService Dapodik desktop:
 
 ### A. Anatomi Relasi Rombel Pilihan (Jenis Rombel 16) di Dapodik
+
 1. **Pemisahan Identitas Rombongan Belajar**:
    - Di Dapodik, mata pelajaran reguler (Wajib & Mulok) bernaung di bawah Rombel Reguler (`jenis_rombel = 1`).
    - Sedangkan mata pelajaran pilihan Fase F (Fisika, Kimia, Biologi, Ekonomi, Sosiologi, Geografi, dll.) didaftarkan operator Dapodik di bawah **Rombongan Belajar Pilihan (`jenis_rombel = 16`)**.
@@ -591,14 +592,16 @@ Untuk menjamin alur kirim nilai balik ke Dapodik (`/nilai-akhir/kirim-dapodik` d
    - Rapkumer menyimpan `dapodikAnggotaRombelId` spesifik rombel pilihan di `tableMuridMataPelajaran`, sehingga saat `postNilai` dijalankan, nilai mapel pilihan dikirim menggunakan `anggota_rombel_id` rombel pilihan siswa. Nilai langsung tampil sempurna saat operator membuka rombel pilihan di Dapodik desktop.
 
 ### B. Proteksi dan Eliminasi Nilai Semu (Zero Phantom Scores)
+
 - **Penyaringan Keikutsertaan Siswa**:
   Sebelum baris nilai dikirim, sistem memvalidasi apakah siswa benar-benar terdaftar di `tableMuridMataPelajaran` untuk mapel pilihan terkait. Siswa dari rombel reguler yang tidak mengambil mapel pilihan tersebut tidak akan dikirimkan nilai, mencegah terjadinya data sampah atau penolakan transaksi dari Dapodik.
 - **Pencegahan Matev Kosong**:
   Jika dalam satu kelas reguler tidak ada satu pun siswa yang mengambil suatu mapel pilihan, mata pelajaran tersebut secara otomatis dilewati dari daftar kandidat matev (`allCandidates`), mirip dengan optimasi pemilihan varian agama (PAPB).
 
 ### C. Mekanisme Self-Healing Otomatis
+
 - Saat proses kirim nilai berlangsung, fungsi `fetchPembelajaranRombel` sekaligus membaca seluruh rombel pilihan jenis 16 dari endpoint `getRombonganBelajar`.
-- Jika ada siswa atau mapel pilihan yang belum sempat memiliki referensi UUID rombel/anggota di database lokal, sistem secara otomatis menyelesaikan (*resolve*) pemetaannya secara instan di latar belakang dan memperbarui database lokal.
+- Jika ada siswa atau mapel pilihan yang belum sempat memiliki referensi UUID rombel/anggota di database lokal, sistem secara otomatis menyelesaikan (_resolve_) pemetaannya secara instan di latar belakang dan memperbarui database lokal.
 
 ---
 

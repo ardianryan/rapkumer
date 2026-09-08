@@ -25,6 +25,7 @@ import { ensurePermissionMigration } from './ensure-permission-migration';
 import { ensurePresensiSettingsSchema } from './ensure-presensi-settings';
 import { ensureZitadelSchema } from './ensure-zitadel';
 import { ensurePembelajaranSchema } from './ensure-pembelajaran';
+import { ensureNilaiAkhirMapelSchema } from './ensure-nilai-akhir-mapel';
 import { resetEnsuredSchemas } from './ensure-helper';
 
 let startupEnsuresDone = false;
@@ -71,6 +72,7 @@ export async function runStartupEnsures() {
 			await ensureKepalaSekolahAccounts();
 			await ensureZitadelSchema();
 			await ensurePembelajaranSchema();
+			await ensureNilaiAkhirMapelSchema();
 			startupEnsuresDone = true;
 		} finally {
 			startupEnsuresPromise = null;

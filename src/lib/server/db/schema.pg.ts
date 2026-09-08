@@ -1752,3 +1752,78 @@ export const tableDapodikPembelajaran = pgTable(
 	},
 	(table) => [unique().on(table.pembelajaranId)]
 );
+
+/**
+ * Konfigurasi bobot persentase Formatif vs Sumatif per mata pelajaran.
+ * Berdiri sendiri agar tidak mengotori tabel bawaan Rapkumer maupun Dapodik.
+ */
+export const tableBobotNilaiAkhirMapel = pgTable(
+	'bobot_nilai_akhir_mapel',
+	{
+		id: serial().primaryKey(),
+		mataPelajaranId: integer()
+			.references(() => tableMataPelajaran.id, { onDelete: 'cascade' })
+			.notNull(),
+		bobotFormatif: integer().default(30).notNull(),
+		bobotSumatif: integer().default(70).notNull(),
+		...audit
+	},
+	(table) => [unique().on(table.mataPelajaranId)]
+);
+
+export const tableBobotNilaiAkhirMapelRelations = relations(
+	tableBobotNilaiAkhirMapel,
+	({ one }) => ({
+		mataPelajaran: one(tableMataPelajaran, {
+			fields: [tableBobotNilaiAkhirMapel.mataPelajaranId],
+			references: [tableMataPelajaran.id]
+		})
+	})
+);
+
+/**
+ * Nilai Akhir gabungan resmi (Formatif + Sumatif berbobot) per murid per mata pelajaran.
+ * Menyimpan snapshot skor saat dikunci, rincian capaian TP, dan status penguncian.
+ */
+export const tableNilaiAkhirMapel = pgTable(
+	'nilai_akhir_mapel',
+	{
+		id: serial().primaryKey(),
+		muridId: integer()
+			.references(() => tableMurid.id, { onDelete: 'cascade' })
+			.notNull(),
+		mataPelajaranId: integer()
+			.references(() => tableMataPelajaran.id, { onDelete: 'cascade' })
+			.notNull(),
+		nilaiFormatif: real(),
+		nilaiSumatif: real(),
+		bobotFormatif: integer().notNull(),
+		bobotSumatif: integer().notNull(),
+		nilaiAkhir: real().notNull(),
+		capaianTp: text(), // JSON Array: [{ tpId, kode, deskripsi, skor, status: 'T' | 'R' }]
+		status: text().default('terkunci').notNull(),
+		dikunciPada: text(),
+		dikunciOlehId: integer().references(() => tableAuthUser.id, { onDelete: 'set null' }),
+		...audit
+	},
+	(table) => [
+		unique().on(table.muridId, table.mataPelajaranId),
+		index('idx_nilai_akhir_mapel_lookup').on(table.mataPelajaranId, table.muridId),
+		index('idx_nilai_akhir_mapel_murid').on(table.muridId)
+	]
+);
+
+export const tableNilaiAkhirMapelRelations = relations(tableNilaiAkhirMapel, ({ one }) => ({
+	murid: one(tableMurid, {
+		fields: [tableNilaiAkhirMapel.muridId],
+		references: [tableMurid.id]
+	}),
+	mataPelajaran: one(tableMataPelajaran, {
+		fields: [tableNilaiAkhirMapel.mataPelajaranId],
+		references: [tableMataPelajaran.id]
+	}),
+	dikunciOleh: one(tableAuthUser, {
+		fields: [tableNilaiAkhirMapel.dikunciOlehId],
+		references: [tableAuthUser.id]
+	})
+}));
