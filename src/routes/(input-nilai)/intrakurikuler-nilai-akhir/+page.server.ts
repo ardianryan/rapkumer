@@ -335,6 +335,7 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 		return {
 			no: idx + 1,
 			muridId: murid.id,
+			mapelId,
 			nisn: murid.nisn,
 			nama: murid.nama.trim(),
 			agamaLabel: labelVarianUntukMurid(
@@ -361,6 +362,7 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 		targetMapelNama:
 			targetMapel?.nama ?? (isAgama ? AGAMA_BASE_SUBJECT : isPks ? PKS_BASE_SUBJECT : ''),
 		selectedMapelId: singleMapelId,
+		distinctMapelIds,
 		daftarSiswa,
 		bobot: { formatif: bobotFormatif, sumatif: bobotSumatif },
 		isLocked: allLocked,
@@ -423,6 +425,7 @@ export const actions: Actions = {
 		const payloadStr = String(form.get('payload') ?? '[]');
 		let items: Array<{
 			muridId: number;
+			mapelId?: number | null;
 			formatifScore: number | null;
 			sumatifScore: number | null;
 			nilaiAkhir: number;
@@ -449,7 +452,7 @@ export const actions: Actions = {
 
 		await db.transaction(async (tx) => {
 			for (const item of items) {
-				const mapelId = singleMapelId ?? 0;
+				const mapelId = item.mapelId || singleMapelId || 0;
 				if (!mapelId) continue;
 
 				await tx
@@ -496,9 +499,21 @@ export const actions: Actions = {
 	bukaKunci: async ({ request }) => {
 		const form = await request.formData();
 		const mapelId = Number(form.get('mapelId'));
-		if (!mapelId) return fail(400, { message: 'Mata pelajaran tidak valid.' });
+		const mapelIdsStr = String(form.get('mapelIds') ?? '');
+		const mapelIds = mapelIdsStr
+			? mapelIdsStr
+					.split(',')
+					.map((s) => Number(s.trim()))
+					.filter((n) => !Number.isNaN(n) && n > 0)
+			: mapelId
+				? [mapelId]
+				: [];
 
-		await db.delete(tableNilaiAkhirMapel).where(eq(tableNilaiAkhirMapel.mataPelajaranId, mapelId));
+		if (!mapelIds.length) return fail(400, { message: 'Mata pelajaran tidak valid.' });
+
+		await db
+			.delete(tableNilaiAkhirMapel)
+			.where(inArray(tableNilaiAkhirMapel.mataPelajaranId, mapelIds));
 
 		return { success: true, message: 'Kunci nilai akhir berhasil dibuka.' };
 	}

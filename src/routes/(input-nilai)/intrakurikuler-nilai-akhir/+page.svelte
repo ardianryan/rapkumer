@@ -1,19 +1,27 @@
 <script lang="ts">
-	/* eslint-disable svelte/no-navigation-without-resolve */
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import Icon from '$lib/components/icon.svelte';
 	import { toast } from '$lib/components/toast.svelte';
+	import { autoSubmit, searchQueryMarker } from '$lib/utils';
 
 	let { data } = $props();
 
 	// State pencarian & bobot
 	let searchTerm = $state('');
 	// svelte-ignore state_referenced_locally
+	let selectedMapelValue = $state(data.selectedMapelValue ?? '');
+	// svelte-ignore state_referenced_locally
 	let bobotFormatif = $state(data.bobot?.formatif ?? 30);
 	// svelte-ignore state_referenced_locally
 	let bobotSumatif = $state(data.bobot?.sumatif ?? 70);
+
 	let isSubmitting = $state(false);
+	let bobotSaving = $state(false);
+
+	// Modals
+	let showBobotModal = $state(false);
+	let showAutofillModal = $state(false);
 
 	// State Auto-fill e-Rapor
 	let selectedFile: File | null = $state(null);
@@ -24,11 +32,31 @@
 	const totalBobot = $derived(Number(bobotFormatif || 0) + Number(bobotSumatif || 0));
 	const isBobotValid = $derived(totalBobot === 100);
 
+	const hasMapel = $derived((data.mapelList?.length ?? 0) > 0);
+
+	const kelasAktifLabel = $derived.by(() => {
+		const kelas = page.data.kelasAktif ?? null;
+		if (!kelas) return null;
+		return kelas.fase ? `${kelas.nama} - ${kelas.fase}` : kelas.nama;
+	});
+
+	// Restriksi hak akses wali_asuh
+	const canEdit = $derived.by(() => {
+		const u = page.data.user as { type?: string } | null | undefined;
+		return u?.type !== 'wali_asuh';
+	});
+
 	// Sinkronisasi data saat mapel berubah
 	$effect(() => {
+		selectedMapelValue = data.selectedMapelValue ?? '';
 		bobotFormatif = data.bobot?.formatif ?? 30;
 		bobotSumatif = data.bobot?.sumatif ?? 70;
 	});
+
+	function formatScore(value: number | null | undefined) {
+		if (value == null || Number.isNaN(value)) return '—';
+		return Number(value).toFixed(2);
+	}
 
 	// Daftar siswa dengan preview kalkulasi bobot
 	const daftarSiswaProcessed = $derived.by(() => {
@@ -68,6 +96,7 @@
 		return JSON.stringify(
 			daftarSiswaProcessed.map((s: (typeof daftarSiswaProcessed)[number]) => ({
 				muridId: s.muridId,
+				mapelId: s.mapelId,
 				formatifScore: s.formatifScore,
 				sumatifScore: s.sumatifScore,
 				nilaiAkhir: s.previewNilai ?? 0,
@@ -78,15 +107,6 @@
 			}))
 		);
 	});
-
-	// Handler ganti mapel
-	function onSelectMapel(e: Event) {
-		const select = e.target as HTMLSelectElement;
-		const val = select.value;
-		if (val) {
-			goto(`?mapel_id=${val}`, { keepFocus: true, noScroll: true });
-		}
-	}
 
 	// Handler upload & autofill e-Rapor
 	async function handleAutofillSubmit(e: Event) {
@@ -135,6 +155,8 @@
 			document.body.removeChild(link);
 			window.URL.revokeObjectURL(downloadUrl);
 
+			showAutofillModal = false;
+			selectedFile = null;
 			toast('File template e-Rapor SMA berhasil diisi dan diunduh!', 'success');
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : String(err);
@@ -146,368 +168,434 @@
 	}
 </script>
 
-<div class="space-y-6 pb-12">
-	<!-- Header Section -->
-	<div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+<div class="card bg-base-100 cursor-default rounded-lg border-none p-4 shadow-md">
+	<!-- Top Header Section -->
+	<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
 		<div>
-			<h1 class="text-2xl font-bold tracking-tight text-base-content">
-				Nilai Akhir Intrakurikuler
-			</h1>
-			<p class="text-sm text-base-content/70">
-				Kalkulasi nilai gabungan Formatif & Sumatif berbobot, penguncian resmi, dan Smart Auto-Fill
-				ke e-Rapor SMA.
-			</p>
-		</div>
+			<h2 class="text-xl font-bold">
+				Daftar Nilai Akhir
+				{#if data.targetMapelNama}
+					- {data.targetMapelNama}
+				{/if}
+			</h2>
 
-		<!-- Status Badge -->
-		{#if data.isLocked}
-			<div class="badge badge-success gap-2 py-3.5 px-4 font-semibold shadow-sm">
-				<Icon name="check" class="size-4" />
-				<span>Nilai Akhir Terkunci</span>
-			</div>
-		{:else}
-			<div class="badge badge-warning gap-2 py-3.5 px-4 font-semibold shadow-sm">
-				<Icon name="alert" class="size-4" />
-				<span>Belum Dikunci (Draft)</span>
-			</div>
-		{/if}
-	</div>
-
-	<!-- Filter & Selector Bar -->
-	<div class="card bg-base-100 shadow-sm border border-base-200">
-		<div class="card-body p-4 md:p-6">
-			<div class="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-				<!-- Mapel Dropdown -->
-				<div class="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 max-w-xl">
-					<label for="select-mapel" class="text-sm font-semibold shrink-0 text-base-content/80">
-						Pilih Mata Pelajaran:
-					</label>
-					<select
-						id="select-mapel"
-						class="select select-bordered w-full font-medium"
-						value={data.selectedMapelValue}
-						onchange={onSelectMapel}
-					>
-						{#if !data.mapelList?.length}
-							<option value="">Belum ada mata pelajaran</option>
-						{:else}
-							{#each data.mapelList as mapel (mapel.value)}
-								<option value={mapel.value}>{mapel.nama}</option>
-							{/each}
-						{/if}
-					</select>
-				</div>
-
-				<!-- Search Filter -->
-				<div class="relative min-w-[240px]">
-					<input
-						type="search"
-						placeholder="Cari nama atau NISN..."
-						class="input input-bordered w-full pl-9"
-						bind:value={searchTerm}
-					/>
-					<span
-						class="absolute inset-y-0 left-3 flex items-center pointer-events-none text-base-content/50"
-					>
-						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-							/>
-						</svg>
-					</span>
-				</div>
-			</div>
-		</div>
-	</div>
-
-	<!-- Grid Aksi 2-Tahap -->
-	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-		<!-- KARTU TAHAP 1: Konfigurasi Bobot & Kunci Nilai -->
-		<div class="card bg-base-100 shadow-sm border border-base-200">
-			<div class="card-body p-5 md:p-6 flex flex-col justify-between">
-				<div>
-					<div class="flex items-center gap-2 mb-2">
-						<span class="badge badge-primary font-bold">Tahap 1</span>
-						<h2 class="font-bold text-lg text-base-content">Konfigurasi Bobot & Kunci Nilai</h2>
-					</div>
-					<p class="text-xs text-base-content/70 mb-4">
-						Tentukan persentase kontribusi Formatif dan Sumatif. Klik Generate untuk mengunci nilai
-						akhir resmi ke database.
-					</p>
-
-					<!-- Form Bobot -->
-					<div
-						class="grid grid-cols-2 gap-4 bg-base-200/50 p-4 rounded-xl border border-base-200 mb-4"
-					>
-						<div>
-							<label
-								for="bobot-formatif-input"
-								class="label p-0 pb-1 text-xs font-semibold text-base-content/80"
-							>
-								Bobot Formatif (%)
-							</label>
-							<input
-								id="bobot-formatif-input"
-								type="number"
-								min="0"
-								max="100"
-								class="input input-bordered input-sm w-full font-bold"
-								bind:value={bobotFormatif}
-							/>
-						</div>
-						<div>
-							<label
-								for="bobot-sumatif-input"
-								class="label p-0 pb-1 text-xs font-semibold text-base-content/80"
-							>
-								Bobot Sumatif (%)
-							</label>
-							<input
-								id="bobot-sumatif-input"
-								type="number"
-								min="0"
-								max="100"
-								class="input input-bordered input-sm w-full font-bold"
-								bind:value={bobotSumatif}
-							/>
-						</div>
-						<div class="col-span-2 flex items-center justify-between pt-1">
-							<span class="text-xs text-base-content/70">
-								Total Bobot: <span
-									class="font-bold"
-									class:text-error={!isBobotValid}
-									class:text-success={isBobotValid}>{totalBobot}%</span
-								>
-							</span>
-							{#if !isBobotValid}
-								<span class="text-xs text-error font-medium">Harus berjumlah tepat 100%</span>
-							{/if}
-						</div>
-					</div>
-				</div>
-
-				<!-- Tombol Aksi Kunci / Buka Kunci -->
-				<div class="flex items-center gap-3 pt-2">
-					<form
-						action="?/generateDanKunci"
-						method="POST"
-						use:enhance={() => {
-							isSubmitting = true;
-							return async ({ result, update }) => {
-								isSubmitting = false;
-								if (result.type === 'success') {
-									toast('Nilai akhir berhasil di-generate dan dikunci ke database!', 'success');
-								}
-								await update();
-							};
-						}}
-						class="flex-1"
-					>
-						<input type="hidden" name="selectedMapelValue" value={data.selectedMapelValue} />
-						<input type="hidden" name="bobotFormatif" value={bobotFormatif} />
-						<input type="hidden" name="bobotSumatif" value={bobotSumatif} />
-						<input type="hidden" name="payload" value={generatePayload} />
-
-						<button
-							type="submit"
-							class="btn btn-primary w-full gap-2 shadow-sm"
-							disabled={!isBobotValid || isSubmitting || !data.daftarSiswa?.length}
-						>
-							<Icon name="save" class="size-4" />
-							<span>{isSubmitting ? 'Mengunci...' : 'Generate & Kunci Nilai Akhir'}</span>
-						</button>
-					</form>
-
-					{#if data.isLocked}
-						<form
-							action="?/bukaKunci"
-							method="POST"
-							use:enhance={() => {
-								return async ({ update }) => {
-									toast('Kunci nilai dibuka.', 'info');
-									await update();
-								};
-							}}
-						>
-							<input type="hidden" name="mapelId" value={data.selectedMapelId} />
-							<button
-								type="submit"
-								class="btn btn-ghost border-base-300 text-error hover:bg-error/10 gap-1.5"
-								title="Buka kunci nilai untuk diedit ulang"
-							>
-								<span>Buka Kunci</span>
-							</button>
-						</form>
-					{/if}
-				</div>
-			</div>
-		</div>
-
-		<!-- KARTU TAHAP 2: Auto-Fill Format e-Rapor SMA -->
-		<div
-			class="card bg-base-100 shadow-sm border border-base-200"
-			class:opacity-60={!data.isLocked}
-		>
-			<div class="card-body p-5 md:p-6 flex flex-col justify-between">
-				<div>
-					<div class="flex items-center gap-2 mb-2">
-						<span class="badge badge-secondary font-bold">Tahap 2</span>
-						<h2 class="font-bold text-lg text-base-content">Auto-Fill Format e-Rapor SMA</h2>
-					</div>
-					<p class="text-xs text-base-content/70 mb-4">
-						Unggah file template kosongan dari e-Rapor SMA (<code
-							class="text-primary font-mono text-[11px]">f_nilai_...xlsx</code
-						>). Sistem akan menyuntikkan nilai terkunci beserta status TP Valid.
-					</p>
-
-					<!-- File Dropzone -->
-					<form onsubmit={handleAutofillSubmit} class="space-y-4">
-						<div
-							class="border-2 border-dashed border-base-300 hover:border-primary rounded-xl p-4 text-center transition-colors bg-base-200/30"
-						>
-							<input
-								id="erapor-file"
-								type="file"
-								accept=".xlsx"
-								class="file-input file-input-bordered file-input-sm w-full max-w-xs"
-								disabled={!data.isLocked || isAutofilling}
-								onchange={(e) => {
-									const target = e.target as HTMLInputElement;
-									if (target.files && target.files.length > 0) {
-										selectedFile = target.files[0];
-									}
-								}}
-							/>
-							<div class="text-[11px] text-base-content/60 mt-2">
-								Format template resmi e-Rapor SMA Kemendikdasmen (.xlsx)
-							</div>
-						</div>
-
-						{#if autofillError}
-							<div class="alert alert-error text-xs py-2">
-								<span>{autofillError}</span>
-							</div>
-						{/if}
-
-						<button
-							type="submit"
-							class="btn btn-secondary w-full gap-2 shadow-sm"
-							disabled={!data.isLocked || !selectedFile || isAutofilling}
-						>
-							{#if isAutofilling}
-								<span class="loading loading-spinner loading-xs"></span>
-								<span>Memproses Auto-Fill...</span>
-							{:else}
-								<Icon name="download" class="size-4" />
-								<span>Auto-Fill & Unduh Template e-Rapor</span>
-							{/if}
-						</button>
-					</form>
-				</div>
-
-				<div class="text-[11px] text-base-content/60 pt-2 flex items-center gap-1">
-					<Icon name="check" class="size-3.5 text-success inline" />
-					<span>Hasil unduhan 100% valid dan langsung dapat diunggah ke e-Rapor SMA.</span>
-				</div>
-			</div>
-		</div>
-	</div>
-
-	<!-- Tabel Rincian Nilai Siswa -->
-	<div class="card bg-base-100 shadow-sm border border-base-200">
-		<div
-			class="card-header p-4 md:p-5 border-b border-base-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-		>
-			<div>
-				<h3 class="font-bold text-base text-base-content">Daftar Nilai Akhir Siswa</h3>
-				<p class="text-xs text-base-content/60">
-					Menampilkan {filteredSiswa.length} siswa • Mata Pelajaran:
-					<span class="font-semibold text-primary">{data.targetMapelNama || '-'}</span>
+			{#if kelasAktifLabel}
+				<p class="text-base-content/70 text-sm">Kelas aktif: {kelasAktifLabel}</p>
+			{:else}
+				<p class="text-base-content/60 text-sm">
+					Pilih kelas di navbar untuk melihat mata pelajaran intrakurikuler.
 				</p>
-			</div>
+			{/if}
 		</div>
 
-		<div class="overflow-x-auto">
-			<table class="table table-sm md:table-md w-full">
+		<div class="flex items-center gap-2 max-sm:w-full">
+			<button
+				type="button"
+				class="btn btn-soft shadow-none max-sm:flex-1"
+				onclick={() => (showBobotModal = true)}
+				disabled={!canEdit || !hasMapel}
+				title={!canEdit ? 'Anda tidak memiliki izin' : ''}
+			>
+				<Icon name="gear" />
+				Atur Bobot
+			</button>
+
+			{#if data.isLocked}
+				<form
+					action="?/bukaKunci"
+					method="POST"
+					use:enhance={() => {
+						isSubmitting = true;
+						return async ({ result, update }) => {
+							isSubmitting = false;
+							await update();
+							if (result.type === 'success') {
+								toast('Kunci nilai akhir berhasil dibuka.', 'info');
+							}
+						};
+					}}
+				>
+					<input type="hidden" name="mapelId" value={data.selectedMapelId ?? ''} />
+					<input type="hidden" name="mapelIds" value={data.distinctMapelIds?.join(',') ?? ''} />
+					<button
+						type="submit"
+						class="btn btn-soft btn-warning shadow-none"
+						disabled={isSubmitting || !canEdit}
+					>
+						<Icon name="lock" />
+						Buka Kunci
+					</button>
+				</form>
+			{:else}
+				<form
+					action="?/generateDanKunci"
+					method="POST"
+					use:enhance={() => {
+						isSubmitting = true;
+						return async ({ result, update }) => {
+							isSubmitting = false;
+							await update();
+							if (result.type === 'success') {
+								toast('Nilai akhir berhasil dihitung dan dikunci.', 'success');
+							}
+						};
+					}}
+				>
+					<input type="hidden" name="selectedMapelValue" value={selectedMapelValue} />
+					<input type="hidden" name="bobotFormatif" value={bobotFormatif} />
+					<input type="hidden" name="bobotSumatif" value={bobotSumatif} />
+					<input type="hidden" name="payload" value={generatePayload} />
+					<button
+						type="submit"
+						class="btn btn-soft btn-primary shadow-none"
+						disabled={isSubmitting || !isBobotValid || !filteredSiswa.length || !canEdit}
+						title={!isBobotValid ? 'Total bobot harus tepat 100%' : ''}
+					>
+						<Icon name="save" />
+						Generate & Kunci
+					</button>
+				</form>
+			{/if}
+
+			<button
+				type="button"
+				class="btn btn-soft shadow-none max-sm:flex-1"
+				onclick={() => (showAutofillModal = true)}
+				disabled={!data.isLocked}
+				title={!data.isLocked ? 'Kunci nilai akhir terlebih dahulu untuk auto-fill e-Rapor' : ''}
+			>
+				<Icon name="export" />
+				Auto-Fill e-Rapor
+			</button>
+		</div>
+	</div>
+
+	<!-- Filter & Status Bar -->
+	<div class="flex flex-col justify-between gap-2 sm:flex-row sm:flex-wrap">
+		<form class="w-full sm:max-w-80 md:max-w-80" method="get" use:autoSubmit>
+			<select
+				class="select bg-base-200 w-full truncate dark:border-none"
+				title="Pilih mata pelajaran"
+				name="mapel_id"
+				bind:value={selectedMapelValue}
+				disabled={!hasMapel}
+			>
+				{#if !hasMapel}
+					<option value="">Belum ada mata pelajaran</option>
+				{:else}
+					<option value="" disabled selected={selectedMapelValue === ''}>
+						Pilih Mata Pelajaran
+					</option>
+					{#each data.mapelList as mapel (mapel.value)}
+						<option value={mapel.value}>{mapel.nama}</option>
+					{/each}
+				{/if}
+			</select>
+			{#if searchTerm.trim().length}
+				<input type="hidden" name="q" value={searchTerm.trim()} />
+			{/if}
+		</form>
+
+		<div class="flex items-center gap-2">
+			{#if data.isLocked}
+				<span class="badge badge-soft badge-success gap-1.5 py-3 px-3">
+					<Icon name="check" /> Terkunci (Bobot F: {data.bobot?.formatif}%, S: {data.bobot
+						?.sumatif}%)
+				</span>
+			{:else}
+				<span class="badge badge-soft badge-warning gap-1.5 py-3 px-3">
+					<Icon name="alert" /> Belum Dikunci (Draft Bobot F: {bobotFormatif}%, S: {bobotSumatif}%)
+				</span>
+			{/if}
+		</div>
+	</div>
+
+	<!-- Search Input -->
+	<form
+		class="mt-2 w-full"
+		data-sveltekit-keepfocus
+		data-sveltekit-replacestate
+		onsubmit={(e) => e.preventDefault()}
+	>
+		<label class="input bg-base-200 dark:bg-base-300 w-full dark:border-none">
+			<Icon name="search" />
+			<input
+				type="search"
+				name="q"
+				bind:value={searchTerm}
+				spellcheck="false"
+				autocomplete="name"
+				placeholder="Cari nama murid atau NISN..."
+			/>
+		</label>
+	</form>
+
+	<!-- Table or Alert States -->
+	{#if !hasMapel}
+		<div class="alert alert-soft alert-info mt-6">
+			<Icon name="info" />
+			<span>
+				Belum ada mata pelajaran intrakurikuler untuk kelas ini. Tambahkan terlebih dahulu di menu
+				<strong>Intrakurikuler</strong>.
+			</span>
+		</div>
+	{:else if !filteredSiswa.length}
+		<div class="alert alert-soft alert-warning mt-6">
+			<Icon name="alert" />
+			<span>
+				{#if searchTerm}
+					Tidak ditemukan murid dengan kata kunci <strong>"{searchTerm}"</strong>. Coba gunakan nama
+					lain atau bersihkan pencarian.
+				{:else}
+					Belum ada data murid untuk kelas ini. Silakan tambah murid di menu <strong>Murid</strong>.
+				{/if}
+			</span>
+		</div>
+	{:else}
+		<div
+			class="bg-base-100 dark:bg-base-200 mt-4 overflow-x-auto rounded-md shadow-md dark:shadow-none"
+		>
+			<table class="border-base-200 table min-w-140 border dark:border-none">
 				<thead>
-					<tr class="bg-base-200/50 text-base-content/70">
-						<th class="w-12 text-center">No</th>
-						<th>NISN</th>
-						<th>Nama Siswa</th>
-						<th class="text-center">Skor Formatif</th>
-						<th class="text-center">Skor Sumatif</th>
-						<th class="text-center font-bold text-primary">Nilai Akhir (NA)</th>
-						<th>Capaian Tertinggi (Optimal 'T')</th>
-						<th>Capaian Terendah (Perlu Peningkatan 'R')</th>
+					<tr class="bg-base-200 dark:bg-base-300 text-base-content text-left font-bold">
+						<th style="width: 50px; min-width: 40px;">No</th>
+						<th class="min-w-48">Nama</th>
+						<th class="min-w-28 text-center">Formatif</th>
+						<th class="min-w-28 text-center">Sumatif</th>
+						<th class="min-w-32 text-center">Nilai Akhir (NA)</th>
+						<th class="min-w-64">Capaian Kompetensi Tertinggi (T)</th>
+						<th class="min-w-64">Capaian Kompetensi Terendah (R)</th>
+						<th class="min-w-24 text-center">Status</th>
 					</tr>
 				</thead>
 				<tbody>
-					{#if !filteredSiswa.length}
+					{#each filteredSiswa as siswa (siswa.muridId)}
 						<tr>
-							<td colspan="8" class="text-center py-8 text-base-content/50">
-								Tidak ada data siswa ditemukan.
+							<td>{siswa.no}</td>
+							<td>
+								{@html searchQueryMarker(searchTerm, siswa.nama)}
+								{#if siswa.nisn}
+									<div class="text-[11px] font-normal opacity-70">NISN: {siswa.nisn}</div>
+								{/if}
+								{#if siswa.agamaLabel}
+									<div class="text-[11px] font-normal opacity-70">{siswa.agamaLabel}</div>
+								{/if}
+							</td>
+							<td class="text-center font-semibold">
+								{formatScore(siswa.formatifScore)}
+							</td>
+							<td class="text-center font-semibold">
+								{formatScore(siswa.sumatifScore)}
+							</td>
+							<td class="text-center">
+								<span
+									class="font-bold text-base {siswa.isLocked ? 'text-primary' : 'text-warning'}"
+								>
+									{formatScore(siswa.previewNilai)}
+								</span>
+							</td>
+							<td class="text-xs max-w-xs">
+								{#if siswa.tpOptimal}
+									<span class="badge badge-soft badge-success badge-xs font-semibold mr-1">T</span>
+									<span>{siswa.tpOptimal}</span>
+								{:else}
+									<span class="text-base-content/40">—</span>
+								{/if}
+							</td>
+							<td class="text-xs max-w-xs">
+								{#if siswa.tpPerluPeningkatan}
+									<span class="badge badge-soft badge-warning badge-xs font-semibold mr-1">R</span>
+									<span>{siswa.tpPerluPeningkatan}</span>
+								{:else}
+									<span class="text-base-content/40">—</span>
+								{/if}
+							</td>
+							<td class="text-center">
+								{#if siswa.isLocked}
+									<span class="badge badge-soft badge-success badge-sm">Terkunci</span>
+								{:else}
+									<span class="badge badge-soft badge-warning badge-sm">Draft</span>
+								{/if}
 							</td>
 						</tr>
-					{:else}
-						{#each filteredSiswa as siswa (siswa.muridId)}
-							<tr class="hover:bg-base-200/30 transition-colors">
-								<td class="text-center font-mono text-xs">{siswa.no}</td>
-								<td class="font-mono text-xs text-base-content/80">{siswa.nisn || '-'}</td>
-								<td>
-									<div class="font-semibold text-sm text-base-content">{siswa.nama}</div>
-									{#if siswa.agamaLabel}
-										<span class="text-[10px] text-base-content/50">{siswa.agamaLabel}</span>
-									{/if}
-								</td>
-								<td class="text-center font-mono">
-									{siswa.formatifScore != null ? siswa.formatifScore : '—'}
-								</td>
-								<td class="text-center font-mono">
-									{siswa.sumatifScore != null ? siswa.sumatifScore : '—'}
-								</td>
-								<td
-									class="text-center font-mono font-bold text-base"
-									class:text-primary={siswa.isLocked}
-									class:text-warning={!siswa.isLocked}
-								>
-									{siswa.previewNilai != null ? siswa.previewNilai : '—'}
-								</td>
-								<td
-									class="text-xs text-base-content/80 max-w-xs truncate"
-									title={siswa.tpOptimal ?? '-'}
-								>
-									{#if siswa.tpOptimal}
-										<span
-											class="badge badge-success/15 text-success border-success/30 badge-xs font-semibold mr-1"
-											>T</span
-										>
-										<span>{siswa.tpOptimal}</span>
-									{:else}
-										<span class="text-base-content/40">—</span>
-									{/if}
-								</td>
-								<td
-									class="text-xs text-base-content/80 max-w-xs truncate"
-									title={siswa.tpPerluPeningkatan ?? '-'}
-								>
-									{#if siswa.tpPerluPeningkatan}
-										<span
-											class="badge badge-warning/15 text-warning border-warning/30 badge-xs font-semibold mr-1"
-											>R</span
-										>
-										<span>{siswa.tpPerluPeningkatan}</span>
-									{:else}
-										<span class="text-base-content/40">—</span>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					{/if}
+					{/each}
 				</tbody>
 			</table>
 		</div>
+	{/if}
+</div>
+
+<!-- MODAL: ATUR BOBOT -->
+<input
+	id="nilai-akhir-bobot-modal"
+	type="checkbox"
+	class="modal-toggle"
+	bind:checked={showBobotModal}
+	hidden
+/>
+<div
+	class="modal"
+	aria-hidden={!showBobotModal}
+	onclick={(e) => {
+		if (e.target === e.currentTarget && !bobotSaving) showBobotModal = false;
+	}}
+>
+	<div class="modal-box max-w-lg">
+		<h3 class="text-lg font-bold">Atur Bobot Nilai Akhir</h3>
+		<p class="text-base-content/70 text-sm">
+			Tentukan proporsi kontribusi nilai Formatif dan Sumatif untuk mata pelajaran <strong
+				>{data.targetMapelNama || 'ini'}</strong
+			>.
+		</p>
+
+		<form
+			action="?/simpanBobot"
+			method="POST"
+			class="mt-4 grid grid-cols-1 gap-3"
+			use:enhance={() => {
+				bobotSaving = true;
+				return async ({ result, update }) => {
+					bobotSaving = false;
+					await update();
+					if (result.type === 'success') {
+						showBobotModal = false;
+						toast('Bobot nilai akhir berhasil disimpan.', 'success');
+					} else if (result.type === 'failure') {
+						toast(String(result.data?.message ?? 'Gagal menyimpan bobot.'), 'error');
+					}
+				};
+			}}
+		>
+			<input type="hidden" name="mapelId" value={data.selectedMapelId ?? ''} />
+			<fieldset class="fieldset">
+				<legend class="fieldset-legend font-semibold">Bobot Formatif (%)</legend>
+				<input
+					type="number"
+					name="formatif"
+					min="0"
+					max="100"
+					class="input bg-base-200 dark:bg-base-300 w-full dark:border-none"
+					bind:value={bobotFormatif}
+					disabled={bobotSaving}
+				/>
+			</fieldset>
+			<fieldset class="fieldset">
+				<legend class="fieldset-legend font-semibold">Bobot Sumatif (%)</legend>
+				<input
+					type="number"
+					name="sumatif"
+					min="0"
+					max="100"
+					class="input bg-base-200 dark:bg-base-300 w-full dark:border-none"
+					bind:value={bobotSumatif}
+					disabled={bobotSaving}
+				/>
+			</fieldset>
+
+			<div class="flex items-center justify-between pt-1 text-sm">
+				<span class="text-base-content/70">
+					Total Bobot: <strong class={isBobotValid ? 'text-success' : 'text-error'}
+						>{totalBobot}%</strong
+					>
+				</span>
+				{#if !isBobotValid}
+					<span class="text-xs font-semibold text-error">Harus berjumlah tepat 100%</span>
+				{/if}
+			</div>
+
+			<div class="modal-action mt-6 flex justify-end gap-2">
+				<button
+					type="button"
+					class="btn btn-ghost"
+					onclick={() => (showBobotModal = false)}
+					disabled={bobotSaving}
+				>
+					Batal
+				</button>
+				<button type="submit" class="btn btn-primary" disabled={!isBobotValid || bobotSaving}>
+					{#if bobotSaving}
+						<span class="loading loading-spinner loading-xs"></span>
+					{/if}
+					Simpan Bobot
+				</button>
+			</div>
+		</form>
+	</div>
+</div>
+
+<!-- MODAL: AUTO-FILL E-RAPOR SMA -->
+<input
+	id="autofill-modal"
+	type="checkbox"
+	class="modal-toggle"
+	bind:checked={showAutofillModal}
+	hidden
+/>
+<div
+	class="modal"
+	aria-hidden={!showAutofillModal}
+	onclick={(e) => {
+		if (e.target === e.currentTarget && !isAutofilling) showAutofillModal = false;
+	}}
+>
+	<div class="modal-box max-w-lg">
+		<h3 class="text-lg font-bold">Auto-Fill Format e-Rapor SMA</h3>
+		<p class="text-base-content/70 text-sm">
+			Unggah file template kosongan dari aplikasi e-Rapor SMA (<code
+				class="text-primary font-mono text-xs">f_nilai_...xlsx</code
+			>). Sistem Rapkumer akan otomatis menyuntikkan Nilai Akhir yang terkunci beserta status
+			capaian TP.
+		</p>
+
+		<form onsubmit={handleAutofillSubmit} class="mt-4 space-y-4">
+			<fieldset class="fieldset">
+				<legend class="fieldset-legend font-semibold"
+					>Pilih File Template e-Rapor SMA (.xlsx)</legend
+				>
+				<input
+					type="file"
+					accept=".xlsx"
+					class="file-input bg-base-200 dark:bg-base-300 w-full dark:border-none"
+					disabled={isAutofilling}
+					onchange={(e) => {
+						const target = e.target as HTMLInputElement;
+						if (target.files && target.files.length > 0) {
+							selectedFile = target.files[0];
+						}
+					}}
+				/>
+			</fieldset>
+
+			{#if autofillError}
+				<div class="alert alert-soft alert-error text-xs">
+					<Icon name="error" />
+					<span>{autofillError}</span>
+				</div>
+			{/if}
+
+			<div class="modal-action mt-6 flex justify-end gap-2">
+				<button
+					type="button"
+					class="btn btn-ghost"
+					onclick={() => (showAutofillModal = false)}
+					disabled={isAutofilling}
+				>
+					Batal
+				</button>
+				<button
+					type="submit"
+					class="btn btn-primary gap-2"
+					disabled={!selectedFile || isAutofilling}
+				>
+					{#if isAutofilling}
+						<span class="loading loading-spinner loading-xs"></span>
+						<span>Memproses...</span>
+					{:else}
+						<Icon name="download" />
+						<span>Isi & Unduh Excel</span>
+					{/if}
+				</button>
+			</div>
+		</form>
 	</div>
 </div>
