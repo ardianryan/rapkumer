@@ -23,6 +23,7 @@ import { mergeAccountsUnderKepalaSekolah } from '$lib/server/pengguna-merge';
 import { randomBytes } from 'node:crypto';
 import { fail } from '@sveltejs/kit';
 import { ensureZitadelSchema } from '$lib/server/db/ensure-zitadel';
+import { syncTeacherAssignments, type GuruMapelAssignment } from '$lib/server/teacher-assignments';
 
 const u = tableAuthUser;
 
@@ -646,13 +647,55 @@ export async function load({ url, locals }) {
 		userZitadelMap.set(row.userId, row);
 	}
 
-	// Attach mapelIds/kelasIds/pembelajaran/sso to each user for edit modal & table display
+	const mpNameById = new Map<number, string>();
+	for (const mp of mataPelajaran) {
+		if (mp.id && mp.nama) mpNameById.set(mp.id, mp.nama);
+	}
+
+	// Attach mapelIds/kelasIds/pembelajaran/assignments/sso to each user for edit modal & table display
 	for (const user of users) {
 		const uid = user.id as number;
 		if (uid > 0) {
-			(user as Record<string, unknown>).mataPelajaranIds = userMapelMap.get(uid) ?? [];
-			(user as Record<string, unknown>).kelasIds = userKelasMap.get(uid) ?? [];
-			(user as Record<string, unknown>).pembelajaranList = userPembelajaranMap.get(uid) ?? [];
+			const mIds = userMapelMap.get(uid) ?? [];
+			const kIds = userKelasMap.get(uid) ?? [];
+			const pList = userPembelajaranMap.get(uid) ?? [];
+
+			(user as Record<string, unknown>).mataPelajaranIds = mIds;
+			(user as Record<string, unknown>).kelasIds = kIds;
+			(user as Record<string, unknown>).pembelajaranList = pList;
+
+			// Buat daftar penugasan multi-mapel multi-kelas terstruktur
+			const mapelGroup = new Map<string, { mapelNama: string; kelasIds: Set<number> }>();
+			for (const p of pList) {
+				const name = mpNameById.get(p.mataPelajaranId);
+				if (name) {
+					const key = name.trim().toLowerCase();
+					if (!mapelGroup.has(key)) {
+						mapelGroup.set(key, { mapelNama: name.trim(), kelasIds: new Set<number>() });
+					}
+					mapelGroup.get(key)!.kelasIds.add(p.kelasId);
+				}
+			}
+
+			// Fallback jika pembelajaranList kosong tapi memiliki relasi mata pelajaran dan kelas
+			if (mapelGroup.size === 0 && mIds.length > 0) {
+				for (const mId of mIds) {
+					const name = mpNameById.get(mId);
+					if (name) {
+						const key = name.trim().toLowerCase();
+						if (!mapelGroup.has(key)) {
+							mapelGroup.set(key, { mapelNama: name.trim(), kelasIds: new Set<number>(kIds) });
+						}
+					}
+				}
+			}
+
+			const userAssignments: GuruMapelAssignment[] = Array.from(mapelGroup.values()).map((g) => ({
+				mapelNama: g.mapelNama,
+				kelasIds: Array.from(g.kelasIds)
+			}));
+			(user as Record<string, unknown>).assignments = userAssignments;
+
 			const ssoRecord = userZitadelMap.get(uid) ?? null;
 			(user as Record<string, unknown>).sso = ssoRecord;
 			if (!(user as Record<string, unknown>).dapodikPtkId && ssoRecord?.ptkId) {
@@ -792,6 +835,27 @@ export const actions = {
 			}
 		}
 
+		// Parse penugasan terstruktur multi-mapel multi-kelas (khusus guru)
+		let assignments: GuruMapelAssignment[] = [];
+		const assignmentsRaw = form.get('assignments');
+		if (assignmentsRaw) {
+			try {
+				const parsed = JSON.parse(String(assignmentsRaw));
+				if (Array.isArray(parsed)) {
+					assignments = parsed
+						.map((item: { mapelNama?: string; kelasIds?: number[] }) => ({
+							mapelNama: String(item.mapelNama ?? '').trim(),
+							kelasIds: Array.isArray(item.kelasIds)
+								? item.kelasIds.map(Number).filter((n) => !isNaN(n) && n > 0)
+								: []
+						}))
+						.filter((a) => a.mapelNama.length > 0 && a.kelasIds.length > 0);
+				}
+			} catch (err) {
+				console.warn('[pengguna] failed to parse assignments', err);
+			}
+		}
+
 		const sekolahIdRaw = form.get('sekolahId');
 		const sekolahId = sekolahIdRaw ? Number(String(sekolahIdRaw)) : null;
 
@@ -894,70 +958,70 @@ export const actions = {
 				throw new Error('Failed to retrieve created user');
 			}
 
-			// Insert many-to-many entries untuk semua mata pelajaran yang dipilih
-			for (const mapelId of mataPelajaranIds) {
-				try {
-					await db.insert(tableAuthUserMataPelajaran).values({
-						authUserId: created.id,
-						mataPelajaranId: mapelId,
-						createdAt: timestamp,
-						updatedAt: timestamp
-					});
-				} catch (err) {
-					// Ignore duplicate errors (if somehow same mapel was added twice)
-					if (String(err).includes('UNIQUE')) {
-						console.warn(`[pengguna] duplicate mapel entry: user ${created.id}, mapel ${mapelId}`);
-					} else {
-						throw err;
-					}
-				}
-			}
-
-			// Insert many-to-many entries untuk semua kelas yang dipilih
-			for (const kelasIdItem of kelasIds) {
-				try {
-					await db.insert(tableAuthUserKelas).values({
-						authUserId: created.id,
-						kelasId: kelasIdItem,
-						createdAt: timestamp,
-						updatedAt: timestamp
-					});
-				} catch (err) {
-					// Ignore duplicate errors (if somehow same kelas was added twice)
-					if (String(err).includes('UNIQUE')) {
-						console.warn(
-							`[pengguna] duplicate kelas entry: user ${created.id}, kelas ${kelasIdItem}`
-						);
-					} else {
-						throw err;
-					}
-				}
-			}
-
-			// Insert penugasan presisi pembelajaran (auth_user_pembelajaran)
-			for (const mapelId of mataPelajaranIds) {
-				const mp = await db.query.tableMataPelajaran.findFirst({
-					where: eq(tableMataPelajaran.id, mapelId),
-					columns: { id: true, kelasId: true }
+			// Sync penugasan: jika ada data terstruktur assignments (khusus role guru), gunakan syncTeacherAssignments
+			let syncResult: { allMataPelajaranIds: number[]; allKelasIds: number[] } | null = null;
+			if (roleValue === 'user' && assignments.length > 0) {
+				syncResult = await syncTeacherAssignments(db, {
+					authUserId: created.id,
+					pegawaiId,
+					assignments,
+					sekolahId
 				});
-				if (mp?.kelasId) {
+			} else {
+				// Fallback untuk legacy atau role selain guru
+				for (const mapelId of mataPelajaranIds) {
 					try {
-						await db.insert(tableAuthUserPembelajaran).values({
+						await db.insert(tableAuthUserMataPelajaran).values({
 							authUserId: created.id,
-							kelasId: mp.kelasId,
-							mataPelajaranId: mp.id,
+							mataPelajaranId: mapelId,
 							createdAt: timestamp,
 							updatedAt: timestamp
 						});
 					} catch (err) {
-						const msg = String(err).toLowerCase();
-						if (!msg.includes('unique') && !msg.includes('duplicate')) throw err;
+						if (!String(err).includes('UNIQUE')) throw err;
+					}
+				}
+
+				for (const kelasIdItem of kelasIds) {
+					try {
+						await db.insert(tableAuthUserKelas).values({
+							authUserId: created.id,
+							kelasId: kelasIdItem,
+							createdAt: timestamp,
+							updatedAt: timestamp
+						});
+					} catch (err) {
+						if (!String(err).includes('UNIQUE')) throw err;
+					}
+				}
+
+				for (const mapelId of mataPelajaranIds) {
+					const mp = await db.query.tableMataPelajaran.findFirst({
+						where: eq(tableMataPelajaran.id, mapelId),
+						columns: { id: true, kelasId: true }
+					});
+					if (mp?.kelasId) {
+						try {
+							await db.insert(tableAuthUserPembelajaran).values({
+								authUserId: created.id,
+								kelasId: mp.kelasId,
+								mataPelajaranId: mp.id,
+								createdAt: timestamp,
+								updatedAt: timestamp
+							});
+						} catch (err) {
+							const msg = String(err).toLowerCase();
+							if (!msg.includes('unique') && !msg.includes('duplicate')) throw err;
+						}
 					}
 				}
 			}
 
+			const finalMataPelajaranIds = syncResult ? syncResult.allMataPelajaranIds : mataPelajaranIds;
+			const finalKelasIds = syncResult ? syncResult.allKelasIds : kelasIds;
+
 			console.info(
-				`[pengguna] Created user via action: ${username} -> id=${created.id}, mapels=${mataPelajaranIds.length}, kelas=${kelasIds.length}`
+				`[pengguna] Created user via action: ${username} -> id=${created.id}, mapels=${finalMataPelajaranIds.length}, kelas=${finalKelasIds.length}`
 			);
 
 			// diagnostic logs to help track persistence issues after DB imports
@@ -975,8 +1039,9 @@ export const actions = {
 				user: created,
 				displayName: nama,
 				dapodikPtkId: dapodikPtkId || null,
-				mataPelajaranIds: mataPelajaranIds,
-				kelasIds: kelasIds
+				assignments: roleValue === 'user' ? assignments : undefined,
+				mataPelajaranIds: finalMataPelajaranIds,
+				kelasIds: finalKelasIds
 			};
 		} catch (err: unknown) {
 			console.error('Failed to create user', err);
@@ -1040,6 +1105,27 @@ export const actions = {
 			}
 		}
 
+		// Parse penugasan terstruktur multi-mapel multi-kelas (khusus guru)
+		let assignments: GuruMapelAssignment[] = [];
+		const assignmentsRaw = form.get('assignments');
+		if (assignmentsRaw) {
+			try {
+				const parsed = JSON.parse(String(assignmentsRaw));
+				if (Array.isArray(parsed)) {
+					assignments = parsed
+						.map((item: { mapelNama?: string; kelasIds?: number[] }) => ({
+							mapelNama: String(item.mapelNama ?? '').trim(),
+							kelasIds: Array.isArray(item.kelasIds)
+								? item.kelasIds.map(Number).filter((n) => !isNaN(n) && n > 0)
+								: []
+						}))
+						.filter((a) => a.mapelNama.length > 0 && a.kelasIds.length > 0);
+				}
+			} catch {
+				/* ignore */
+			}
+		}
+
 		const sekolahId = form.get('sekolahId') ? Number(form.get('sekolahId')) : null;
 		if (sekolahId) {
 			const exists = await db.query.tableSekolah.findFirst({
@@ -1095,6 +1181,7 @@ export const actions = {
 				}
 
 				// Update pegawai nama and dapodikPtkId if provided
+				let effectivePegawaiId = existing.pegawaiId;
 				if (existing.pegawaiId) {
 					const pegUpdate: Record<string, unknown> = {};
 					if (nama) pegUpdate.nama = nama;
@@ -1115,7 +1202,10 @@ export const actions = {
 							sekolahId: sekolahId ?? undefined
 						})
 						.returning({ id: tablePegawai.id });
-					if (p) await tx.update(u).set({ pegawaiId: p.id }).where(eq(u.id, id));
+					if (p) {
+						effectivePegawaiId = p.id;
+						await tx.update(u).set({ pegawaiId: p.id }).where(eq(u.id, id));
+					}
 				}
 
 				// Sync with ZITADEL SSO record if user is connected
@@ -1131,62 +1221,75 @@ export const actions = {
 					}
 				}
 
-				// Sync many-to-many: delete existing then re-insert
-				await tx
-					.delete(tableAuthUserMataPelajaran)
-					.where(eq(tableAuthUserMataPelajaran.authUserId, id));
-				const ts = new Date().toISOString();
-				for (const mpId of mataPelajaranIds) {
-					try {
-						await tx.insert(tableAuthUserMataPelajaran).values({
-							authUserId: id,
-							mataPelajaranId: mpId,
-							createdAt: ts,
-							updatedAt: ts
-						});
-					} catch (err) {
-						if (!String(err).includes('UNIQUE')) throw err;
-					}
-				}
-
-				await tx.delete(tableAuthUserKelas).where(eq(tableAuthUserKelas.authUserId, id));
-				for (const kId of kelasIds) {
-					try {
-						await tx.insert(tableAuthUserKelas).values({
-							authUserId: id,
-							kelasId: kId,
-							createdAt: ts,
-							updatedAt: ts
-						});
-					} catch (err) {
-						if (!String(err).includes('UNIQUE')) throw err;
-					}
-				}
-
-				// Sync auth_user_pembelajaran
-				await tx
-					.delete(tableAuthUserPembelajaran)
-					.where(eq(tableAuthUserPembelajaran.authUserId, id));
-				for (const mpId of mataPelajaranIds) {
-					const mp = await tx.query.tableMataPelajaran.findFirst({
-						where: eq(tableMataPelajaran.id, mpId),
-						columns: { id: true, kelasId: true }
+				// Sync penugasan: jika ada data terstruktur assignments (khusus role guru), gunakan syncTeacherAssignments
+				let syncResult: { allMataPelajaranIds: number[]; allKelasIds: number[] } | null = null;
+				if (roleValue === 'user' && assignments.length > 0) {
+					syncResult = await syncTeacherAssignments(tx as unknown as typeof db, {
+						authUserId: id,
+						pegawaiId: effectivePegawaiId,
+						assignments,
+						sekolahId
 					});
-					if (mp?.kelasId) {
+				} else {
+					// Fallback untuk legacy atau role non-guru
+					await tx
+						.delete(tableAuthUserMataPelajaran)
+						.where(eq(tableAuthUserMataPelajaran.authUserId, id));
+					const ts = new Date().toISOString();
+					for (const mpId of mataPelajaranIds) {
 						try {
-							await tx.insert(tableAuthUserPembelajaran).values({
+							await tx.insert(tableAuthUserMataPelajaran).values({
 								authUserId: id,
-								kelasId: mp.kelasId,
-								mataPelajaranId: mp.id,
+								mataPelajaranId: mpId,
 								createdAt: ts,
 								updatedAt: ts
 							});
 						} catch (err) {
-							const msg = String(err).toLowerCase();
-							if (!msg.includes('unique') && !msg.includes('duplicate')) throw err;
+							if (!String(err).includes('UNIQUE')) throw err;
+						}
+					}
+
+					await tx.delete(tableAuthUserKelas).where(eq(tableAuthUserKelas.authUserId, id));
+					for (const kId of kelasIds) {
+						try {
+							await tx.insert(tableAuthUserKelas).values({
+								authUserId: id,
+								kelasId: kId,
+								createdAt: ts,
+								updatedAt: ts
+							});
+						} catch (err) {
+							if (!String(err).includes('UNIQUE')) throw err;
+						}
+					}
+
+					// Sync auth_user_pembelajaran
+					await tx
+						.delete(tableAuthUserPembelajaran)
+						.where(eq(tableAuthUserPembelajaran.authUserId, id));
+					for (const mpId of mataPelajaranIds) {
+						const mp = await tx.query.tableMataPelajaran.findFirst({
+							where: eq(tableMataPelajaran.id, mpId),
+							columns: { id: true, kelasId: true }
+						});
+						if (mp?.kelasId) {
+							try {
+								await tx.insert(tableAuthUserPembelajaran).values({
+									authUserId: id,
+									kelasId: mp.kelasId,
+									mataPelajaranId: mp.id,
+									createdAt: ts,
+									updatedAt: ts
+								});
+							} catch (err) {
+								const msg = String(err).toLowerCase();
+								if (!msg.includes('unique') && !msg.includes('duplicate')) throw err;
+							}
 						}
 					}
 				}
+
+				return syncResult;
 			});
 
 			// Return updated user
@@ -1205,6 +1308,7 @@ export const actions = {
 				user: updated,
 				displayName: nama,
 				dapodikPtkId: dapodikPtkId !== undefined ? dapodikPtkId || null : undefined,
+				assignments: roleValue === 'user' ? assignments : undefined,
 				mataPelajaranIds,
 				kelasIds
 			};

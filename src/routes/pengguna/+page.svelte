@@ -20,6 +20,7 @@
 		mataPelajaranId?: number | null;
 		mataPelajaranIds?: number[];
 		kelasIds?: number[];
+		assignments?: Array<{ mapelNama: string; kelasIds: number[] }>;
 		sso?: {
 			userId: number;
 			zitadelUuid: string;
@@ -364,6 +365,7 @@
 							roles: [typeLabels[newType] ?? newType],
 							mataPelajaranIds: body.mataPelajaranIds ?? users[idx].mataPelajaranIds,
 							kelasIds: body.kelasIds ?? users[idx].kelasIds,
+							assignments: body.assignments ?? users[idx].assignments,
 							passwordUpdatedAt: serverUser?.passwordUpdatedAt ?? users[idx].passwordUpdatedAt
 						};
 					}
@@ -391,11 +393,13 @@
 						kelasId: null,
 						kelasName: null,
 						passwordUpdatedAt: serverUser?.passwordUpdatedAt ?? new Date().toISOString(),
+						sekolahId: body.sekolahId ? Number(body.sekolahId) : null,
 						mataPelajaranIds: body.mataPelajaranIds ?? [],
 						kelasIds: body.kelasIds ?? [],
+						assignments: body.assignments ?? [],
 						// determine isNew based on whether server actually returned a real id
 						isNew: body.__server_user_returned ? false : true
-					} as LocalUser;
+					} as unknown as LocalUser;
 					users = [newUser, ...users];
 
 					// if server did not return an id (or returned a local fallback), start polling to resolve the created user by username

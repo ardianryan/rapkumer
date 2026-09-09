@@ -3,6 +3,9 @@
 	import Icon from '$lib/components/icon.svelte';
 	import { toast } from '$lib/components/toast.svelte';
 	import { validatePasswordStrength } from '$lib/password-policy';
+	import MultiMapelAssignmentEditor, {
+		type GuruMapelAssignment
+	} from '$lib/components/pengguna/MultiMapelAssignmentEditor.svelte';
 
 	let {
 		open = $bindable(false),
@@ -24,6 +27,8 @@
 			sekolahId?: number | null;
 			mataPelajaranIds?: number[];
 			kelasIds?: number[];
+			assignments?: GuruMapelAssignment[];
+			pembelajaranList?: Array<{ kelasId: number; mataPelajaranId: number }>;
 			sso?: {
 				ptkId?: string | null;
 				[key: string]: unknown;
@@ -38,9 +43,10 @@
 	let dapodikPtkId = $state('');
 	let password = $state('');
 	let type = $state('user');
-	// Multi-mapel: simpan sebagai Set of checked mata pelajaran IDs
+	// Multi-mapel & Multi-kelas terstruktur khusus guru
+	let assignments = $state<GuruMapelAssignment[]>([{ mapelNama: '', kelasIds: [] }]);
+	// Legacy fallback: untuk role wali_kelas dsb
 	let mataPelajaranIds = $state(new Set<number>());
-	// Multi-kelas: simpan sebagai Set of checked kelas IDs
 	let kelasIds = $state(new Set<number>());
 	let sekolahId = $state<string | number | null>('');
 	let initialized = $state(false);
@@ -75,20 +81,23 @@
 		const hasNama = nama.trim().length > 0;
 		const hasUsername = username.trim().length > 0;
 		const hasPassword = isEditMode ? true : password.trim().length > 0;
-		const hasMapel = type !== 'user' || mataPelajaranIds.size > 0;
+		const hasMapel =
+			type !== 'user' ||
+			assignments.some(
+				(a) => (a.mapelNama ?? '').trim().length > 0 && (a.kelasIds ?? []).length > 0
+			);
 		return hasNama && hasUsername && hasPassword && hasMapel;
 	});
 
 	function uniqueByNama(list: { id: number; nama: string }[]) {
 		const map = new Map<string, { id: number; nama: string }>();
 		for (const m of list) {
-			// keep the first occurrence for a given nama
 			if (!map.has(m.nama)) map.set(m.nama, m);
 		}
 		return Array.from(map.values());
 	}
 
-	// initialize defaults only once when the modal opens (prevent clearing while open)
+	// initialize defaults only once when the modal opens
 	$effect(() => {
 		if (open && !initialized) {
 			if (editUser) {
@@ -99,11 +108,50 @@
 				sekolahId = editUser.sekolahId ?? '';
 				mataPelajaranIds = new Set(editUser.mataPelajaranIds ?? []);
 				kelasIds = new Set(editUser.kelasIds ?? []);
+
+				// Inisialisasi assignments terstruktur
+				if (editUser.assignments && editUser.assignments.length > 0) {
+					assignments = JSON.parse(JSON.stringify(editUser.assignments));
+				} else if (editUser.pembelajaranList && editUser.pembelajaranList.length > 0) {
+					const mpNameMap = new Map<number, string>();
+					for (const m of mataPelajaran) mpNameMap.set(m.id, m.nama);
+					const grouped = new Map<string, Set<number>>();
+					for (const p of editUser.pembelajaranList) {
+						const mName = mpNameMap.get(p.mataPelajaranId);
+						if (mName) {
+							const key = mName.trim();
+							if (!grouped.has(key)) grouped.set(key, new Set());
+							grouped.get(key)!.add(p.kelasId);
+						}
+					}
+					assignments = Array.from(grouped.entries()).map(([mapelNama, kIds]) => ({
+						mapelNama,
+						kelasIds: Array.from(kIds)
+					}));
+				} else if (editUser.mataPelajaranIds && editUser.mataPelajaranIds.length > 0) {
+					const kIds = editUser.kelasIds ?? [];
+					const seen = new Set<string>();
+					const list: GuruMapelAssignment[] = [];
+					for (const mId of editUser.mataPelajaranIds) {
+						const found = mataPelajaran.find((m: { id: number; nama: string }) => m.id === mId);
+						if (found?.nama) {
+							const key = found.nama.trim().toLowerCase();
+							if (!seen.has(key)) {
+								seen.add(key);
+								list.push({ mapelNama: found.nama.trim(), kelasIds: kIds });
+							}
+						}
+					}
+					assignments = list.length > 0 ? list : [{ mapelNama: '', kelasIds: [] }];
+				} else {
+					assignments = [{ mapelNama: '', kelasIds: [] }];
+				}
 			} else {
 				nama = '';
 				username = '';
 				dapodikPtkId = '';
 				type = 'user';
+				assignments = [{ mapelNama: '', kelasIds: [] }];
 				mataPelajaranIds = new Set<number>();
 				kelasIds = new Set<number>();
 				sekolahId = '';
@@ -136,32 +184,19 @@
 	function toggleSelectAllKelas() {
 		selectAllKelas = !selectAllKelas;
 		if (selectAllKelas) {
-			// Select all visible kelas
 			for (const k of filteredKelasList) {
 				kelasIds.add(k.id);
 			}
 		} else {
-			// Deselect all kelas
 			kelasIds.clear();
 		}
 		kelasIds = new Set(kelasIds);
 	}
 
 	function close() {
-		// reset initialized so next open will reinitialize fields
 		initialized = false;
 		open = false;
 		dispatch('cancel');
-	}
-
-	function toggleMapel(id: number) {
-		if (mataPelajaranIds.has(id)) {
-			mataPelajaranIds.delete(id);
-		} else {
-			mataPelajaranIds.add(id);
-		}
-		// Trigger reactivity
-		mataPelajaranIds = new Set(mataPelajaranIds);
 	}
 
 	function toggleKelas(id: number) {
@@ -170,7 +205,6 @@
 		} else {
 			kelasIds.add(id);
 		}
-		// Trigger reactivity
 		kelasIds = new Set(kelasIds);
 	}
 
@@ -190,12 +224,17 @@
 		form.set('nama', nama || '');
 		form.set('dapodikPtkId', dapodikPtkId.trim());
 		form.set('type', type || 'user');
-		// Send multiple mapel as JSON array
-		form.set('mataPelajaranIds', JSON.stringify(Array.from(mataPelajaranIds)));
-		// Send multiple kelas as JSON array
-		form.set('kelasIds', JSON.stringify(Array.from(kelasIds)));
-		// include sekolahId when provided
 		form.set('sekolahId', String(sekolahId ?? ''));
+
+		if (type === 'user') {
+			// Multi-mapel & multi-kelas terstruktur
+			form.set('assignments', JSON.stringify(assignments));
+			const allKelasIds = Array.from(new Set(assignments.flatMap((a) => a.kelasIds)));
+			form.set('kelasIds', JSON.stringify(allKelasIds));
+		} else {
+			form.set('mataPelajaranIds', JSON.stringify(Array.from(mataPelajaranIds)));
+			form.set('kelasIds', JSON.stringify(Array.from(kelasIds)));
+		}
 
 		const endpoint = isEditMode ? '?/update_user' : '?/create_user';
 		if (isEditMode) form.set('id', String(editUser!.id));
@@ -204,13 +243,19 @@
 			const res = await fetch(endpoint, { method: 'POST', body: form });
 			if (res.ok) {
 				const body = await res.json().catch(() => ({}));
+				const allKelasIds =
+					type === 'user'
+						? Array.from(new Set(assignments.flatMap((a) => a.kelasIds)))
+						: Array.from(kelasIds);
+
 				const mergedBody = {
 					...body,
 					username: body.user?.username ?? username,
 					displayName: body.displayName ?? nama,
 					dapodikPtkId: body.dapodikPtkId ?? (dapodikPtkId.trim() || null),
+					assignments: type === 'user' ? assignments : undefined,
 					mataPelajaranIds: body.mataPelajaranIds ?? Array.from(mataPelajaranIds),
-					kelasIds: body.kelasIds ?? Array.from(kelasIds),
+					kelasIds: body.kelasIds ?? allKelasIds,
 					user: body.user ?? {
 						id: isEditMode ? editUser!.id : Date.now(),
 						username: body.user?.username ?? username,
@@ -264,9 +309,11 @@
 
 {#if open}
 	<div class="modal modal-open">
-		<div class="modal-box flex max-h-[90vh] max-w-lg flex-col p-4">
+		<div
+			class={`modal-box flex max-h-[90vh] flex-col p-4 sm:p-6 ${type === 'user' ? 'max-w-2xl' : 'max-w-lg'}`}
+		>
 			<h3 class="mb-3 text-lg font-bold">{modalTitle}</h3>
-			<div class="flex-1 space-y-3 overflow-y-auto px-1">
+			<div class="flex-1 space-y-4 overflow-y-auto px-1">
 				<!-- Sekolah -->
 				<fieldset class="fieldset">
 					<legend class="fieldset-legend">Sekolah</legend>
@@ -294,83 +341,9 @@
 					</p>
 				</fieldset>
 
-				<!-- Mata Pelajaran Collapse -->
-				<div tabindex="0" role="button" class="bg-base-200 border-base-300 collapse-arrow collapse">
-					<div class="collapse-title font-semibold">
-						Mata Pelajaran {#if mataPelajaranIds.size > 0}
-							<span class="badge badge-sm badge-primary">{mataPelajaranIds.size}</span>
-						{/if}
-					</div>
-					<div class="collapse-content text-sm">
-						<div class="space-y-3">
-							<p class="text-xs opacity-75">Pilih satu atau lebih mata pelajaran yang diajari</p>
-							{#if filteredMataPelajaran.length > 0}
-								<div class="space-y-2">
-									{#each filteredMataPelajaran as m (m.id)}
-										<label class="flex cursor-pointer gap-2">
-											<input
-												type="checkbox"
-												class="checkbox checkbox-sm"
-												checked={mataPelajaranIds.has(m.id)}
-												onchange={() => toggleMapel(m.id)}
-											/>
-											<span class="text-sm">{m.nama}</span>
-										</label>
-									{/each}
-								</div>
-							{:else}
-								<p class="text-xs opacity-75">- tidak ada mata pelajaran -</p>
-							{/if}
-						</div>
-					</div>
-				</div>
-
-				<!-- Kelas -->
-				<div tabindex="0" role="button" class="bg-base-200 border-base-300 collapse-arrow collapse">
-					<div class="collapse-title font-semibold">
-						Kelas {#if kelasIds.size > 0}
-							<span class="badge badge-sm badge-secondary">{kelasIds.size}</span>
-						{/if}
-					</div>
-					<div class="collapse-content text-sm">
-						<div class="space-y-3">
-							<p class="text-xs opacity-75">Pilih satu atau lebih kelas yang bisa diakses</p>
-							{#if filteredKelasList.length > 0}
-								<div class="space-y-2">
-									<label class="bg-base-300 flex cursor-pointer gap-2 rounded p-2 font-semibold">
-										<input
-											type="checkbox"
-											class="checkbox checkbox-sm"
-											checked={selectAllKelas}
-											onchange={toggleSelectAllKelas}
-										/>
-										<span class="text-sm">Pilih Semua</span>
-									</label>
-									{#each filteredKelasList as k (k.id)}
-										<label class="flex cursor-pointer gap-2">
-											<input
-												type="checkbox"
-												class="checkbox checkbox-sm"
-												checked={kelasIds.has(k.id)}
-												onchange={() => toggleKelas(k.id)}
-											/>
-											<span class="text-sm"
-												>{k.nama}
-												{#if k.fase}({k.fase}){/if}</span
-											>
-										</label>
-									{/each}
-								</div>
-							{:else}
-								<p class="text-xs opacity-75">- tidak ada kelas -</p>
-							{/if}
-						</div>
-					</div>
-				</div>
-
 				<!-- Nama -->
 				<fieldset class="fieldset">
-					<legend class="fieldset-legend">Nama</legend>
+					<legend class="fieldset-legend">Nama Lengkap</legend>
 					<input
 						id="add-user-nama"
 						required
@@ -399,26 +372,27 @@
 
 				<!-- Role -->
 				<fieldset class="fieldset">
-					<legend class="fieldset-legend">Role</legend>
+					<legend class="fieldset-legend">Peran (Role)</legend>
 					<select
 						id="add-user-role"
-						class="select dark:bg-base-200 w-full dark:border-none"
+						class="select dark:bg-base-200 w-full dark:border-none font-semibold"
 						bind:value={type}
 						onchange={() => {
 							if (type === 'wali_kelas') selectAllMapelAndKelas();
 						}}
 					>
-						<option value="admin">Admin</option>
-						<option value="kepala_sekolah">Kepala Sekolah</option>
+						<option value="user">Guru (Pendidik)</option>
 						<option value="wali_kelas">Wali Kelas</option>
 						<option value="wali_asuh">Wali Asuh</option>
-						<option value="user">Guru</option>
+						<option value="kepala_sekolah">Kepala Sekolah</option>
+						<option value="admin">Admin</option>
 					</select>
 					<p class="label text-wrap">Tentukan peran pengguna dalam sistem</p>
 				</fieldset>
 
+				<!-- Akun Login -->
 				<fieldset class="fieldset">
-					<legend class="fieldset-legend">Akun</legend>
+					<legend class="fieldset-legend">Akun Masuk</legend>
 					<div class="flex flex-col gap-2 sm:flex-row">
 						<label class="input validator dark:bg-base-200 w-full dark:border-none">
 							<Icon name="user" />
@@ -458,9 +432,69 @@
 							: 'Nama pengguna dan kata sandi untuk masuk'}
 					</p>
 				</fieldset>
+
+				<!-- KHUSUS GURU: Editor Penugasan Multi-Mapel & Multi-Kelas -->
+				{#if type === 'user'}
+					<div class="pt-2 border-t border-slate-200 dark:border-slate-800">
+						<MultiMapelAssignmentEditor
+							bind:assignments
+							availableMapel={filteredMataPelajaran}
+							availableKelas={filteredKelasList}
+						/>
+					</div>
+				{:else if type === 'wali_kelas'}
+					<!-- Kelas untuk Wali Kelas -->
+					<div
+						tabindex="0"
+						role="button"
+						class="bg-base-200 border-base-300 collapse-arrow collapse"
+					>
+						<div class="collapse-title font-semibold">
+							Kelas yang Diampu {#if kelasIds.size > 0}
+								<span class="badge badge-sm badge-secondary">{kelasIds.size}</span>
+							{/if}
+						</div>
+						<div class="collapse-content text-sm">
+							<div class="space-y-3">
+								<p class="text-xs opacity-75">Pilih kelas yang diampu oleh Wali Kelas ini</p>
+								{#if filteredKelasList.length > 0}
+									<div class="space-y-2">
+										<label class="bg-base-300 flex cursor-pointer gap-2 rounded p-2 font-semibold">
+											<input
+												type="checkbox"
+												class="checkbox checkbox-sm"
+												checked={selectAllKelas}
+												onchange={toggleSelectAllKelas}
+											/>
+											<span class="text-sm">Pilih Semua</span>
+										</label>
+										{#each filteredKelasList as k (k.id)}
+											<label class="flex cursor-pointer gap-2">
+												<input
+													type="checkbox"
+													class="checkbox checkbox-sm"
+													checked={kelasIds.has(k.id)}
+													onchange={() => toggleKelas(k.id)}
+												/>
+												<span class="text-sm"
+													>{k.nama}
+													{#if k.fase}({k.fase}){/if}</span
+												>
+											</label>
+										{/each}
+									</div>
+								{:else}
+									<p class="text-xs opacity-75">- tidak ada kelas -</p>
+								{/if}
+							</div>
+						</div>
+					</div>
+				{/if}
 			</div>
 
-			<div class="modal-action sticky bottom-0 z-10">
+			<div
+				class="modal-action sticky bottom-0 z-10 pt-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"
+			>
 				<button
 					class="btn btn-soft shadow-none mr-auto"
 					type="button"

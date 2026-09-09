@@ -2,16 +2,17 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import db from '$lib/server/db';
 import {
-	tableAuthUser,
-	tableAuthUserKelas,
-	tableAuthUserMataPelajaran,
-	tableAuthUserPembelajaran,
 	tableAuthZitadelUser,
 	tableKelas,
 	tableMataPelajaran,
 	tablePegawai
 } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
+import {
+	getTeacherAssignments,
+	syncTeacherAssignments,
+	type GuruMapelAssignment
+} from '$lib/server/teacher-assignments';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) {
@@ -40,37 +41,20 @@ export const load: PageServerLoad = async ({ locals }) => {
 		sekolahId = firstSekolah?.id;
 	}
 
-	// Ambil mata pelajaran yang saat ini ditugaskan ke guru ini
-	const assignedMapelRows = await db
-		.select({
-			id: tableMataPelajaran.id,
-			nama: tableMataPelajaran.nama,
-			kode: tableMataPelajaran.kode,
-			kelasId: tableMataPelajaran.kelasId
-		})
-		.from(tableAuthUserMataPelajaran)
-		.innerJoin(
-			tableMataPelajaran,
-			eq(tableMataPelajaran.id, tableAuthUserMataPelajaran.mataPelajaranId)
-		)
-		.where(eq(tableAuthUserMataPelajaran.authUserId, userId));
+	// Ambil penugasan presisi guru saat ini (multi-mapel multi-kelas)
+	const assignedAssignments = await getTeacherAssignments(userId, locals.user.pegawaiId);
 
-	// Ambil kelas yang saat ini ditugaskan ke guru ini
-	const assignedKelasRows = await db
-		.select({
-			id: tableKelas.id,
-			nama: tableKelas.nama,
-			fase: tableKelas.fase
-		})
-		.from(tableAuthUserKelas)
-		.innerJoin(tableKelas, eq(tableKelas.id, tableAuthUserKelas.kelasId))
-		.where(eq(tableAuthUserKelas.authUserId, userId));
-
-	// Ambil seluruh daftar mata pelajaran aktif di sekolah (dari Dapodik/Rapkumer)
-	let availableMapel: { id: number; nama: string; kode: string | null }[] = [];
+	// Ambil seluruh daftar kelas aktif di sekolah ini
 	let availableKelas: { id: number; nama: string; fase: string | null }[] = [];
+	let availableMapel: { id: number; nama: string; kode: string | null }[] = [];
 
 	if (sekolahId) {
+		availableKelas = await db.query.tableKelas.findMany({
+			where: eq(tableKelas.sekolahId, sekolahId),
+			columns: { id: true, nama: true, fase: true },
+			orderBy: (table, { asc }) => [asc(table.nama)]
+		});
+
 		const rawMapel = await db
 			.select({
 				id: tableMataPelajaran.id,
@@ -81,7 +65,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			.innerJoin(tableKelas, eq(tableKelas.id, tableMataPelajaran.kelasId))
 			.where(eq(tableKelas.sekolahId, sekolahId));
 
-		// Deduplikasi nama mata pelajaran untuk pilihan yang bersih
+		// Deduplikasi nama mata pelajaran
 		const mapelMap = new Map<string, (typeof rawMapel)[0]>();
 		for (const m of rawMapel) {
 			const cleanName = (m.nama ?? '').trim();
@@ -90,20 +74,26 @@ export const load: PageServerLoad = async ({ locals }) => {
 			}
 		}
 		availableMapel = Array.from(mapelMap.values());
-
-		availableKelas = await db.query.tableKelas.findMany({
-			where: eq(tableKelas.sekolahId, sekolahId),
-			columns: { id: true, nama: true, fase: true },
-			orderBy: (table, { asc }) => [asc(table.nama)]
-		});
 	}
+
+	// Ambil informasi detail kelas yang saat ini ditugaskan untuk ringkasan UI
+	const allAssignedKelasIds = Array.from(new Set(assignedAssignments.flatMap((a) => a.kelasIds)));
+
+	const assignedKelasDetails =
+		allAssignedKelasIds.length > 0
+			? await db.query.tableKelas.findMany({
+					where: inArray(tableKelas.id, allAssignedKelasIds),
+					columns: { id: true, nama: true, fase: true },
+					orderBy: (table, { asc }) => [asc(table.nama)]
+				})
+			: [];
 
 	return {
 		user: locals.user,
 		pegawai,
 		zitadelUser,
-		assignedMapel: assignedMapelRows,
-		assignedKelas: assignedKelasRows,
+		assignedAssignments,
+		assignedKelasDetails,
 		availableMapel,
 		availableKelas
 	};
@@ -131,72 +121,68 @@ export const actions: Actions = {
 		if (!locals.user) throw redirect(303, '/login');
 
 		const formData = await request.formData();
-		const mapelIds = formData
-			.getAll('mapelIds')
-			.map((v) => Number(v))
-			.filter((n) => !Number.isNaN(n) && n > 0);
-		const kelasIds = formData
-			.getAll('kelasIds')
-			.map((v) => Number(v))
-			.filter((n) => !Number.isNaN(n) && n > 0);
-
 		const userId = locals.user.id;
+		const sekolahId = locals.user.sekolahId ?? locals.sekolah?.id ?? null;
 
-		try {
-			// 1. Update relasi mata pelajaran
-			await db
-				.delete(tableAuthUserMataPelajaran)
-				.where(eq(tableAuthUserMataPelajaran.authUserId, userId));
+		let assignments: GuruMapelAssignment[] = [];
 
-			for (const mapelId of mapelIds) {
-				await db.insert(tableAuthUserMataPelajaran).values({
-					authUserId: userId,
-					mataPelajaranId: mapelId
-				});
+		// 1. Coba parse dari format terstruktur JSON multi-mapel
+		const assignmentsRaw = formData.get('assignments');
+		if (assignmentsRaw && typeof assignmentsRaw === 'string') {
+			try {
+				const parsed = JSON.parse(assignmentsRaw);
+				if (Array.isArray(parsed)) {
+					assignments = parsed
+						.map((item: { mapelNama?: string; kelasIds?: number[] }) => ({
+							mapelNama: String(item.mapelNama ?? '').trim(),
+							kelasIds: Array.isArray(item.kelasIds)
+								? item.kelasIds.map(Number).filter((n) => !isNaN(n) && n > 0)
+								: []
+						}))
+						.filter((a) => a.mapelNama.length > 0 && a.kelasIds.length > 0);
+				}
+			} catch (err) {
+				console.warn('[onboarding] Gagal parse assignments JSON:', err);
 			}
+		}
 
-			// 2. Update relasi kelas
-			await db.delete(tableAuthUserKelas).where(eq(tableAuthUserKelas.authUserId, userId));
+		// 2. Fallback jika dikirim lewat format legacy terpisah
+		if (assignments.length === 0) {
+			const mapelIds = formData
+				.getAll('mapelIds')
+				.map((v) => Number(v))
+				.filter((n) => !Number.isNaN(n) && n > 0);
+			const kelasIds = formData
+				.getAll('kelasIds')
+				.map((v) => Number(v))
+				.filter((n) => !Number.isNaN(n) && n > 0);
 
-			for (const kelasId of kelasIds) {
-				await db.insert(tableAuthUserKelas).values({
-					authUserId: userId,
-					kelasId
-				});
-			}
-
-			// 3. Update relasi presisi pembelajaran (auth_user_pembelajaran)
-			await db
-				.delete(tableAuthUserPembelajaran)
-				.where(eq(tableAuthUserPembelajaran.authUserId, userId));
-
-			for (const mapelId of mapelIds) {
-				const mp = await db.query.tableMataPelajaran.findFirst({
-					where: eq(tableMataPelajaran.id, mapelId),
-					columns: { id: true, kelasId: true }
-				});
-				if (mp?.kelasId) {
-					try {
-						await db.insert(tableAuthUserPembelajaran).values({
-							authUserId: userId,
-							kelasId: mp.kelasId,
-							mataPelajaranId: mp.id
+			if (mapelIds.length > 0 && kelasIds.length > 0) {
+				for (const mapelId of mapelIds) {
+					const mp = await db.query.tableMataPelajaran.findFirst({
+						where: eq(tableMataPelajaran.id, mapelId),
+						columns: { nama: true }
+					});
+					if (mp?.nama) {
+						assignments.push({
+							mapelNama: mp.nama,
+							kelasIds
 						});
-					} catch {
-						// ignore duplicate
 					}
 				}
 			}
+		}
 
-			// Set primary mapel jika ada
-			if (mapelIds.length > 0) {
-				await db
-					.update(tableAuthUser)
-					.set({ mataPelajaranId: mapelIds[0] })
-					.where(eq(tableAuthUser.id, userId));
-			}
+		try {
+			// Simpan pemetaan presisi
+			await syncTeacherAssignments(db, {
+				authUserId: userId,
+				pegawaiId: locals.user.pegawaiId,
+				assignments,
+				sekolahId
+			});
 
-			// 3. Tandai onboarding selesai
+			// Tandai onboarding selesai
 			await db
 				.update(tableAuthZitadelUser)
 				.set({ isOnboarded: true })
