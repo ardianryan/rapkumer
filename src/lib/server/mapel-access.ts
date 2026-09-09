@@ -85,32 +85,47 @@ export async function getAksesMapelUser(
 
 	// 2. Jika targetKelasId diberikan, prioritaskan pengecekan presisi per kelas
 	if (targetKelasId) {
-		// A. Dari penugasan presisi auth_user_pembelajaran
-		const pembelajarans = await db.query.tableAuthUserPembelajaran.findMany({
-			columns: { mataPelajaranId: true },
-			where: and(
-				eq(tableAuthUserPembelajaran.authUserId, user.id),
-				eq(tableAuthUserPembelajaran.kelasId, targetKelasId)
-			)
+		const userHasCustomPembelajaran = await db.query.tableAuthUserPembelajaran.findFirst({
+			columns: { id: true },
+			where: eq(tableAuthUserPembelajaran.authUserId, user.id)
 		});
 
-		// B. Dari pengampu langsung di tabel mata_pelajaran (sinkron Dapodik)
-		const pengampus = pegawaiId
-			? await db.query.tableMataPelajaran.findMany({
-					columns: { id: true },
-					where: and(
-						eq(tableMataPelajaran.kelasId, targetKelasId),
-						eq(tableMataPelajaran.pengampuId, pegawaiId)
-					)
-				})
-			: [];
+		let targetMapelIds: Set<number>;
 
-		const targetMapelIds = new Set<number>([
-			...pembelajarans.map((p) => p.mataPelajaranId),
-			...pengampus.map((p) => p.id)
-		]);
+		if (userHasCustomPembelajaran) {
+			// A. Dari penugasan presisi auth_user_pembelajaran (mapping mandiri/admin)
+			// Jika guru memiliki penugasan khusus, HANYA gunakan data penugasan tersebut
+			// agar tidak mengubah atau merusak aturan data Dapodik.
+			const pembelajarans = await db.query.tableAuthUserPembelajaran.findMany({
+				columns: { mataPelajaranId: true },
+				where: and(
+					eq(tableAuthUserPembelajaran.authUserId, user.id),
+					eq(tableAuthUserPembelajaran.kelasId, targetKelasId)
+				)
+			});
+			targetMapelIds = new Set<number>(pembelajarans.map((p) => p.mataPelajaranId));
 
-		// Jika ditemukan penugasan presisi untuk kelas ini, HANYA gunakan mapel kelas ini!
+			// Jika user memiliki penugasan khusus tapi tidak mengajar di kelas target ini,
+			// jangan berikan akses mapel di kelas target ini (jangan jatuh ke fallback general).
+			if (targetMapelIds.size === 0) {
+				return { ids: new Set(), names: new Set(), rawNames: new Set() };
+			}
+		} else {
+			// B. Dari pengampu langsung di tabel mata_pelajaran (sinkron bawaan Dapodik)
+			// Hanya dipakai jika guru belum memiliki konfigurasi penugasan mandiri.
+			const pengampus = pegawaiId
+				? await db.query.tableMataPelajaran.findMany({
+						columns: { id: true },
+						where: and(
+							eq(tableMataPelajaran.kelasId, targetKelasId),
+							eq(tableMataPelajaran.pengampuId, pegawaiId)
+						)
+					})
+				: [];
+			targetMapelIds = new Set<number>(pengampus.map((p) => p.id));
+		}
+
+		// Jika ditemukan penugasan untuk kelas ini, HANYA gunakan mapel kelas ini!
 		if (targetMapelIds.size > 0) {
 			const intiRows = await db.query.tableMataPelajaran.findMany({
 				columns: { id: true, kelasId: true, nama: true, dapodikPembelajaranId: true },
@@ -159,8 +174,8 @@ export async function getAksesMapelUser(
 	const ids = new Set(assigned.map((row) => row.mataPelajaranId));
 	if (user.mataPelajaranId) ids.add(user.mataPelajaranId);
 
-	// Tambahkan juga mapel dari pengampuId jika ada
-	if (pegawaiId) {
+	// Tambahkan juga mapel dari pengampuId bawaan Dapodik HANYA jika belum ada assignment khusus
+	if (ids.size === 0 && pegawaiId) {
 		const pengampusAll = await db.query.tableMataPelajaran.findMany({
 			columns: { id: true },
 			where: eq(tableMataPelajaran.pengampuId, pegawaiId)

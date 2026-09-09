@@ -6,7 +6,7 @@ import {
 	tableAuthUserPembelajaran,
 	tableMataPelajaran
 } from '$lib/server/db/schema';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 export type GuruMapelAssignment = {
 	mapelNama: string;
@@ -20,6 +20,12 @@ function norm(str: string | null | undefined): string {
 /**
  * Mengambil penugasan mapel & kelas seorang guru dari database,
  * dikelompokkan berdasarkan nama mata pelajaran -> daftar ID kelas yang diajar.
+ *
+ * Kebijakan Data Bersih (Safe & Clean):
+ * 1. Jika guru sudah memiliki penugasan di auth_user_pembelajaran (hasil mapping mandiri/admin),
+ *    maka HANYA data tersebut yang digunakan (tidak mencampur atau merusak data Dapodik).
+ * 2. Jika belum ada di auth_user_pembelajaran, gunakan data pengampu bawaan tarikan Dapodik
+ *    sebagai default awal sebelum guru/admin melakukan mapping mandiri.
  */
 export async function getTeacherAssignments(
 	authUserId: number,
@@ -27,7 +33,7 @@ export async function getTeacherAssignments(
 ): Promise<GuruMapelAssignment[]> {
 	if (!authUserId || authUserId <= 0) return [];
 
-	// 1. Ambil dari tableAuthUserPembelajaran (penugasan presisi)
+	// 1. Ambil dari tableAuthUserPembelajaran (penugasan presisi tingkat pengguna)
 	const pembelajaranRows = await db
 		.select({
 			kelasId: tableAuthUserPembelajaran.kelasId,
@@ -41,7 +47,29 @@ export async function getTeacherAssignments(
 		)
 		.where(eq(tableAuthUserPembelajaran.authUserId, authUserId));
 
-	// 2. Ambil dari pengampuId pada tableMataPelajaran jika ada pegawaiId
+	// Jika guru sudah memiliki data penugasan presisi, gunakan data ini sepenuhnya
+	if (pembelajaranRows.length > 0) {
+		const mapelGroup = new Map<string, { displayNama: string; kelasIds: Set<number> }>();
+		for (const row of pembelajaranRows) {
+			const rawName = (row.mapelNama ?? '').trim();
+			const key = norm(rawName);
+			if (!key) continue;
+
+			if (!mapelGroup.has(key)) {
+				mapelGroup.set(key, { displayNama: rawName, kelasIds: new Set<number>() });
+			}
+			if (row.kelasId && row.kelasId > 0) {
+				mapelGroup.get(key)!.kelasIds.add(row.kelasId);
+			}
+		}
+
+		return Array.from(mapelGroup.values()).map((g) => ({
+			mapelNama: g.displayNama,
+			kelasIds: Array.from(g.kelasIds).sort((a, b) => a - b)
+		}));
+	}
+
+	// 2. Default awal: Jika belum pernah dikonfigurasi mandiri, ambil dari pengampuId bawaan Dapodik
 	const pengampuRows = pegawaiId
 		? await db
 				.select({
@@ -53,74 +81,77 @@ export async function getTeacherAssignments(
 				.where(eq(tableMataPelajaran.pengampuId, pegawaiId))
 		: [];
 
-	// Kelompokkan berdasarkan normalized nama mata pelajaran
-	const mapelGroup = new Map<string, { displayNama: string; kelasIds: Set<number> }>();
-
-	for (const row of [...pembelajaranRows, ...pengampuRows]) {
-		const rawName = (row.mapelNama ?? '').trim();
-		const key = norm(rawName);
-		if (!key) continue;
-
-		if (!mapelGroup.has(key)) {
-			mapelGroup.set(key, { displayNama: rawName, kelasIds: new Set<number>() });
-		}
-		if (row.kelasId && row.kelasId > 0) {
-			mapelGroup.get(key)!.kelasIds.add(row.kelasId);
-		}
-	}
-
-	// 3. Fallback jika belum pernah ada pembelajaran / pengampu
-	if (mapelGroup.size === 0) {
-		const userMapel = await db
-			.select({
-				id: tableMataPelajaran.id,
-				nama: tableMataPelajaran.nama,
-				kelasId: tableMataPelajaran.kelasId
-			})
-			.from(tableAuthUserMataPelajaran)
-			.innerJoin(
-				tableMataPelajaran,
-				eq(tableMataPelajaran.id, tableAuthUserMataPelajaran.mataPelajaranId)
-			)
-			.where(eq(tableAuthUserMataPelajaran.authUserId, authUserId));
-
-		const userKelas = await db
-			.select({ kelasId: tableAuthUserKelas.kelasId })
-			.from(tableAuthUserKelas)
-			.where(eq(tableAuthUserKelas.authUserId, authUserId));
-
-		const assignedKelasIds = userKelas.map((k) => k.kelasId).filter(Boolean);
-
-		for (const m of userMapel) {
-			const rawName = (m.nama ?? '').trim();
+	if (pengampuRows.length > 0) {
+		const mapelGroup = new Map<string, { displayNama: string; kelasIds: Set<number> }>();
+		for (const row of pengampuRows) {
+			const rawName = (row.mapelNama ?? '').trim();
 			const key = norm(rawName);
 			if (!key) continue;
 
 			if (!mapelGroup.has(key)) {
-				// Hubungkan ke kelas-kelas yang di-assign ke guru ini
-				const kIds = new Set<number>(assignedKelasIds);
-				if (m.kelasId) kIds.add(m.kelasId);
-				mapelGroup.set(key, { displayNama: rawName, kelasIds: kIds });
+				mapelGroup.set(key, { displayNama: rawName, kelasIds: new Set<number>() });
+			}
+			if (row.kelasId && row.kelasId > 0) {
+				mapelGroup.get(key)!.kelasIds.add(row.kelasId);
 			}
 		}
+
+		return Array.from(mapelGroup.values()).map((g) => ({
+			mapelNama: g.displayNama,
+			kelasIds: Array.from(g.kelasIds).sort((a, b) => a - b)
+		}));
 	}
 
-	// Format ke Array of GuruMapelAssignment
-	const result: GuruMapelAssignment[] = [];
-	for (const group of mapelGroup.values()) {
-		if (group.kelasIds.size > 0) {
-			result.push({
-				mapelNama: group.displayNama,
-				kelasIds: Array.from(group.kelasIds).sort((a, b) => a - b)
-			});
+	// 3. Fallback jika belum pernah ada pembelajaran / pengampu
+	const userMapel = await db
+		.select({
+			id: tableMataPelajaran.id,
+			nama: tableMataPelajaran.nama,
+			kelasId: tableMataPelajaran.kelasId
+		})
+		.from(tableAuthUserMataPelajaran)
+		.innerJoin(
+			tableMataPelajaran,
+			eq(tableMataPelajaran.id, tableAuthUserMataPelajaran.mataPelajaranId)
+		)
+		.where(eq(tableAuthUserMataPelajaran.authUserId, authUserId));
+
+	const userKelas = await db
+		.select({ kelasId: tableAuthUserKelas.kelasId })
+		.from(tableAuthUserKelas)
+		.where(eq(tableAuthUserKelas.authUserId, authUserId));
+
+	const assignedKelasIds = userKelas.map((k) => k.kelasId).filter(Boolean);
+
+	const mapelGroup = new Map<string, { displayNama: string; kelasIds: Set<number> }>();
+	for (const m of userMapel) {
+		const rawName = (m.nama ?? '').trim();
+		const key = norm(rawName);
+		if (!key) continue;
+
+		if (!mapelGroup.has(key)) {
+			const kIds = new Set<number>(assignedKelasIds);
+			if (m.kelasId) kIds.add(m.kelasId);
+			mapelGroup.set(key, { displayNama: rawName, kelasIds: kIds });
 		}
 	}
 
-	return result;
+	return Array.from(mapelGroup.values())
+		.filter((g) => g.kelasIds.size > 0)
+		.map((g) => ({
+			mapelNama: g.displayNama,
+			kelasIds: Array.from(g.kelasIds).sort((a, b) => a - b)
+		}));
 }
 
 /**
- * Menyimpan pemetaan multi-kelas multi-mapel secara transaksional dan presisi.
+ * Menyimpan pemetaan multi-kelas multi-mapel guru secara transaksional dan presisi.
+ *
+ * PENTING:
+ * Fungsi ini HANYA mengelola hak akses akun guru (auth_user_pembelajaran, auth_user_kelas,
+ * auth_user_mata_pelajaran, dan izin akun).
+ * Fungsi ini TIDAK MENGUBAH tabel mata_pelajaran atau kolom pengampu_id Dapodik sama sekali,
+ * sehingga data dan aturan tarikan Dapodik tetap 100% aman, asli, dan bersih.
  */
 export async function syncTeacherAssignments(
 	client: typeof db,
@@ -135,7 +166,7 @@ export async function syncTeacherAssignments(
 	allKelasIds: number[];
 	pembelajaranList: Array<{ kelasId: number; mataPelajaranId: number }>;
 }> {
-	const { authUserId, pegawaiId, assignments } = params;
+	const { authUserId, assignments } = params;
 	const timestamp = new Date().toISOString();
 
 	// 1. Bersihkan dan normalisasi input assignments
@@ -169,7 +200,8 @@ export async function syncTeacherAssignments(
 		kelasIds: seenMapel.get(norm(a.mapelNama)) ?? a.kelasIds
 	}));
 
-	// 2. Cari atau buat entri tableMataPelajaran untuk setiap pasangan (kelasId, mapelNama)
+	// 2. Hubungkan ke data riil tableMataPelajaran yang sudah ada di sekolah/kelas
+	// (Tidak membuat mapel buatan di tableMataPelajaran agar data Dapodik tetap bersih)
 	const matchedPembelajaran: Array<{ kelasId: number; mataPelajaranId: number }> = [];
 	const resolvedMapelIds = new Set<number>();
 	const resolvedKelasIds = new Set<number>();
@@ -180,7 +212,7 @@ export async function syncTeacherAssignments(
 		for (const kelasId of assignment.kelasIds) {
 			resolvedKelasIds.add(kelasId);
 
-			// Cek apakah mata pelajaran sudah ada di kelas ini
+			// Cocokkan dengan entri mata pelajaran yang ada di kelas ini
 			const existingMp = await client.query.tableMataPelajaran.findFirst({
 				where: and(
 					eq(tableMataPelajaran.kelasId, kelasId),
@@ -188,37 +220,11 @@ export async function syncTeacherAssignments(
 				)
 			});
 
-			let targetMapelId: number | null = existingMp?.id ?? null;
-
-			// Jika belum ada di kelas ini, cari template dari kelas lain di sekolah ini untuk dicopy datanya
-			if (!targetMapelId) {
-				const templateMp = await client.query.tableMataPelajaran.findFirst({
-					where: sql`LOWER(TRIM(${tableMataPelajaran.nama})) = ${mapelNameKey}`
-				});
-
-				const [inserted] = await client
-					.insert(tableMataPelajaran)
-					.values({
-						kelasId,
-						nama: assignment.mapelNama.trim(),
-						namaLokal: templateMp?.namaLokal ?? null,
-						kode: templateMp?.kode ?? null,
-						jenis: templateMp?.jenis ?? 'belum_dipetakan',
-						kkm: templateMp?.kkm ?? 0,
-						pengampuId: pegawaiId ?? null
-					})
-					.returning({ id: tableMataPelajaran.id });
-
-				if (inserted?.id) {
-					targetMapelId = inserted.id;
-				}
-			}
-
-			if (targetMapelId) {
-				resolvedMapelIds.add(targetMapelId);
+			if (existingMp?.id) {
+				resolvedMapelIds.add(existingMp.id);
 				matchedPembelajaran.push({
 					kelasId,
-					mataPelajaranId: targetMapelId
+					mataPelajaranId: existingMp.id
 				});
 			}
 		}
@@ -227,7 +233,7 @@ export async function syncTeacherAssignments(
 	const allMataPelajaranIds = Array.from(resolvedMapelIds);
 	const allKelasIds = Array.from(resolvedKelasIds);
 
-	// 3. Update tableAuthUserPembelajaran (penugasan presisi)
+	// 3. Update tableAuthUserPembelajaran (penugasan presisi tingkat pengguna)
 	await client
 		.delete(tableAuthUserPembelajaran)
 		.where(eq(tableAuthUserPembelajaran.authUserId, authUserId));
@@ -283,39 +289,7 @@ export async function syncTeacherAssignments(
 		}
 	}
 
-	// 6. Sinkronisasi pengampuId pada tableMataPelajaran (agar Distribusi Guru & Dapodik sinkron)
-	if (pegawaiId) {
-		// A. Mapel yang tidak lagi diajar oleh pegawai ini -> lepaskan pengampu
-		if (allMataPelajaranIds.length > 0) {
-			await client
-				.update(tableMataPelajaran)
-				.set({ pengampuId: null })
-				.where(
-					and(
-						eq(tableMataPelajaran.pengampuId, pegawaiId),
-						sql`${tableMataPelajaran.id} NOT IN (${sql.join(
-							allMataPelajaranIds.map((id) => sql`${id}`),
-							sql`, `
-						)})`
-					)
-				);
-		} else {
-			await client
-				.update(tableMataPelajaran)
-				.set({ pengampuId: null })
-				.where(eq(tableMataPelajaran.pengampuId, pegawaiId));
-		}
-
-		// B. Set pengampuId untuk semua mapel yang baru di-assign
-		if (allMataPelajaranIds.length > 0) {
-			await client
-				.update(tableMataPelajaran)
-				.set({ pengampuId: pegawaiId })
-				.where(inArray(tableMataPelajaran.id, allMataPelajaranIds));
-		}
-	}
-
-	// 7. Update tableAuthUser: primary mapel, primary kelas, dan permission kelas_pindah
+	// 6. Update tableAuthUser: primary mapel, primary kelas, dan permission kelas_pindah
 	const currentUser = await client.query.tableAuthUser.findFirst({
 		where: eq(tableAuthUser.id, authUserId),
 		columns: { permissions: true, type: true }
@@ -327,8 +301,8 @@ export async function syncTeacherAssignments(
 			: [];
 
 		// Jika guru mengajar lebih dari 1 kelas, berikan izin pindah kelas
-		if (allKelasIds.length > 1 && !perms.includes('kelas_pindah' as UserPermission)) {
-			perms.push('kelas_pindah' as UserPermission);
+		if (allKelasIds.length > 1 && !perms.includes('kelas_pindah')) {
+			perms.push('kelas_pindah');
 		}
 
 		await client
