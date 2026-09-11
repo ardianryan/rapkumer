@@ -57,3 +57,6 @@ vite.config.ts.timestamp-*
 # ai local config
 opencode.json
 openclaw.json
+
+# Strix pentest output
+/strix_runs

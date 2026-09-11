@@ -13,6 +13,13 @@
 		return (perms as string[]).includes('dashboard_manage');
 	});
 
+	// Backup endpoint is admin-only server-side; mirror that so the button is not
+	// shown enabled to a non-admin who merely has dashboard_manage.
+	let canDownloadBackup = $derived.by(() => {
+		const type = page.data.user?.type;
+		return type === 'admin' || type === 'kepala_sekolah';
+	});
+
 	let downloadingBackup = $state(false);
 
 	const handleBackupDownload = async () => {
@@ -91,12 +98,12 @@
 			<div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
 				<button
 					type="button"
-					onclick={() => (canDashboardManage ? handleBackupDownload() : undefined)}
+					onclick={() => (canDownloadBackup ? handleBackupDownload() : undefined)}
 					class="btn btn-outline btn-accent w-full shadow-none"
-					disabled={downloadingBackup || !canDashboardManage}
-					aria-disabled={!canDashboardManage}
+					disabled={downloadingBackup || !canDownloadBackup}
+					aria-disabled={!canDownloadBackup}
 					aria-busy={downloadingBackup}
-					title={!canDashboardManage
+					title={!canDownloadBackup
 						? 'Anda tidak memiliki izin untuk melakukan tindakan cepat'
 						: ''}
 				>

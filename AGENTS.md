@@ -18,6 +18,7 @@ pnpm check                   # svelte-kit sync + svelte-check
 pnpm check:watch             # svelte-kit sync + svelte-check --watch
 pnpm lint                    # prettier --check . && eslint .
 pnpm format                  # prettier --write . (tabs, single quotes, no trailing comma, width 100)
+strix -n -t ./ --scan-mode quick   # AI pentest (install & usage: docs/SKILLS.md)
 ```
 
 ## Stack
@@ -39,6 +40,8 @@ pnpm format                  # prettier --write . (tabs, single quotes, no trail
 - `src/lib/server/db/ensure-*.ts` — schema migration helpers, run on first request.
 - `src/lib/server/pdf/templates/` — PagedJS rapor/cover/biodata/piagam/keasramaan HTML templates.
 - `installer/` — InnoSetup script + packaging config for Windows builds.
+- `docs/` — development reference (setup, daof, development, Strix pentesting: `docs/SKILLS.md`).
+- `.agents/skills/` — Strix pentest skills + bahasa writing skills; opencode discovers these automatically.
 - `$lib/utils.ts` — `cookieNames`, `flatten`/`unflatten`/`populateForm`, `modalRoute`.
 
 ## UI conventions
@@ -127,3 +130,11 @@ The 4 logic blocks below are **mutually exclusive** — gated by `isWaliKelasMas
 
 - Run `pnpm lint` then `pnpm check` before committing.
 - No test framework wired (vitest/playwright absent).
+
+## Security (Strix)
+
+AI pentest for this repo: `docs/SKILLS.md`. Quick command:
+```sh
+strix -n -t ./ --scan-mode quick --max-budget 15
+```
+Output goes to `strix_runs/` (gitignored). Skills live in `.agents/skills/`; restart opencode session after adding new skills.

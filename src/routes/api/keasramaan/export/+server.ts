@@ -8,6 +8,8 @@ import {
 import { asc, eq } from 'drizzle-orm';
 import ExcelJS from 'exceljs';
 import { cookieNames } from '$lib/utils';
+import { isAuthorizedUser } from '../../../pengguna/permissions';
+import { canAccessKelas } from '$lib/server/kelas-akses';
 
 function isTableMissingError(error: unknown) {
 	if (error instanceof Error) {
@@ -18,6 +20,20 @@ function isTableMissingError(error: unknown) {
 
 export async function POST({ cookies, locals }) {
 	try {
+		const user = locals.user;
+		if (!user) {
+			return new Response(JSON.stringify({ fail: 'Harus login terlebih dahulu.' }), {
+				status: 401,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
+		if (!isAuthorizedUser(['mata_pelajaran_keasramaan'], user)) {
+			return new Response(JSON.stringify({ fail: 'Anda tidak memiliki izin.' }), {
+				status: 403,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
+
 		const kelasIdCookie = cookies.get(cookieNames.ACTIVE_KELAS_ID) || null;
 		const kelasId = kelasIdCookie ? Number(kelasIdCookie) : null;
 		if (!kelasId || !Number.isFinite(kelasId)) {
@@ -31,6 +47,13 @@ export async function POST({ cookies, locals }) {
 		if (!sekolahId) {
 			return new Response(JSON.stringify({ fail: 'Pilih sekolah aktif terlebih dahulu.' }), {
 				status: 400,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
+
+		if (!(await canAccessKelas(user, sekolahId, kelasId))) {
+			return new Response(JSON.stringify({ fail: 'Anda tidak memiliki izin untuk kelas ini.' }), {
+				status: 403,
 				headers: { 'Content-Type': 'application/json' }
 			});
 		}
