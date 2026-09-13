@@ -26,6 +26,7 @@ import { ensurePresensiSettingsSchema } from './ensure-presensi-settings';
 import { ensureZitadelSchema } from './ensure-zitadel';
 import { ensurePembelajaranSchema } from './ensure-pembelajaran';
 import { ensureNilaiAkhirMapelSchema } from './ensure-nilai-akhir-mapel';
+import { ensureModulAjarSchema } from './ensure-modul-ajar';
 import { resetEnsuredSchemas } from './ensure-helper';
 
 let startupEnsuresDone = false;
@@ -73,6 +74,7 @@ export async function runStartupEnsures() {
 			await ensureZitadelSchema();
 			await ensurePembelajaranSchema();
 			await ensureNilaiAkhirMapelSchema();
+			await ensureModulAjarSchema();
 			startupEnsuresDone = true;
 		} finally {
 			startupEnsuresPromise = null;

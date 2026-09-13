@@ -97,6 +97,11 @@ export const appMenuItems: MenuItem[] = [
 				path: '/jurnal-mengajar'
 			},
 			{
+				title: 'Modul Ajar',
+				path: '/modul-ajar',
+				tags: ['modul ajar', 'rpp', 'rpm', 'pembelajaran mendalam', 'deep learning']
+			},
+			{
 				title: 'Catatan Wali Kelas',
 				path: '/catatan-wali-kelas'
 			},

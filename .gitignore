@@ -37,6 +37,7 @@ vite.config.ts.timestamp-*
 /data/sounds
 # Dinas luar attachments (undangan PDF, SPPD bukti PDF & foto)
 /data/dinas-luar
+*.docx
 
 #cert
 /installer/cert
