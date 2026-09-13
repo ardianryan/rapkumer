@@ -446,7 +446,7 @@ export async function runDapodikSync(options: {
 	await syncEkskul(muridIndex, rombelLoad.rows, sections);
 
 	// 10b. Mata Pelajaran Pilihan — rombel jenis 16 di getRombonganBelajar (Fase F SMA/SMK).
-	await syncMapelPilihan(muridIndex, rombelLoad.rows, ptkIndex, sections);
+	await syncMapelPilihan(muridIndex, rombelLoad.rows, ptkIndex, sections, semesterTarget.id);
 
 	// 11. Referensi mata pelajaran nasional (getMataPelajaran) — cache lokal untuk
 	//     pemetaan mapel buatan sekolah ke ID Dapodik saat posting nilai.
@@ -2252,7 +2252,8 @@ async function syncMapelPilihan(
 	muridIndex: MuridIndex,
 	rombelRows: Row[],
 	ptkIndex: PegawaiIndex,
-	sections: DapodikSectionLog[]
+	sections: DapodikSectionLog[],
+	semesterId?: number
 ) {
 	try {
 		const pilihanRombels = rombelRows.filter((row) => intOrNull(row['jenis_rombel']) === 16);
@@ -2265,11 +2266,20 @@ async function syncMapelPilihan(
 			return;
 		}
 
+		// Daftar kelas reguler pada semester target untuk fallback pencocokan jika anggota_rombel di Dapodik masih kosong
+		const kelasList = semesterId
+			? await db.query.tableKelas.findMany({
+					where: eq(tableKelas.semesterId, semesterId)
+				})
+			: [];
+		const sortedKelas = [...kelasList].sort((a, b) => b.nama.length - a.nama.length);
+
 		let mapelCreated = 0;
 		let membersLinked = 0;
 
 		for (const row of pilihanRombels) {
 			const rombelPilihanId = str(row, 'rombongan_belajar_id');
+			const rombelNama = str(row, 'nama') ?? '';
 			const pbRows = rowsOf(row['pembelajaran']);
 			for (const pb of pbRows) {
 				const namaMapel = str(pb, 'nama_mata_pelajaran') ?? str(pb, 'nama');
@@ -2292,6 +2302,17 @@ async function syncMapelPilihan(
 					const list = perKelas.get(murid.kelasId) ?? [];
 					list.push({ muridId: murid.id, anggotaRombelId });
 					perKelas.set(murid.kelasId, list);
+				}
+
+				// Fallback jika rombel pilihan di Dapodik belum ada anggotanya (anggota_rombel masih kosong):
+				// Cocokkan kelas reguler dari prefix nama rombel (mis. 'X-10 KODING' -> kelas 'X-10').
+				if (perKelas.size === 0 && sortedKelas.length > 0) {
+					const matched = sortedKelas.find(
+						(k) => rombelNama.startsWith(k.nama + ' ') || rombelNama === k.nama
+					);
+					if (matched) {
+						perKelas.set(matched.id, []);
+					}
 				}
 
 				const now = new Date().toISOString();
@@ -2320,12 +2341,21 @@ async function syncMapelPilihan(
 					}
 
 					// Cari atau buat mapel berjenis 'pilihan' di kelas ini
-					let mapel = await db.query.tableMataPelajaran.findFirst({
-						where: and(
-							eq(tableMataPelajaran.kelasId, kelasId),
-							eq(tableMataPelajaran.nama, namaMapel)
-						)
-					});
+					let mapel =
+						(pembelajaranId
+							? await db.query.tableMataPelajaran.findFirst({
+									where: and(
+										eq(tableMataPelajaran.kelasId, kelasId),
+										eq(tableMataPelajaran.dapodikPembelajaranId, pembelajaranId)
+									)
+								})
+							: null) ??
+						(await db.query.tableMataPelajaran.findFirst({
+							where: and(
+								eq(tableMataPelajaran.kelasId, kelasId),
+								eq(tableMataPelajaran.nama, namaMapel)
+							)
+						}));
 
 					if (!mapel) {
 						const [{ maxUrutan }] = await db
