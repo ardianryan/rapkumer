@@ -24,6 +24,8 @@ import { waktuToLocalDate } from '$lib/server/absen/utils';
 import { isSchoolDay } from '$lib/hari-sekolah';
 import ExcelJS from 'exceljs';
 import { error } from '@sveltejs/kit';
+import { isAuthorizedUser } from '../../../pengguna/permissions';
+import { canAccessKelas } from '$lib/server/kelas-akses';
 
 function getDaysInMonth(year: number, month: number) {
 	return new Date(year, month, 0).getDate();
@@ -65,6 +67,14 @@ export async function POST({ cookies, locals, request }) {
 
 	if (locals.user.type === 'user') {
 		throw error(403, 'Anda tidak memiliki izin untuk mengunduh rekap kehadiran.');
+	}
+
+	if (!isAuthorizedUser(['administrasi_absen'], locals.user)) {
+		throw error(403, 'Anda tidak memiliki izin untuk mengunduh rekap kehadiran.');
+	}
+
+	if (!(await canAccessKelas(locals.user, sekolahId, kelasAktifId))) {
+		throw error(403, 'Anda tidak memiliki izin untuk kelas ini.');
 	}
 
 	const body = await request.json();

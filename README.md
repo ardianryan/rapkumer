@@ -128,6 +128,22 @@ Lokasi database lokal:
 data/database.sqlite3
 ```
 
+### Skills untuk AI Coding Agent (opencode)
+
+Skills (instruksi untuk agent coding) disimpan di folder `.agents/skills/` dan dibaca otomatis oleh opencode. Terdapat dua kelompok:
+
+- **Strix (security testing):** 9 skill untuk menjalankan AI pentest, memperbaiki temuan keamanan, dan menyiapkan CI scanning. Cara install/pembaruan:
+
+  ```sh
+  npx skills add usestrix/strix
+  ```
+
+  Panduan instalasi Strix CLI, konfigurasi LLM, dan perintah scan tersedia di `docs/SKILLS.md`.
+
+- **Bahasa Indonesia:** skill `bahasa-inti` (aturan inti penulisan bahasa Indonesia) dan `bahasa-website` (penulisan UX/microcopy) — sudah termasuk di repository.
+
+Restart ulang session opencode setelah menambah atau memperbarui skills agar dikenali.
+
 ## Struktur Proyek (Singkat)
 
 - `src/` — Kode sumber aplikasi SvelteKit (komponen, route, dan server).

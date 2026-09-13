@@ -2,8 +2,13 @@ import { error } from '@sveltejs/kit';
 import { readFile, stat } from 'node:fs/promises';
 import db from '$lib/server/db';
 import { resolveDatabasePath } from '$lib/server/db-url';
+import { isAdminUser } from '../../../pengguna/permissions';
 
-export async function GET() {
+export async function GET({ locals }) {
+	const user = locals.user;
+	if (!isAdminUser(user)) {
+		throw error(403, 'Hanya admin dan kepala sekolah yang dapat mengunduh backup database.');
+	}
 	// Handle PostgreSQL
 	if (db.$client?.isPostgres) {
 		try {
