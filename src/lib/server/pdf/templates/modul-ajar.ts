@@ -29,6 +29,8 @@ export interface ModulAjarPrintData {
 
 export function renderModulAjarHTML(data: ModulAjarPrintData): string {
 	const { identitas, konten, kepalaSekolah, ttd } = data;
+	const jabatanKepala =
+		kepalaSekolah.statusKepalaSekolah === 'plt' ? 'Plt. Kepala Sekolah' : 'Kepala Sekolah';
 
 	const dimensiRows = (konten.identifikasi?.dimensiProfilLulusan || [])
 		.map(
@@ -526,7 +528,7 @@ ul, ol {
 		<tr>
 			<td>
 				<p>Mengetahui,</p>
-				<p>${formatValue(kepalaSekolah.statusKepalaSekolah || 'Kepala Sekolah')}</p>
+				<p>${escHtml(jabatanKepala)}</p>
 				<div class="ttd-space"></div>
 				<p class="font-bold" style="text-decoration: underline;">${formatValue(kepalaSekolah.nama)}</p>
 				<p>NIP. ${formatValue(kepalaSekolah.nip)}</p>
