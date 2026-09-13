@@ -172,6 +172,29 @@
 		}
 	];
 
+	const allTabs = [
+		{ id: 'identitas' as TabKey, label: 'A. Identitas & AI', shortLabel: 'A. Identitas' },
+		{ id: 'identifikasi' as TabKey, label: 'B. Identifikasi', shortLabel: 'B. Identifikasi' },
+		{ id: 'desain' as TabKey, label: 'C. Desain Pembelajaran', shortLabel: 'C. Desain' },
+		{ id: 'memahami' as TabKey, label: 'D. Tahap 1: Memahami', shortLabel: 'D. Memahami' },
+		{
+			id: 'mengaplikasi' as TabKey,
+			label: 'E. Tahap 2: Mengaplikasi',
+			shortLabel: 'E. Mengaplikasi'
+		},
+		{ id: 'merefleksi' as TabKey, label: 'F. Tahap 3: Merefleksi', shortLabel: 'F. Merefleksi' },
+		{ id: 'asesmen' as TabKey, label: 'G. Asesmen Pembelajaran', shortLabel: 'G. Asesmen' },
+		{ id: 'rubrik' as TabKey, label: 'H. Rubrik 4 Skala', shortLabel: 'H. Rubrik' },
+		{
+			id: 'diferensiasi' as TabKey,
+			label: 'I. Diferensiasi Belajar',
+			shortLabel: 'I. Diferensiasi'
+		},
+		{ id: 'remedial' as TabKey, label: 'J. Remedial & Pengayaan', shortLabel: 'J. Remedial' },
+		{ id: 'refleksi' as TabKey, label: 'K. Refleksi Guru', shortLabel: 'K. Refleksi' },
+		{ id: 'lampiran' as TabKey, label: 'L. Lampiran & Glosarium', shortLabel: 'L. Lampiran' }
+	];
+
 	// Filtered modul ajar
 	const listModul = $derived(
 		(data.daftarModulAjar || []).filter((m) =>
@@ -571,26 +594,24 @@
 	{/if}
 </div>
 
-<!-- MODAL EDITOR & AI GENERATOR (SPLIT-WORKSPACE REDESIGN) -->
+<!-- MODAL EDITOR & AI GENERATOR (RESPONSIVE SPLIT-WORKSPACE) -->
 {#if showModal}
-	<div class="modal modal-open z-50 p-2 sm:p-4">
+	<dialog class="modal modal-open modal-bottom sm:modal-middle z-50 p-0 sm:p-4" open>
 		<div
-			class="modal-box w-full max-w-6xl h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl rounded-2xl border border-base-300 bg-base-100"
+			class="modal-box w-full max-w-6xl h-[92dvh] sm:h-[90vh] max-h-[92dvh] sm:max-h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-2xl border border-base-300 bg-base-100"
 		>
 			<!-- Modal Top Header -->
 			<div
-				class="flex items-center justify-between px-6 py-3.5 border-b border-base-200 bg-base-100 shrink-0"
+				class="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5 border-b border-base-200 bg-base-100 shrink-0"
 			>
-				<div class="flex items-center gap-3">
-					<div class="p-2.5 rounded-xl bg-primary/10 text-primary">
+				<div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+					<div class="p-2 sm:p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
 						<Icon name={editId > 0 ? 'edit' : 'book'} />
 					</div>
-					<div>
+					<div class="min-w-0">
 						<div class="flex items-center gap-2">
-							<h2 class="text-base sm:text-lg font-bold">
-								{editId > 0
-									? 'Edit Modul Ajar Pembelajaran Mendalam'
-									: 'Buat Modul Ajar Pembelajaran Mendalam'}
+							<h2 class="text-sm sm:text-lg font-bold truncate">
+								{editId > 0 ? 'Edit Modul Ajar' : 'Buat Modul Ajar'}
 							</h2>
 							<span
 								class="badge badge-xs {statusModul === 'final'
@@ -600,15 +621,15 @@
 								{statusModul}
 							</span>
 						</div>
-						<p class="text-xs text-base-content/60">
-							{selectedMapelNama} • Format 12 Bagian Pengawas & Standar Kaidah EYD V
+						<p class="text-[11px] sm:text-xs text-base-content/60 truncate">
+							{selectedMapelNama} • Format 12 Bagian Pembelajaran Mendalam
 						</p>
 					</div>
 				</div>
 
 				<button
 					type="button"
-					class="btn btn-sm btn-ghost btn-circle"
+					class="btn btn-xs sm:btn-sm btn-ghost btn-circle shrink-0"
 					onclick={() => (showModal = false)}
 					aria-label="Tutup"
 				>
@@ -616,11 +637,46 @@
 				</button>
 			</div>
 
-			<!-- Modal Body Split Workspace: Left Vertical Nav + Right Main Panel -->
+			<!-- Mobile Tab Selector (Visible only on mobile <md) -->
+			<div class="md:hidden border-b border-base-200 bg-base-200/50 p-2.5 shrink-0 space-y-2">
+				<div class="flex items-center gap-2">
+					<span class="text-[11px] font-bold text-base-content/70 shrink-0">Bagian:</span>
+					<select
+						bind:value={activeTab}
+						class="select select-bordered select-xs w-full text-xs font-semibold rounded-lg bg-base-100"
+					>
+						{#each navGroups as group (group.title)}
+							<optgroup label={group.title}>
+								{#each group.items as item (item.id)}
+									<option value={item.id}>{item.label}</option>
+								{/each}
+							</optgroup>
+						{/each}
+					</select>
+				</div>
+				<div
+					class="flex items-center gap-1.5 overflow-x-auto pb-0.5"
+					style="scrollbar-width: none;"
+				>
+					{#each allTabs as item (item.id)}
+						<button
+							type="button"
+							class="btn btn-xs whitespace-nowrap rounded-lg {activeTab === item.id
+								? 'btn-primary shadow-xs'
+								: 'btn-ghost bg-base-100 border border-base-300/60 text-base-content/70'}"
+							onclick={() => (activeTab = item.id)}
+						>
+							{item.shortLabel}
+						</button>
+					{/each}
+				</div>
+			</div>
+
+			<!-- Modal Body Split Workspace: Left Vertical Nav (Desktop) + Right Main Panel -->
 			<div class="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
-				<!-- Left Sidebar Navigation -->
+				<!-- Left Sidebar Navigation (Desktop only) -->
 				<aside
-					class="w-full md:w-64 border-r border-base-200 bg-base-200/40 p-3 overflow-y-auto shrink-0 space-y-4"
+					class="hidden md:block w-64 border-r border-base-200 bg-base-200/40 p-3 overflow-y-auto shrink-0 space-y-4"
 				>
 					{#each navGroups as group (group.title)}
 						<div>
@@ -1933,12 +1989,12 @@
 
 			<!-- Modal Bottom Footer -->
 			<div
-				class="flex items-center justify-between px-6 py-3.5 border-t border-base-200 bg-base-100 shrink-0"
+				class="flex items-center justify-between px-3.5 sm:px-6 py-2.5 sm:py-3.5 border-t border-base-200 bg-base-100 shrink-0 gap-2"
 			>
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-1.5 sm:gap-2">
 					<button
 						type="button"
-						class="btn btn-sm btn-ghost rounded-xl"
+						class="btn btn-xs sm:btn-sm btn-ghost rounded-xl"
 						onclick={() => (showModal = false)}
 					>
 						Tutup
@@ -1946,19 +2002,19 @@
 					{#if editId > 0}
 						<button
 							type="button"
-							class="btn btn-sm btn-outline gap-1.5 rounded-xl"
+							class="btn btn-xs sm:btn-sm btn-outline gap-1 sm:gap-1.5 rounded-xl"
 							onclick={() => window.open('/api/pdf/modul-ajar?id=' + editId, '_blank')}
 						>
 							<Icon name="print" />
-							Cetak PDF
+							<span class="hidden sm:inline">Cetak</span> PDF
 						</button>
 					{/if}
 				</div>
 
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-1.5 sm:gap-2">
 					<button
 						type="button"
-						class="btn btn-sm btn-outline rounded-xl"
+						class="btn btn-xs sm:btn-sm btn-outline rounded-xl"
 						onclick={() => handleSave('draf')}
 						disabled={isSaving || !materiPokok.trim()}
 					>
@@ -1966,14 +2022,17 @@
 					</button>
 					<button
 						type="button"
-						class="btn btn-sm btn-primary shadow-sm rounded-xl"
+						class="btn btn-xs sm:btn-sm btn-primary shadow-sm rounded-xl"
 						onclick={() => handleSave('final')}
 						disabled={isSaving || !materiPokok.trim()}
 					>
-						{isSaving ? 'Menyimpan...' : 'Simpan & Finalkan'}
+						{isSaving ? 'Menyimpan...' : 'Finalkan'}
 					</button>
 				</div>
 			</div>
 		</div>
-	</div>
+		<form method="dialog" class="modal-backdrop">
+			<button type="button" onclick={() => (showModal = false)}>close</button>
+		</form>
+	</dialog>
 {/if}
