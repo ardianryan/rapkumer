@@ -2,6 +2,48 @@
 	import { onMount } from 'svelte';
 	import Icon from '$lib/components/icon.svelte';
 
+	interface AgamaOption {
+		id: number | string;
+		label: string;
+		name?: string;
+	}
+
+	interface Props {
+		mapelDisplayName?: string;
+		mapelKelasNama?: string;
+		kelasAktifLabel?: string | null;
+		importTooltip?: string;
+		isImportDisabled?: boolean;
+		onOpenImport?: () => void;
+		onOpenSalinParalel?: () => void;
+		isSalinParalelDisabled?: boolean;
+		salinParalelTooltip?: string;
+		showAgamaSelect?: boolean;
+		isAgamaSelectLocked?: boolean;
+		agamaSelectId?: string;
+		agamaOptions?: AgamaOption[];
+		selectedAgamaId?: string;
+		onAgamaChange?: (e: Event) => void;
+		onAgamaElementMounted?: (el: HTMLSelectElement) => void;
+		onBack?: () => void;
+		handlePrimaryActionClick?: () => void;
+		isTambahTpDisabled?: boolean;
+		tambahTpTooltip?: string;
+		onGenerate?: () => void;
+		isGenerateDisabled?: boolean;
+		generateTooltip?: string;
+		hasSelection?: boolean;
+		isInteractionLocked?: boolean;
+		isCreateModeActive?: boolean;
+		isEditModeActive?: boolean;
+		submitActiveForm?: () => void;
+		activeFormId?: string | null;
+		isFormSubmitting?: boolean;
+		isEditingBobot?: boolean;
+		hasGroups?: boolean;
+		toggleBobotEditing?: () => void;
+	}
+
 	let {
 		mapelDisplayName,
 		mapelKelasNama,
@@ -15,7 +57,7 @@
 		showAgamaSelect,
 		isAgamaSelectLocked = false,
 		agamaSelectId,
-		agamaOptions,
+		agamaOptions = [],
 		selectedAgamaId,
 		onAgamaChange,
 		onAgamaElementMounted,
@@ -36,7 +78,7 @@
 		isEditingBobot,
 		hasGroups,
 		toggleBobotEditing
-	} = $props();
+	}: Props = $props();
 
 	let agamaEl = $state<HTMLSelectElement | null>(null);
 
@@ -147,7 +189,7 @@
 				bind:this={agamaEl}
 				aria-label="Pilih Agama"
 				value={selectedAgamaId}
-				onchange={(e) => onAgamaChange && onAgamaChange(e)}
+				onchange={onAgamaChange}
 				disabled={isAgamaSelectLocked}
 				title={isAgamaSelectLocked
 					? 'Dipilih dan dikunci sesuai dengan tugas guru mapel agama'
