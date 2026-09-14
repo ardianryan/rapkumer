@@ -93,13 +93,18 @@ export const appMenuItems: MenuItem[] = [
 				path: '/presensi-murid'
 			},
 			{
+				title: 'RPM',
+				path: '/rpm',
+				tags: ['rpm', 'rencana pembelajaran', 'mendalam', 'deep learning', 'kurikulum merdeka']
+			},
+			{
 				title: 'Jurnal Mengajar',
 				path: '/jurnal-mengajar'
 			},
 			{
 				title: 'Modul Ajar',
 				path: '/modul-ajar',
-				tags: ['modul ajar', 'rpp', 'rpm', 'pembelajaran mendalam', 'deep learning']
+				tags: ['modul ajar', 'rpp', 'pengawas', 'pembelajaran mendalam', 'deep learning']
 			},
 			{
 				title: 'Catatan Wali Kelas',

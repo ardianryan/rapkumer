@@ -58,6 +58,7 @@ export const groupedUserPermissions = {
 	administrasi: {
 		values: [
 			['absen', 'Presensi Murid'],
+			['rpm', 'RPM'],
 			['jurnal_mengajar', 'Jurnal Mengajar'],
 			['modul_ajar', 'Modul Ajar'],
 			['catatan_wali_kelas', 'Catatan Wali Kelas'],
@@ -96,6 +97,7 @@ export const defaultPermissionsByType: Partial<Record<AuthUser['type'], UserPerm
 		'input_nilai_nilai_ekstrakurikuler',
 		'input_nilai_asesmen_keasramaan',
 		'administrasi_absen',
+		'administrasi_rpm',
 		'administrasi_jurnal_mengajar',
 		'administrasi_modul_ajar',
 		'administrasi_catatan_wali_kelas',
@@ -118,6 +120,7 @@ export const defaultPermissionsByType: Partial<Record<AuthUser['type'], UserPerm
 		'input_nilai_asesmen_sumatif',
 		'input_nilai_asesmen_kokurikuler',
 		'administrasi_absen',
+		'administrasi_rpm',
 		'administrasi_jurnal_mengajar',
 		'administrasi_modul_ajar',
 		'administrasi_rekap_nilai',
@@ -166,6 +169,7 @@ export const menuRoutePermissions: { path: string; permission: UserPermission }[
 	{ path: '/nilai-ekstrakurikuler', permission: 'input_nilai_nilai_ekstrakurikuler' },
 	{ path: '/asesmen-keasramaan', permission: 'input_nilai_asesmen_keasramaan' },
 	{ path: '/presensi-murid', permission: 'administrasi_absen' },
+	{ path: '/rpm', permission: 'administrasi_rpm' },
 	{ path: '/jurnal-mengajar', permission: 'administrasi_jurnal_mengajar' },
 	{ path: '/modul-ajar', permission: 'administrasi_modul_ajar' },
 	{ path: '/catatan-wali-kelas', permission: 'administrasi_catatan_wali_kelas' },
