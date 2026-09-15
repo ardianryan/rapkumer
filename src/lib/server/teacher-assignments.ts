@@ -4,9 +4,10 @@ import {
 	tableAuthUserKelas,
 	tableAuthUserMataPelajaran,
 	tableAuthUserPembelajaran,
+	tableKelas,
 	tableMataPelajaran
 } from '$lib/server/db/schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 
 export type GuruMapelAssignment = {
 	mapelNama: string;
@@ -136,12 +137,75 @@ export async function getTeacherAssignments(
 		}
 	}
 
-	return Array.from(mapelGroup.values())
+	const fallbackResult = Array.from(mapelGroup.values())
 		.filter((g) => g.kelasIds.size > 0)
 		.map((g) => ({
 			mapelNama: g.displayNama,
 			kelasIds: Array.from(g.kelasIds).sort((a, b) => a - b)
 		}));
+
+	if (fallbackResult.length > 0) {
+		return fallbackResult;
+	}
+
+	// 4. Khusus Wali Kelas: Jika belum ada penugasan mandiri ataupun pengampu eksplisit,
+	// cari kelas perwaliannya (tableKelas.waliKelasId atau auth_user.kelasId).
+	// Di kelas tersebut, mapel yang diampu pegawai ini atau belum memiliki pengampu guru lain
+	// secara otomatis menjadi pembelajaran default bagi Wali Kelas.
+	const userAuth = await db.query.tableAuthUser.findFirst({
+		where: eq(tableAuthUser.id, authUserId),
+		columns: { type: true, kelasId: true, pegawaiId: true }
+	});
+
+	if (userAuth?.type === 'wali_kelas') {
+		const effectivePegId = userAuth.pegawaiId ?? pegawaiId ?? null;
+		const ownKelasRows = await db.query.tableKelas.findMany({
+			where: effectivePegId
+				? or(
+						eq(tableKelas.waliKelasId, effectivePegId),
+						userAuth.kelasId ? eq(tableKelas.id, userAuth.kelasId) : undefined
+					)
+				: userAuth.kelasId
+					? eq(tableKelas.id, userAuth.kelasId)
+					: undefined,
+			columns: { id: true, nama: true }
+		});
+
+		const ownKelasIds = ownKelasRows.map((k) => k.id);
+		if (ownKelasIds.length > 0) {
+			const mapelDiKelas = await db.query.tableMataPelajaran.findMany({
+				where: inArray(tableMataPelajaran.kelasId, ownKelasIds),
+				columns: { id: true, nama: true, kelasId: true, pengampuId: true }
+			});
+
+			const eligibleMapel = mapelDiKelas.filter(
+				(m) => m.nama && (m.pengampuId === effectivePegId || m.pengampuId == null)
+			);
+
+			if (eligibleMapel.length > 0) {
+				const waliGroup = new Map<string, { displayNama: string; kelasIds: Set<number> }>();
+				for (const m of eligibleMapel) {
+					const rawName = (m.nama ?? '').trim();
+					const key = norm(rawName);
+					if (!key) continue;
+
+					if (!waliGroup.has(key)) {
+						waliGroup.set(key, { displayNama: rawName, kelasIds: new Set<number>() });
+					}
+					if (m.kelasId && m.kelasId > 0) {
+						waliGroup.get(key)!.kelasIds.add(m.kelasId);
+					}
+				}
+
+				return Array.from(waliGroup.values()).map((g) => ({
+					mapelNama: g.displayNama,
+					kelasIds: Array.from(g.kelasIds).sort((a, b) => a - b)
+				}));
+			}
+		}
+	}
+
+	return [];
 }
 
 /**
@@ -254,9 +318,29 @@ export async function syncTeacherAssignments(
 	}
 
 	// 4. Update tableAuthUserKelas (hak akses kelas)
+	// Catatan: Jika pengguna adalah wali_kelas, pertahankan kelas perwaliannya
+	const userRecord = await client.query.tableAuthUser.findFirst({
+		where: eq(tableAuthUser.id, authUserId),
+		columns: { type: true, kelasId: true, pegawaiId: true }
+	});
+
+	const protectedKelasIds = new Set<number>();
+	if (userRecord?.type === 'wali_kelas') {
+		if (userRecord.kelasId) protectedKelasIds.add(userRecord.kelasId);
+		if (userRecord.pegawaiId) {
+			const ownClasses = await client.query.tableKelas.findMany({
+				where: eq(tableKelas.waliKelasId, userRecord.pegawaiId),
+				columns: { id: true }
+			});
+			for (const c of ownClasses) protectedKelasIds.add(c.id);
+		}
+	}
+
+	const finalKelasIdsToSet = Array.from(new Set([...allKelasIds, ...protectedKelasIds]));
+
 	await client.delete(tableAuthUserKelas).where(eq(tableAuthUserKelas.authUserId, authUserId));
 
-	for (const kId of allKelasIds) {
+	for (const kId of finalKelasIdsToSet) {
 		try {
 			await client.insert(tableAuthUserKelas).values({
 				authUserId,

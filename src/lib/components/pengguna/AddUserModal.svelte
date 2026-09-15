@@ -158,7 +158,6 @@
 			}
 			password = '';
 			initialized = true;
-			if (type === 'wali_kelas') selectAllMapelAndKelas();
 		}
 	});
 
@@ -171,15 +170,6 @@
 			kelasIds.clear();
 		}
 	});
-
-	function selectAllMapelAndKelas() {
-		mataPelajaranIds = new Set(filteredMataPelajaran.map((m) => m.id));
-		for (const k of filteredKelasList) {
-			kelasIds.add(k.id);
-		}
-		kelasIds = new Set(kelasIds);
-		selectAllKelas = filteredKelasList.length > 0;
-	}
 
 	function toggleSelectAllKelas() {
 		selectAllKelas = !selectAllKelas;
@@ -226,11 +216,15 @@
 		form.set('type', type || 'user');
 		form.set('sekolahId', String(sekolahId ?? ''));
 
-		if (type === 'user') {
+		if (type === 'user' || type === 'wali_kelas') {
 			// Multi-mapel & multi-kelas terstruktur
 			form.set('assignments', JSON.stringify(assignments));
-			const allKelasIds = Array.from(new Set(assignments.flatMap((a) => a.kelasIds)));
-			form.set('kelasIds', JSON.stringify(allKelasIds));
+			const assignedKelasIds = Array.from(new Set(assignments.flatMap((a) => a.kelasIds)));
+			const combinedKelasIds =
+				type === 'wali_kelas'
+					? Array.from(new Set([...assignedKelasIds, ...kelasIds]))
+					: assignedKelasIds;
+			form.set('kelasIds', JSON.stringify(combinedKelasIds));
 		} else {
 			form.set('mataPelajaranIds', JSON.stringify(Array.from(mataPelajaranIds)));
 			form.set('kelasIds', JSON.stringify(Array.from(kelasIds)));
@@ -246,14 +240,16 @@
 				const allKelasIds =
 					type === 'user'
 						? Array.from(new Set(assignments.flatMap((a) => a.kelasIds)))
-						: Array.from(kelasIds);
+						: type === 'wali_kelas'
+							? Array.from(new Set([...assignments.flatMap((a) => a.kelasIds), ...kelasIds]))
+							: Array.from(kelasIds);
 
 				const mergedBody = {
 					...body,
 					username: body.user?.username ?? username,
 					displayName: body.displayName ?? nama,
 					dapodikPtkId: body.dapodikPtkId ?? (dapodikPtkId.trim() || null),
-					assignments: type === 'user' ? assignments : undefined,
+					assignments: type === 'user' || type === 'wali_kelas' ? assignments : undefined,
 					mataPelajaranIds: body.mataPelajaranIds ?? Array.from(mataPelajaranIds),
 					kelasIds: body.kelasIds ?? allKelasIds,
 					user: body.user ?? {
@@ -310,7 +306,7 @@
 {#if open}
 	<div class="modal modal-open">
 		<div
-			class={`modal-box flex max-h-[90vh] flex-col p-4 sm:p-6 ${type === 'user' ? 'max-w-2xl' : 'max-w-lg'}`}
+			class={`modal-box flex max-h-[90vh] flex-col p-4 sm:p-6 ${type === 'user' || type === 'wali_kelas' ? 'max-w-2xl' : 'max-w-lg'}`}
 		>
 			<h3 class="mb-3 text-lg font-bold">{modalTitle}</h3>
 			<div class="flex-1 space-y-4 overflow-y-auto px-1">
@@ -377,9 +373,6 @@
 						id="add-user-role"
 						class="select dark:bg-base-200 w-full dark:border-none font-semibold"
 						bind:value={type}
-						onchange={() => {
-							if (type === 'wali_kelas') selectAllMapelAndKelas();
-						}}
 					>
 						<option value="user">Guru (Pendidik)</option>
 						<option value="wali_kelas">Wali Kelas</option>
@@ -433,61 +426,77 @@
 					</p>
 				</fieldset>
 
-				<!-- KHUSUS GURU: Editor Penugasan Multi-Mapel & Multi-Kelas -->
-				{#if type === 'user'}
+				<!-- Penugasan Kelas & Pembelajaran untuk Guru dan Wali Kelas -->
+				{#if type === 'user' || type === 'wali_kelas'}
+					{#if type === 'wali_kelas'}
+						<!-- Kelas Perwalian untuk Wali Kelas -->
+						<div
+							tabindex="0"
+							role="button"
+							class="bg-base-200 border-base-300 collapse-arrow collapse mb-3"
+						>
+							<div class="collapse-title font-semibold">
+								Kelas Perwalian (Wali Kelas) {#if kelasIds.size > 0}
+									<span class="badge badge-sm badge-secondary">{kelasIds.size}</span>
+								{/if}
+							</div>
+							<div class="collapse-content text-sm">
+								<div class="space-y-3">
+									<p class="text-xs opacity-75">
+										Pilih kelas perwalian yang dibimbing oleh Wali Kelas ini
+									</p>
+									{#if filteredKelasList.length > 0}
+										<div class="space-y-2">
+											<label
+												class="bg-base-300 flex cursor-pointer gap-2 rounded p-2 font-semibold"
+											>
+												<input
+													type="checkbox"
+													class="checkbox checkbox-sm"
+													checked={selectAllKelas}
+													onchange={toggleSelectAllKelas}
+												/>
+												<span class="text-sm">Pilih Semua</span>
+											</label>
+											{#each filteredKelasList as k (k.id)}
+												<label class="flex cursor-pointer gap-2">
+													<input
+														type="checkbox"
+														class="checkbox checkbox-sm"
+														checked={kelasIds.has(k.id)}
+														onchange={() => toggleKelas(k.id)}
+													/>
+													<span class="text-sm"
+														>{k.nama}
+														{#if k.fase}({k.fase}){/if}</span
+													>
+												</label>
+											{/each}
+										</div>
+									{:else}
+										<p class="text-xs opacity-75">- tidak ada kelas -</p>
+									{/if}
+								</div>
+							</div>
+						</div>
+					{/if}
+
+					<!-- Editor Penugasan Pembelajaran (Multi-Mapel & Multi-Kelas) -->
 					<div class="pt-2 border-t border-slate-200 dark:border-slate-800">
+						<div class="mb-2">
+							<span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+								Penugasan Mengajar (Mata Pelajaran & Kelas Pembelajaran)
+							</span>
+							<p class="text-[11px] text-slate-500 dark:text-slate-400">
+								Atur mata pelajaran yang diajarkan oleh pendidik ini beserta kelas-kelas
+								pembelajarannya.
+							</p>
+						</div>
 						<MultiMapelAssignmentEditor
 							bind:assignments
 							availableMapel={filteredMataPelajaran}
 							availableKelas={filteredKelasList}
 						/>
-					</div>
-				{:else if type === 'wali_kelas'}
-					<!-- Kelas untuk Wali Kelas -->
-					<div
-						tabindex="0"
-						role="button"
-						class="bg-base-200 border-base-300 collapse-arrow collapse"
-					>
-						<div class="collapse-title font-semibold">
-							Kelas yang Diampu {#if kelasIds.size > 0}
-								<span class="badge badge-sm badge-secondary">{kelasIds.size}</span>
-							{/if}
-						</div>
-						<div class="collapse-content text-sm">
-							<div class="space-y-3">
-								<p class="text-xs opacity-75">Pilih kelas yang diampu oleh Wali Kelas ini</p>
-								{#if filteredKelasList.length > 0}
-									<div class="space-y-2">
-										<label class="bg-base-300 flex cursor-pointer gap-2 rounded p-2 font-semibold">
-											<input
-												type="checkbox"
-												class="checkbox checkbox-sm"
-												checked={selectAllKelas}
-												onchange={toggleSelectAllKelas}
-											/>
-											<span class="text-sm">Pilih Semua</span>
-										</label>
-										{#each filteredKelasList as k (k.id)}
-											<label class="flex cursor-pointer gap-2">
-												<input
-													type="checkbox"
-													class="checkbox checkbox-sm"
-													checked={kelasIds.has(k.id)}
-													onchange={() => toggleKelas(k.id)}
-												/>
-												<span class="text-sm"
-													>{k.nama}
-													{#if k.fase}({k.fase}){/if}</span
-												>
-											</label>
-										{/each}
-									</div>
-								{:else}
-									<p class="text-xs opacity-75">- tidak ada kelas -</p>
-								{/if}
-							</div>
-						</div>
 					</div>
 				{/if}
 			</div>

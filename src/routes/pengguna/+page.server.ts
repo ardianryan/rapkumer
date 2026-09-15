@@ -958,9 +958,9 @@ export const actions = {
 				throw new Error('Failed to retrieve created user');
 			}
 
-			// Sync penugasan: jika ada data terstruktur assignments (khusus role guru), gunakan syncTeacherAssignments
+			// Sync penugasan: jika ada data terstruktur assignments (guru / wali kelas), gunakan syncTeacherAssignments
 			let syncResult: { allMataPelajaranIds: number[]; allKelasIds: number[] } | null = null;
-			if (roleValue === 'user' && assignments.length > 0) {
+			if ((roleValue === 'user' || roleValue === 'wali_kelas') && assignments.length > 0) {
 				syncResult = await syncTeacherAssignments(db, {
 					authUserId: created.id,
 					pegawaiId,
@@ -1221,9 +1221,9 @@ export const actions = {
 					}
 				}
 
-				// Sync penugasan: jika ada data terstruktur assignments (khusus role guru), gunakan syncTeacherAssignments
+				// Sync penugasan: jika ada data terstruktur assignments (guru / wali kelas), gunakan syncTeacherAssignments
 				let syncResult: { allMataPelajaranIds: number[]; allKelasIds: number[] } | null = null;
-				if (roleValue === 'user' && assignments.length > 0) {
+				if ((roleValue === 'user' || roleValue === 'wali_kelas') && assignments.length > 0) {
 					syncResult = await syncTeacherAssignments(tx as unknown as typeof db, {
 						authUserId: id,
 						pegawaiId: effectivePegawaiId,
