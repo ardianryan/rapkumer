@@ -30,6 +30,7 @@ import {
 import { hashPassword } from './auth';
 import { resolveUniqueUsername } from './usernames';
 import { defaultPermissionsByType } from '../../routes/pengguna/permissions';
+import { normalizeWaliKelasSingleClass } from './db/ensure-pembelajaran';
 import { agamaMapelOptions } from '$lib/statics';
 import { buildCapaianKompetensi, type TujuanScoreEntry } from '$lib/rapor-modes';
 
@@ -439,7 +440,7 @@ export async function runDapodikSync(options: {
 	await upsertPembelajaran(rombel.pembelajaranItems, muridIndex.kelasIdsSet(), ptkIndex, sections);
 
 	// 9b. Akun pengguna guru + penugasan mapel (halaman /pengguna).
-	await ensureGuruAccounts(sekolahId, sections);
+	await ensureGuruAccounts(sekolahId, sections, semesterTarget.id);
 
 	// 10. Ekstrakurikuler — rombel jenis 51 di getRombonganBelajar (endpoint
 	//     getEkskul tidak tersedia / 404 pada build Dapodik desktop).
@@ -983,7 +984,11 @@ async function syncPtk(
  * punya: wali kelas → type 'wali_kelas' (konsisten dengan alur lazy /pengguna),
  * sisanya → type 'user'. Lalu menautkan mata pelajaran pengampu ke akun guru.
  */
-async function ensureGuruAccounts(sekolahId: number, sections: DapodikSectionLog[]) {
+async function ensureGuruAccounts(
+	sekolahId: number,
+	sections: DapodikSectionLog[],
+	targetSemesterId?: number
+) {
 	try {
 		const pegawaiRows = await db.select().from(tablePegawai);
 		const accounts = await db.query.tableAuthUser.findMany({
@@ -997,14 +1002,18 @@ async function ensureGuruAccounts(sekolahId: number, sections: DapodikSectionLog
 		}
 
 		// Kelas per wali → tipe akun + kelas_pindah bila multi-kelas.
-		// Hanya kelas milik sekolah yang sedang sinkron.
+		// Hanya kelas milik sekolah yang sedang sinkron, diprioritaskan semester aktif/target.
 		const kelasRows = await db.query.tableKelas.findMany({
-			columns: { id: true, waliKelasId: true },
+			columns: { id: true, waliKelasId: true, semesterId: true },
 			where: and(eq(tableKelas.sekolahId, sekolahId), sql`${tableKelas.waliKelasId} IS NOT NULL`)
 		});
 		const kelasIdsByWali = new Map<number, number[]>();
 		for (const k of kelasRows) {
 			if (!k.waliKelasId) continue;
+			// Jika targetSemesterId diberikan, utamakan kelas di semester target
+			if (targetSemesterId && k.semesterId && k.semesterId !== targetSemesterId) {
+				continue;
+			}
 			const arr = kelasIdsByWali.get(k.waliKelasId) ?? [];
 			arr.push(k.id);
 			kelasIdsByWali.set(k.waliKelasId, arr);
@@ -1315,6 +1324,9 @@ async function ensureGuruAccounts(sekolahId: number, sections: DapodikSectionLog
 				}
 			}
 		}
+
+		// Normalisasi otomatis agar akun wali_kelas benar-benar hanya terkunci pada 1 kelas perwalian resminya
+		await normalizeWaliKelasSingleClass();
 
 		sections.push({
 			label: 'Akun Guru',

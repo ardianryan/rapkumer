@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import db from '$lib/server/db';
 import {
+	tableAuthUserPembelajaran,
 	tableAuthZitadelUser,
 	tableKelas,
 	tableMataPelajaran,
@@ -43,6 +44,26 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	// Ambil penugasan presisi guru saat ini (multi-mapel multi-kelas)
 	const assignedAssignments = await getTeacherAssignments(userId, locals.user.pegawaiId);
+
+	// Jika ada penugasan terdeteksi namun belum tersimpan di auth_user_pembelajaran,
+	// otomatis sinkronkan ke database agar data pembelajaran selalu persisten
+	if (assignedAssignments.length > 0) {
+		const existingPembelajaran = await db.query.tableAuthUserPembelajaran.findFirst({
+			where: eq(tableAuthUserPembelajaran.authUserId, userId)
+		});
+		if (!existingPembelajaran) {
+			try {
+				await syncTeacherAssignments(db, {
+					authUserId: userId,
+					pegawaiId: locals.user.pegawaiId,
+					assignments: assignedAssignments,
+					sekolahId
+				});
+			} catch (err) {
+				console.warn('[onboarding load] Auto-sync notice:', err);
+			}
+		}
+	}
 
 	// Ambil seluruh daftar kelas aktif di sekolah ini
 	let availableKelas: { id: number; nama: string; fase: string | null }[] = [];
@@ -106,10 +127,28 @@ export const actions: Actions = {
 	confirmCurrent: async ({ locals }) => {
 		if (!locals.user) throw redirect(303, '/login');
 
+		const userId = locals.user.id;
+		const sekolahId = locals.user.sekolahId ?? locals.sekolah?.id ?? null;
+
+		// Ambil penugasan saat ini dan simpan secara persisten ke database
+		const currentAssignments = await getTeacherAssignments(userId, locals.user.pegawaiId);
+		if (currentAssignments.length > 0) {
+			try {
+				await syncTeacherAssignments(db, {
+					authUserId: userId,
+					pegawaiId: locals.user.pegawaiId,
+					assignments: currentAssignments,
+					sekolahId
+				});
+			} catch (err) {
+				console.warn('[confirmCurrent] Persist assignments notice:', err);
+			}
+		}
+
 		await db
 			.update(tableAuthZitadelUser)
 			.set({ isOnboarded: true })
-			.where(eq(tableAuthZitadelUser.userId, locals.user.id));
+			.where(eq(tableAuthZitadelUser.userId, userId));
 
 		throw redirect(303, '/');
 	},

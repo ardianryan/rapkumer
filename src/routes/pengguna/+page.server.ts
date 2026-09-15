@@ -652,58 +652,6 @@ export async function load({ url, locals }) {
 		if (mp.id && mp.nama) mpNameById.set(mp.id, mp.nama);
 	}
 
-	// Attach mapelIds/kelasIds/pembelajaran/assignments/sso to each user for edit modal & table display
-	for (const user of users) {
-		const uid = user.id as number;
-		if (uid > 0) {
-			const mIds = userMapelMap.get(uid) ?? [];
-			const kIds = userKelasMap.get(uid) ?? [];
-			const pList = userPembelajaranMap.get(uid) ?? [];
-
-			(user as Record<string, unknown>).mataPelajaranIds = mIds;
-			(user as Record<string, unknown>).kelasIds = kIds;
-			(user as Record<string, unknown>).pembelajaranList = pList;
-
-			// Buat daftar penugasan multi-mapel multi-kelas terstruktur
-			const mapelGroup = new Map<string, { mapelNama: string; kelasIds: Set<number> }>();
-			for (const p of pList) {
-				const name = mpNameById.get(p.mataPelajaranId);
-				if (name) {
-					const key = name.trim().toLowerCase();
-					if (!mapelGroup.has(key)) {
-						mapelGroup.set(key, { mapelNama: name.trim(), kelasIds: new Set<number>() });
-					}
-					mapelGroup.get(key)!.kelasIds.add(p.kelasId);
-				}
-			}
-
-			// Fallback jika pembelajaranList kosong tapi memiliki relasi mata pelajaran dan kelas
-			if (mapelGroup.size === 0 && mIds.length > 0) {
-				for (const mId of mIds) {
-					const name = mpNameById.get(mId);
-					if (name) {
-						const key = name.trim().toLowerCase();
-						if (!mapelGroup.has(key)) {
-							mapelGroup.set(key, { mapelNama: name.trim(), kelasIds: new Set<number>(kIds) });
-						}
-					}
-				}
-			}
-
-			const userAssignments: GuruMapelAssignment[] = Array.from(mapelGroup.values()).map((g) => ({
-				mapelNama: g.mapelNama,
-				kelasIds: Array.from(g.kelasIds)
-			}));
-			(user as Record<string, unknown>).assignments = userAssignments;
-
-			const ssoRecord = userZitadelMap.get(uid) ?? null;
-			(user as Record<string, unknown>).sso = ssoRecord;
-			if (!(user as Record<string, unknown>).dapodikPtkId && ssoRecord?.ptkId) {
-				(user as Record<string, unknown>).dapodikPtkId = ssoRecord.ptkId;
-			}
-		}
-	}
-
 	// fetch sekolah list so the Add User modal can offer a sekolah selection
 	const sekolahList = await db
 		.select({ id: tableSekolah.id, nama: tableSekolah.nama })
@@ -747,6 +695,81 @@ export async function load({ url, locals }) {
 			sekolahId: k.sekolahId
 		}));
 	})();
+
+	// Attach mapelIds/kelasIds/pembelajaran/assignments/sso to each user for edit modal & table display
+	for (const user of users) {
+		const uid = user.id as number;
+		if (uid > 0) {
+			const mIds = userMapelMap.get(uid) ?? [];
+			const kIds = userKelasMap.get(uid) ?? [];
+			const pList = userPembelajaranMap.get(uid) ?? [];
+
+			(user as Record<string, unknown>).mataPelajaranIds = mIds;
+			(user as Record<string, unknown>).pembelajaranList = pList;
+
+			// Untuk Wali Kelas: pastikan kelas perwaliannya TERKUNCI tepat pada 1 kelas perwalian resminya
+			if (user.type === 'wali_kelas') {
+				let ownWaliKelasId: number | null = null;
+				if (user.pegawaiId) {
+					const official = kelasBerwali.find((k) => k.waliKelasId === user.pegawaiId);
+					if (official) {
+						const matchedK = kelasListRaw.find(
+							(k) => k.nama === official.nama && (!user.sekolahId || k.sekolahId === user.sekolahId)
+						);
+						if (matchedK) ownWaliKelasId = matchedK.id;
+					}
+				}
+				if (!ownWaliKelasId && user.kelasId) {
+					ownWaliKelasId = user.kelasId;
+				}
+				if (!ownWaliKelasId && kIds.length > 0) {
+					ownWaliKelasId = kIds[0];
+				}
+				(user as Record<string, unknown>).ownKelasId = ownWaliKelasId;
+				(user as Record<string, unknown>).kelasIds = ownWaliKelasId ? [ownWaliKelasId] : [];
+			} else {
+				(user as Record<string, unknown>).kelasIds = kIds;
+			}
+
+			// Buat daftar penugasan multi-mapel multi-kelas terstruktur
+			const mapelGroup = new Map<string, { mapelNama: string; kelasIds: Set<number> }>();
+			for (const p of pList) {
+				const name = mpNameById.get(p.mataPelajaranId);
+				if (name) {
+					const key = name.trim().toLowerCase();
+					if (!mapelGroup.has(key)) {
+						mapelGroup.set(key, { mapelNama: name.trim(), kelasIds: new Set<number>() });
+					}
+					mapelGroup.get(key)!.kelasIds.add(p.kelasId);
+				}
+			}
+
+			// Fallback jika pembelajaranList kosong tapi memiliki relasi mata pelajaran dan kelas
+			if (mapelGroup.size === 0 && mIds.length > 0) {
+				for (const mId of mIds) {
+					const name = mpNameById.get(mId);
+					if (name) {
+						const key = name.trim().toLowerCase();
+						if (!mapelGroup.has(key)) {
+							mapelGroup.set(key, { mapelNama: name.trim(), kelasIds: new Set<number>(kIds) });
+						}
+					}
+				}
+			}
+
+			const userAssignments: GuruMapelAssignment[] = Array.from(mapelGroup.values()).map((g) => ({
+				mapelNama: g.mapelNama,
+				kelasIds: Array.from(g.kelasIds)
+			}));
+			(user as Record<string, unknown>).assignments = userAssignments;
+
+			const ssoRecord = userZitadelMap.get(uid) ?? null;
+			(user as Record<string, unknown>).sso = ssoRecord;
+			if (!(user as Record<string, unknown>).dapodikPtkId && ssoRecord?.ptkId) {
+				(user as Record<string, unknown>).dapodikPtkId = ssoRecord.ptkId;
+			}
+		}
+	}
 
 	return { meta: { title: 'Manajemen Pengguna' }, users, mataPelajaran, sekolahList, kelasList };
 }
@@ -927,8 +950,17 @@ export const actions = {
 				// For backward compatibility: only set mataPelajaranId if single mapel
 				// Multi-mapel users should have null so system uses join table instead
 				mataPelajaranId: mataPelajaranIds.length === 1 ? mataPelajaranIds[0] : undefined,
-				// Set kelasId to first item (for backward compatibility with old code that checks kelasId)
-				kelasId: kelasIds.length > 0 ? kelasIds[0] : undefined,
+				// Set kelasId to official ownKelasId or first item
+				kelasId:
+					roleValue === 'wali_kelas'
+						? form.get('ownKelasId')
+							? Number(form.get('ownKelasId'))
+							: kelasIds.length > 0
+								? kelasIds[0]
+								: undefined
+						: kelasIds.length > 0
+							? kelasIds[0]
+							: undefined,
 				// persist sekolah selection when provided so login reliably selects it
 				sekolahId: sekolahId ?? undefined,
 				pegawaiId: pegawaiId ?? undefined,
@@ -1172,7 +1204,17 @@ export const actions = {
 				} else {
 					updateData.mataPelajaranId = undefined;
 				}
-				if (kelasIds.length > 0) {
+				if (roleValue === 'wali_kelas') {
+					const ownKelasIdRaw = form.get('ownKelasId');
+					const ownKelasId = ownKelasIdRaw
+						? Number(ownKelasIdRaw)
+						: kelasIds.length > 0
+							? kelasIds[0]
+							: null;
+					if (ownKelasId) {
+						updateData.kelasId = ownKelasId;
+					}
+				} else if (kelasIds.length > 0) {
 					updateData.kelasId = kelasIds[0];
 				}
 

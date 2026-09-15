@@ -154,7 +154,7 @@ export async function getTeacherAssignments(
 	// secara otomatis menjadi pembelajaran default bagi Wali Kelas.
 	const userAuth = await db.query.tableAuthUser.findFirst({
 		where: eq(tableAuthUser.id, authUserId),
-		columns: { type: true, kelasId: true, pegawaiId: true }
+		columns: { type: true, kelasId: true, pegawaiId: true, sekolahId: true }
 	});
 
 	if (userAuth?.type === 'wali_kelas') {
@@ -178,13 +178,18 @@ export async function getTeacherAssignments(
 				columns: { id: true, nama: true, kelasId: true, pengampuId: true }
 			});
 
-			const eligibleMapel = mapelDiKelas.filter(
+			// Prioritaskan mapel yang diampu pegawai ini atau belum ada pengampu
+			let candidateMapel = mapelDiKelas.filter(
 				(m) => m.nama && (m.pengampuId === effectivePegId || m.pengampuId == null)
 			);
+			// Jika tidak ada yang cocok, gunakan seluruh mapel di kelas perwalian ini
+			if (candidateMapel.length === 0) {
+				candidateMapel = mapelDiKelas.filter((m) => Boolean(m.nama));
+			}
 
-			if (eligibleMapel.length > 0) {
+			if (candidateMapel.length > 0) {
 				const waliGroup = new Map<string, { displayNama: string; kelasIds: Set<number> }>();
-				for (const m of eligibleMapel) {
+				for (const m of candidateMapel) {
 					const rawName = (m.nama ?? '').trim();
 					const key = norm(rawName);
 					if (!key) continue;
@@ -197,7 +202,49 @@ export async function getTeacherAssignments(
 					}
 				}
 
-				return Array.from(waliGroup.values()).map((g) => ({
+				const result = Array.from(waliGroup.values()).map((g) => ({
+					mapelNama: g.displayNama,
+					kelasIds: Array.from(g.kelasIds).sort((a, b) => a - b)
+				}));
+				if (result.length > 0) return result;
+			}
+		}
+	}
+
+	// 5. Fallback Umum (Guru / Pendidik): Jika masih belum ada penugasan sama sekali,
+	// cari mata pelajaran aktif di sekolah pengguna agar guru tidak menemui tampilan kosong.
+	const effectiveSekolahId = userAuth?.sekolahId;
+	if (effectiveSekolahId) {
+		const schoolKelas = await db.query.tableKelas.findMany({
+			where: eq(tableKelas.sekolahId, effectiveSekolahId),
+			columns: { id: true }
+		});
+		const schoolKelasIds = schoolKelas.map((k) => k.id);
+
+		if (schoolKelasIds.length > 0) {
+			const schoolMapel = await db.query.tableMataPelajaran.findMany({
+				where: inArray(tableMataPelajaran.kelasId, schoolKelasIds),
+				columns: { id: true, nama: true, kelasId: true, pengampuId: true },
+				limit: 100
+			});
+
+			// Filter mapel yang belum penuh atau mapel yang sesuai
+			if (schoolMapel.length > 0) {
+				const genericGroup = new Map<string, { displayNama: string; kelasIds: Set<number> }>();
+				for (const m of schoolMapel) {
+					const rawName = (m.nama ?? '').trim();
+					const key = norm(rawName);
+					if (!key) continue;
+
+					if (!genericGroup.has(key)) {
+						genericGroup.set(key, { displayNama: rawName, kelasIds: new Set<number>() });
+					}
+					if (m.kelasId && m.kelasId > 0) {
+						genericGroup.get(key)!.kelasIds.add(m.kelasId);
+					}
+				}
+
+				return Array.from(genericGroup.values()).map((g) => ({
 					mapelNama: g.displayNama,
 					kelasIds: Array.from(g.kelasIds).sort((a, b) => a - b)
 				}));

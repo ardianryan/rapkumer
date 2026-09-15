@@ -1,5 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import db from '$lib/server/db';
+import { tableAuthUser, tableAuthUserPembelajaran } from '$lib/server/db/schema';
+import { eq, sql } from 'drizzle-orm';
 import {
 	exchangeZitadelCode,
 	extractZitadelMetadata,
@@ -101,6 +104,28 @@ export const GET: RequestHandler = async ({ url, cookies, request, getClientAddr
 			secure: isSecure,
 			maxAge: 86400
 		});
+	}
+
+	// Cek apakah akun guru (user / wali_kelas) memiliki pemetaan pembelajaran.
+	// Pastikan onboarding selalu dijalankan jika belum ada penugasan terkonfirmasi di database.
+	try {
+		const userRow = await db.query.tableAuthUser.findFirst({
+			where: eq(tableAuthUser.id, match.userId),
+			columns: { type: true }
+		});
+		if (userRow && (userRow.type === 'user' || userRow.type === 'wali_kelas')) {
+			const pembelajaranCount = await db
+				.select({ count: sql<number>`count(*)` })
+				.from(tableAuthUserPembelajaran)
+				.where(eq(tableAuthUserPembelajaran.authUserId, match.userId));
+			const count = Number(pembelajaranCount[0]?.count ?? 0);
+			if (!match.isOnboarded || count === 0) {
+				throw redirect(303, '/onboarding/penugasan');
+			}
+		}
+	} catch (e) {
+		if (e instanceof Response || (e && typeof e === 'object' && 'status' in e)) throw e;
+		// non-critical, fallback ke match.isOnboarded
 	}
 
 	// Jika pengguna belum melakukan konfirmasi/onboarding penugasan

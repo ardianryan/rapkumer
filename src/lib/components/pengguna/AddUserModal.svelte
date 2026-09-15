@@ -51,7 +51,7 @@
 	let sekolahId = $state<string | number | null>('');
 	let initialized = $state(false);
 	let showPassword = $state(false);
-	let selectAllKelas = $state(false);
+	let selectedWaliKelasId = $state<number | null>(null);
 	let saving = $state(false);
 
 	const isEditMode = $derived(editUser !== null);
@@ -108,6 +108,10 @@
 				sekolahId = editUser.sekolahId ?? '';
 				mataPelajaranIds = new Set(editUser.mataPelajaranIds ?? []);
 				kelasIds = new Set(editUser.kelasIds ?? []);
+				selectedWaliKelasId =
+					(editUser as { ownKelasId?: number | null }).ownKelasId ??
+					(editUser.kelasIds?.[0] ? Number(editUser.kelasIds[0]) : null) ??
+					(editUser.kelasId ? Number(editUser.kelasId) : null);
 
 				// Inisialisasi assignments terstruktur
 				if (editUser.assignments && editUser.assignments.length > 0) {
@@ -154,6 +158,7 @@
 				assignments = [{ mapelNama: '', kelasIds: [] }];
 				mataPelajaranIds = new Set<number>();
 				kelasIds = new Set<number>();
+				selectedWaliKelasId = null;
 				sekolahId = '';
 			}
 			password = '';
@@ -165,37 +170,16 @@
 	$effect(() => {
 		if (!open) {
 			initialized = false;
-			selectAllKelas = false;
+			selectedWaliKelasId = null;
 			saving = false;
 			kelasIds.clear();
 		}
 	});
 
-	function toggleSelectAllKelas() {
-		selectAllKelas = !selectAllKelas;
-		if (selectAllKelas) {
-			for (const k of filteredKelasList) {
-				kelasIds.add(k.id);
-			}
-		} else {
-			kelasIds.clear();
-		}
-		kelasIds = new Set(kelasIds);
-	}
-
 	function close() {
 		initialized = false;
 		open = false;
 		dispatch('cancel');
-	}
-
-	function toggleKelas(id: number) {
-		if (kelasIds.has(id)) {
-			kelasIds.delete(id);
-		} else {
-			kelasIds.add(id);
-		}
-		kelasIds = new Set(kelasIds);
 	}
 
 	async function save() {
@@ -220,11 +204,17 @@
 			// Multi-mapel & multi-kelas terstruktur
 			form.set('assignments', JSON.stringify(assignments));
 			const assignedKelasIds = Array.from(new Set(assignments.flatMap((a) => a.kelasIds)));
-			const combinedKelasIds =
-				type === 'wali_kelas'
-					? Array.from(new Set([...assignedKelasIds, ...kelasIds]))
+			if (type === 'wali_kelas') {
+				if (selectedWaliKelasId) {
+					form.set('ownKelasId', String(selectedWaliKelasId));
+				}
+				const combinedKelasIds = selectedWaliKelasId
+					? Array.from(new Set([...assignedKelasIds, selectedWaliKelasId]))
 					: assignedKelasIds;
-			form.set('kelasIds', JSON.stringify(combinedKelasIds));
+				form.set('kelasIds', JSON.stringify(combinedKelasIds));
+			} else {
+				form.set('kelasIds', JSON.stringify(assignedKelasIds));
+			}
 		} else {
 			form.set('mataPelajaranIds', JSON.stringify(Array.from(mataPelajaranIds)));
 			form.set('kelasIds', JSON.stringify(Array.from(kelasIds)));
@@ -241,7 +231,12 @@
 					type === 'user'
 						? Array.from(new Set(assignments.flatMap((a) => a.kelasIds)))
 						: type === 'wali_kelas'
-							? Array.from(new Set([...assignments.flatMap((a) => a.kelasIds), ...kelasIds]))
+							? Array.from(
+									new Set([
+										...assignments.flatMap((a) => a.kelasIds),
+										...(selectedWaliKelasId ? [selectedWaliKelasId] : [])
+									])
+								)
 							: Array.from(kelasIds);
 
 				const mergedBody = {
@@ -319,7 +314,7 @@
 						bind:value={sekolahId}
 						onchange={() => {
 							kelasIds.clear();
-							selectAllKelas = false;
+							selectedWaliKelasId = null;
 						}}
 					>
 						<option disabled selected={sekolahId === ''} value="">Pilih Sekolah</option>
@@ -429,55 +424,37 @@
 				<!-- Penugasan Kelas & Pembelajaran untuk Guru dan Wali Kelas -->
 				{#if type === 'user' || type === 'wali_kelas'}
 					{#if type === 'wali_kelas'}
-						<!-- Kelas Perwalian untuk Wali Kelas -->
-						<div
-							tabindex="0"
-							role="button"
-							class="bg-base-200 border-base-300 collapse-arrow collapse mb-3"
-						>
-							<div class="collapse-title font-semibold">
-								Kelas Perwalian (Wali Kelas) {#if kelasIds.size > 0}
-									<span class="badge badge-sm badge-secondary">{kelasIds.size}</span>
-								{/if}
-							</div>
-							<div class="collapse-content text-sm">
-								<div class="space-y-3">
-									<p class="text-xs opacity-75">
-										Pilih kelas perwalian yang dibimbing oleh Wali Kelas ini
-									</p>
-									{#if filteredKelasList.length > 0}
-										<div class="space-y-2">
-											<label
-												class="bg-base-300 flex cursor-pointer gap-2 rounded p-2 font-semibold"
-											>
-												<input
-													type="checkbox"
-													class="checkbox checkbox-sm"
-													checked={selectAllKelas}
-													onchange={toggleSelectAllKelas}
-												/>
-												<span class="text-sm">Pilih Semua</span>
-											</label>
-											{#each filteredKelasList as k (k.id)}
-												<label class="flex cursor-pointer gap-2">
-													<input
-														type="checkbox"
-														class="checkbox checkbox-sm"
-														checked={kelasIds.has(k.id)}
-														onchange={() => toggleKelas(k.id)}
-													/>
-													<span class="text-sm"
-														>{k.nama}
-														{#if k.fase}({k.fase}){/if}</span
-													>
-												</label>
-											{/each}
-										</div>
-									{:else}
-										<p class="text-xs opacity-75">- tidak ada kelas -</p>
-									{/if}
+						<!-- Kelas Perwalian Tunggal untuk Wali Kelas -->
+						<div class="bg-base-200 border border-base-300 rounded-2xl p-4 mb-4 space-y-2">
+							<div class="flex items-center justify-between">
+								<div class="flex items-center gap-2">
+									<Icon name="key" class="text-primary h-4 w-4" />
+									<span class="text-xs font-bold text-slate-800 dark:text-slate-100">
+										Kelas Perwalian (Wali Kelas)
+									</span>
 								</div>
+								<span class="badge badge-sm badge-secondary font-medium">Terkunci 1 Kelas</span>
 							</div>
+							<p class="text-xs opacity-75 leading-relaxed">
+								Wali Kelas hanya membimbing 1 kelas perwalian resmi. Kelas mengajar lainnya dapat
+								diatur pada bagian Penugasan Mengajar di bawah.
+							</p>
+							{#if filteredKelasList.length > 0}
+								<select
+									class="select select-sm w-full bg-white dark:bg-base-100 border-base-300 rounded-xl mt-1"
+									bind:value={selectedWaliKelasId}
+								>
+									<option value={null}>-- Belum Memilih Kelas Perwalian --</option>
+									{#each filteredKelasList as k (k.id)}
+										<option value={k.id}>
+											{k.nama}
+											{#if k.fase}({k.fase}){/if}
+										</option>
+									{/each}
+								</select>
+							{:else}
+								<p class="text-xs opacity-75 italic">- Tidak ada kelas tersedia di sekolah ini -</p>
+							{/if}
 						</div>
 					{/if}
 

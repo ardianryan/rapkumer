@@ -12,8 +12,8 @@ import { getAppVersion } from '$lib/server/app-info';
 import { isSecureRequest, resolveRequestProtocol } from '$lib/server/http';
 import { cookieNames } from '$lib/utils';
 import db from '$lib/server/db';
-import { tableKelas, tableMataPelajaran } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { tableAuthUserPembelajaran, tableKelas, tableMataPelajaran } from '$lib/server/db/schema';
+import { eq, sql } from 'drizzle-orm';
 import { fail, redirect } from '@sveltejs/kit';
 import { getZitadelConfig } from '$lib/server/zitadel';
 import type { Actions, PageServerLoad } from './$types';
@@ -263,6 +263,21 @@ export const actions: Actions = {
 		if (user.mustChangePassword) {
 			logLoginEvent('Forcing password change', { username, userId: user.id });
 			throw redirect(303, '/pengaturan?force=1');
+		}
+
+		// Jika guru / wali kelas belum memiliki pemetaan mapel di pembelajaran, arahkan ke onboarding
+		if (!url.searchParams.get('redirect') && (user.type === 'user' || user.type === 'wali_kelas')) {
+			try {
+				const pembCount = await db
+					.select({ count: sql<number>`count(*)` })
+					.from(tableAuthUserPembelajaran)
+					.where(eq(tableAuthUserPembelajaran.authUserId, user.id));
+				if (Number(pembCount[0]?.count ?? 0) === 0) {
+					throw redirect(303, '/onboarding/penugasan');
+				}
+			} catch (e) {
+				if (e instanceof Response || (e && typeof e === 'object' && 'status' in e)) throw e;
+			}
 		}
 
 		const target = resolveRedirectTarget(url.searchParams.get('redirect')) ?? '/';

@@ -1,5 +1,13 @@
 import db from './index';
 import { ensureSchema } from './ensure-helper';
+import { eq, inArray } from 'drizzle-orm';
+import {
+	tableAuthUser,
+	tableAuthUserKelas,
+	tableAuthUserPembelajaran,
+	tableKelas,
+	tableSemester
+} from './schema';
 
 const PEMBELAJARAN_SCHEMA = 'auth_user_pembelajaran';
 
@@ -116,5 +124,93 @@ export async function ensurePembelajaranSchema() {
 		}
 	} catch (e) {
 		console.warn('[ensurePembelajaranSchema] Backfill migration notice:', e);
+	}
+
+	// Normalisasi otomatis: kunci Wali Kelas hanya pada 1 kelas perwalian resminya
+	await normalizeWaliKelasSingleClass();
+}
+
+/**
+ * Normalisasi akun Wali Kelas hasil tarikan Dapodik:
+ * Memastikan akun wali_kelas benar-benar hanya terkunci pada 1 kelas perwalian resminya.
+ * Membersihkan relasi kelas berlebih di tableAuthUserKelas akibat sync Dapodik lama.
+ */
+export async function normalizeWaliKelasSingleClass() {
+	try {
+		// 1. Ambil seluruh akun wali_kelas yang terhubung ke pegawai
+		const waliAccounts = await db.query.tableAuthUser.findMany({
+			where: eq(tableAuthUser.type, 'wali_kelas'),
+			columns: { id: true, pegawaiId: true, kelasId: true, sekolahId: true }
+		});
+
+		for (const acc of waliAccounts) {
+			if (!acc.pegawaiId) continue;
+
+			// Cari kelas perwalian resmi dari tableKelas.waliKelasId
+			// Utamakan kelas di semester aktif jika ada
+			const kelasRows = await db
+				.select({
+					id: tableKelas.id,
+					isSemesterAktif: tableSemester.isAktif
+				})
+				.from(tableKelas)
+				.leftJoin(tableSemester, eq(tableKelas.semesterId, tableSemester.id))
+				.where(eq(tableKelas.waliKelasId, acc.pegawaiId));
+
+			let officialKelasId: number | null = null;
+			if (kelasRows.length > 0) {
+				const activeK = kelasRows.find((k) => k.isSemesterAktif);
+				officialKelasId = activeK ? activeK.id : kelasRows[0].id;
+			} else if (acc.kelasId) {
+				officialKelasId = acc.kelasId;
+			}
+
+			if (officialKelasId) {
+				// Pastikan auth_user.kelasId menunjuk ke officialKelasId
+				if (acc.kelasId !== officialKelasId) {
+					await db
+						.update(tableAuthUser)
+						.set({ kelasId: officialKelasId })
+						.where(eq(tableAuthUser.id, acc.id));
+				}
+
+				// Cari kelas-kelas pembelajaran resmi guru ini
+				const pembelajarans = await db.query.tableAuthUserPembelajaran.findMany({
+					where: eq(tableAuthUserPembelajaran.authUserId, acc.id),
+					columns: { kelasId: true }
+				});
+				const learningKelasIds = new Set(pembelajarans.map((p) => p.kelasId));
+				learningKelasIds.add(officialKelasId);
+
+				// Hapus relasi tableAuthUserKelas yang bukan kelas perwalian dan bukan kelas pembelajaran
+				const allUserKelas = await db.query.tableAuthUserKelas.findMany({
+					where: eq(tableAuthUserKelas.authUserId, acc.id),
+					columns: { id: true, kelasId: true }
+				});
+
+				const staleIds = allUserKelas
+					.filter((uk) => !learningKelasIds.has(uk.kelasId))
+					.map((uk) => uk.id);
+
+				if (staleIds.length > 0) {
+					await db.delete(tableAuthUserKelas).where(inArray(tableAuthUserKelas.id, staleIds));
+				}
+
+				// Pastikan officialKelasId ada di tableAuthUserKelas
+				const hasOfficial = allUserKelas.some((uk) => uk.kelasId === officialKelasId);
+				if (!hasOfficial) {
+					try {
+						await db.insert(tableAuthUserKelas).values({
+							authUserId: acc.id,
+							kelasId: officialKelasId
+						});
+					} catch {
+						// ignore duplicate
+					}
+				}
+			}
+		}
+	} catch (e) {
+		console.warn('[normalizeWaliKelasSingleClass] Notice:', e);
 	}
 }
