@@ -2,7 +2,13 @@
 	import FormEnhance from '$lib/components/form-enhance.svelte';
 	import Icon from '$lib/components/icon.svelte';
 
-	let { onsuccess }: { onsuccess?: () => void } = $props();
+	let {
+		onsuccess,
+		isSsoUser = false
+	}: {
+		onsuccess?: () => void;
+		isSsoUser?: boolean;
+	} = $props();
 
 	// Password visibility toggles
 	let showCurrentPassword = $state(false);
@@ -23,6 +29,16 @@
 				Perbarui kata sandi untuk menjaga keamanan akses aplikasi.
 			</p>
 		</header>
+
+		{#if isSsoUser}
+			<div class="alert alert-info alert-soft text-sm">
+				<Icon name="info" />
+				<span>
+					Akun Anda terhubung dengan SSO (Single Sign-On). Kredensial dan kata sandi Anda dikelola
+					oleh penyedia SSO. Pengubahan kata sandi di sini tidak wajib.
+				</span>
+			</div>
+		{/if}
 
 		<FormEnhance action="?/change-password" onsuccess={handlePasswordSuccess}>
 			{#snippet children({ submitting, invalid })}

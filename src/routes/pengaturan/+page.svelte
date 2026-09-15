@@ -61,7 +61,7 @@
 
 <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
 	<ChangeUsernameCard />
-	<ChangePasswordCard onsuccess={handlePasswordSuccess} />
+	<ChangePasswordCard onsuccess={handlePasswordSuccess} isSsoUser={data.isSsoUser} />
 </div>
 
 {#if user?.type === 'admin' && data.storage}

@@ -1,11 +1,6 @@
 import crypto from 'node:crypto';
 import db from '$lib/server/db';
-import {
-	tableAuthUser,
-	tableAuthZitadelUser,
-	tablePegawai,
-	tableSekolah
-} from '$lib/server/db/schema';
+import { tableAuthUser, tableAuthZitadelUser, tablePegawai } from '$lib/server/db/schema';
 import { eq, or, sql } from 'drizzle-orm';
 
 export interface ZitadelLiveMetadata {
@@ -526,7 +521,17 @@ export async function matchAndLinkZitadelUser(
 		authUserId = createdUser.id;
 	}
 
-	// 7. Tautkan atau perbarui tableAuthZitadelUser (Upsert aman)
+	// 7. Pengguna yang terautentikasi melalui SSO tidak wajib mengubah kata sandi lokal
+	// karena kredensial dikelola terpusat oleh penyedia SSO.
+	await db
+		.update(tableAuthUser)
+		.set({
+			mustChangePassword: false,
+			updatedAt: new Date().toISOString()
+		})
+		.where(eq(tableAuthUser.id, authUserId));
+
+	// 8. Tautkan atau perbarui tableAuthZitadelUser (Upsert aman)
 	const existingLink = await db.query.tableAuthZitadelUser.findFirst({
 		where: eq(tableAuthZitadelUser.userId, authUserId)
 	});

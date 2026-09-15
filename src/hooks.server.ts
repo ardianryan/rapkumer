@@ -1,7 +1,7 @@
 import '$lib/server/load-env';
 import { applySessionCookie, resolveSession } from '$lib/server/auth';
 import db from '$lib/server/db';
-import { tableSekolah } from '$lib/server/db/schema';
+import { tableAuthUser, tableSekolah } from '$lib/server/db/schema';
 import { isSecureRequest, resolveRequestProtocol } from '$lib/server/http';
 import { cookieNames } from '$lib/utils';
 import { error, redirect, type Handle } from '@sveltejs/kit';
@@ -247,7 +247,19 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	// the default Admin/Admin123 account on first login). Only /pengaturan,
 	// /sekolah/form (needed on a fresh install before any sekolah exists), and
 	// /logout are reachable until the password is replaced.
-	if (event.locals.user?.mustChangePassword) {
+	// Pengecualian: Sesi login melalui SSO (Zitadel) tidak diwajibkan mengganti password lokal.
+	const isSsoSession = Boolean(event.cookies.get('zitadel_id_token'));
+	if (event.locals.user?.mustChangePassword && isSsoSession) {
+		event.locals.user.mustChangePassword = false;
+		db.update(tableAuthUser)
+			.set({ mustChangePassword: false, updatedAt: new Date().toISOString() })
+			.where(eq(tableAuthUser.id, event.locals.user.id))
+			.catch((e) =>
+				console.warn('[auth guard] Gagal reset mustChangePassword untuk pengguna SSO:', e)
+			);
+	}
+
+	if (event.locals.user?.mustChangePassword && !isSsoSession) {
 		const allowed =
 			event.url.pathname === '/pengaturan' ||
 			event.url.pathname === '/sekolah/form' ||

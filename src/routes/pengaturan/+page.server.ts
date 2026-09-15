@@ -6,7 +6,7 @@ import {
 	verifyUserPassword
 } from '$lib/server/auth';
 import db from '$lib/server/db';
-import { tableAuthUser } from '$lib/server/db/schema';
+import { tableAuthUser, tableAuthZitadelUser } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { getAppVersion } from '$lib/server/app-info';
 import { fail, redirect } from '@sveltejs/kit';
@@ -88,7 +88,7 @@ function filterAddresses(entries: AddressEntry[], currentHost: string) {
 	return entries;
 }
 
-export const load: PageServerLoad = async ({ url, locals }) => {
+export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 	const meta: PageMeta = {
 		title: 'Pengaturan',
 		description: 'Pengaturan Aplikasi Administrasi Guru Terpadu'
@@ -117,8 +117,17 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	const isAdminOrKepalaSekolah = isAdmin || locals.user?.type === 'kepala_sekolah';
 	const storage = isAdmin ? await getStorageInfo() : undefined;
 
+	const isSsoSession = Boolean(cookies.get('zitadel_id_token'));
+	const zitadelUser = locals.user
+		? await db.query.tableAuthZitadelUser.findFirst({
+				where: eq(tableAuthZitadelUser.userId, locals.user.id)
+			})
+		: null;
+	const isSsoUser = Boolean(zitadelUser) || isSsoSession;
+
 	const forcePasswordChange =
-		url.searchParams.get('force') === '1' || Boolean(locals.user?.mustChangePassword);
+		!isSsoUser &&
+		(url.searchParams.get('force') === '1' || Boolean(locals.user?.mustChangePassword));
 
 	const bukuTamuPasskeySet =
 		isAdminOrKepalaSekolah && locals.sekolah?.id
@@ -143,6 +152,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		appVersion: getAppVersion(),
 		storage,
 		forcePasswordChange,
+		isSsoUser,
 		bukuTamuPasskeySet,
 		gemini: {
 			keySet: Boolean(storedGemini),
