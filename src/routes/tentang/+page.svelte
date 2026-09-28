@@ -134,7 +134,7 @@
 				<h3 class="card-title mt-1">Tester</h3>
 				<ul class="menu bg-base-200 rounded-box w-full">
 					{#each ['Hamdani, S.Pd., Gr.', 'Rudiansyah, S.Pd., Gr.', 'Putra Panji Prasetiyo, S.Pd., Gr.'] as name (name)}
-						<li><a class="pointer-events-none cursor-default">{name}</a></li>
+						<li><span class="pointer-events-none cursor-default">{name}</span></li>
 					{/each}
 				</ul>
 			</div>

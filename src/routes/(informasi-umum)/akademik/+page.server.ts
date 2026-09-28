@@ -965,7 +965,7 @@ export const actions: Actions = {
 		}
 
 		let sourceSemester:
-			(typeof tableSemester.$inferSelect & { tahunAjaran: TahunAjaranRow }) | null = null;
+			(typeof tableSemester.$inferSelect & { tahunAjaran: TahunAjaranRow }) | null;
 
 		if (Number.isFinite(sourceSemesterId) && (sourceSemesterId ?? 0) > 0) {
 			const candidate = await db.query.tableSemester.findFirst({
@@ -1274,17 +1274,20 @@ export const actions: Actions = {
 		}
 
 		const presensiGuruEnabled = formData.get('presensiGuruEnabled') === '1';
+		const bypassJadwal = formData.get('bypassJadwal') !== '0';
 
 		if (jenisPresensiEnum === 'tiap_mapel') {
-			const jadwalCount = await db.$client.execute({
-				sql: `SELECT COUNT(*) as cnt FROM jadwal_pelajaran WHERE sekolah_id = ?`,
-				args: [sekolahId]
-			});
-			const row = (jadwalCount.rows as unknown as Array<{ cnt: number }>)[0];
-			if (!row || Number(row.cnt) === 0) {
-				return fail(400, {
-					fail: 'Jadwal pelajaran harus diisi terlebih dahulu agar dapat menggunakan presensi tiap mapel'
+			if (!bypassJadwal) {
+				const jadwalCount = await db.$client.execute({
+					sql: `SELECT COUNT(*) as cnt FROM jadwal_pelajaran WHERE sekolah_id = ?`,
+					args: [sekolahId]
 				});
+				const row = (jadwalCount.rows as unknown as Array<{ cnt: number }>)[0];
+				if (!row || Number(row.cnt) === 0) {
+					return fail(400, {
+						fail: 'Jadwal pelajaran harus diisi terlebih dahulu agar dapat menggunakan presensi tiap mapel'
+					});
+				}
 			}
 		} else if (['awal_mapel', 'awal_akhir_mapel'].includes(tipePresensiEnum)) {
 			return fail(400, {
@@ -1306,6 +1309,7 @@ export const actions: Actions = {
 				tipePresensi: tipePresensiEnum,
 				jenisPresensi: jenisPresensiEnum,
 				presensiGuruEnabled,
+				bypassJadwal,
 				liburNasional,
 				liburSemester,
 				updatedAt: new Date().toISOString()
@@ -1320,6 +1324,7 @@ export const actions: Actions = {
 					tipePresensi: tipePresensiEnum,
 					jenisPresensi: jenisPresensiEnum,
 					presensiGuruEnabled,
+					bypassJadwal,
 					liburNasional,
 					liburSemester,
 					updatedAt: new Date().toISOString()

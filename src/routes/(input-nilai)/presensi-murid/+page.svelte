@@ -132,7 +132,9 @@
 			perkiraanJam: string;
 		} | null;
 		guruMapelSubject: { id: number; nama: string } | null;
+		guruMapelSubjects: Array<{ id: number; nama: string }>;
 		isMapelOnJadwal: boolean;
+		bypassJadwal: boolean;
 		harianMapelId: number | null;
 		simulasiHari: string | null;
 		simulasiJam: string | null;
@@ -645,11 +647,11 @@
 							presensiNotReady();
 							return;
 						}
-						if (jadwalBelumDimulai) {
+						if (!data.bypassJadwal && jadwalBelumDimulai) {
 							toast({ message: 'Jam pelajaran bapak/ibu belum dimulai', type: 'warning' });
 							return;
 						}
-						if (page.data.user?.type === 'user' && !data.isMapelOnJadwal) {
+						if (!data.bypassJadwal && page.data.user?.type === 'user' && !data.isMapelOnJadwal) {
 							toast({
 								message: 'Mata pelajaran tidak dijadwalkan pada tanggal ini',
 								type: 'warning'
@@ -669,6 +671,7 @@
 								kelasId: kelasAktif?.id ?? undefined,
 								tanggal: data.tanggal,
 								mataPelajaranId: isiMapelId,
+								daftarMataPelajaran: data.guruMapelSubjects ?? [],
 								namaMataPelajaran: useMapelData
 									? (currentMapel?.namaMataPelajaran ?? fallbackSubject?.nama ?? undefined)
 									: undefined,
@@ -676,7 +679,8 @@
 								simulasiHari: data.simulasiHari,
 								simulasiJam: data.simulasiJam,
 								tipePresensi: data.tipePresensi,
-								jenisPresensi: data.jenisPresensi
+								jenisPresensi: data.jenisPresensi,
+								bypassJadwal: data.bypassJadwal ?? false
 							},
 							dismissible: true
 						});

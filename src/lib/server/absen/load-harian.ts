@@ -529,7 +529,7 @@ export async function loadHarian(params: {
 			? sql`(${tableAbsensi.mataPelajaranId} = ${firstMapelId} OR ${tableAbsensi.mataPelajaranId} IS NULL)`
 			: sql`${tableAbsensi.mataPelajaranId} IS NULL`;
 
-	let queryRecords: QueryRecord[] = [];
+	let queryRecords: QueryRecord[];
 	let tableReady = true;
 
 	try {
@@ -752,17 +752,42 @@ export async function loadHarian(params: {
 		papbMpId = result.papbMpId;
 	}
 
+	const bypassJadwal = !!(presensiSettings as { bypassJadwal?: boolean | number })?.bypassJadwal;
+	if (bypassJadwal) {
+		isMapelOnJadwal = true;
+	}
+
+	let guruMapelSubjects: Array<{ id: number; nama: string }> = [];
 	if (user.type === 'user' && precomputedUserMpIds && precomputedUserMpIds.size > 0) {
-		const mp = await db.query.tableMataPelajaran.findFirst({
+		const mps = await db.query.tableMataPelajaran.findMany({
 			columns: { id: true, nama: true },
-			where: inArray(tableMataPelajaran.id, [...precomputedUserMpIds])
+			where: and(
+				eq(tableMataPelajaran.kelasId, kelasId),
+				inArray(tableMataPelajaran.id, [...precomputedUserMpIds])
+			)
 		});
-		if (mp) {
-			const isAgama = agamaNameSet.has(mp.nama);
-			guruMapelSubject = {
-				id: isAgama && papbMpId != null ? papbMpId : mp.id,
-				nama: isAgama ? 'Pendidikan Agama dan Budi Pekerti' : mp.nama
+		guruMapelSubjects = mps.map((m) => {
+			const isAgama = agamaNameSet.has(m.nama);
+			return {
+				id: isAgama && papbMpId != null ? papbMpId : m.id,
+				nama: isAgama ? 'Pendidikan Agama dan Budi Pekerti' : m.nama
 			};
+		});
+		if (guruMapelSubjects.length > 0) {
+			guruMapelSubject = guruMapelSubjects[0];
+		} else {
+			const mp = await db.query.tableMataPelajaran.findFirst({
+				columns: { id: true, nama: true },
+				where: inArray(tableMataPelajaran.id, [...precomputedUserMpIds])
+			});
+			if (mp) {
+				const isAgama = agamaNameSet.has(mp.nama);
+				guruMapelSubject = {
+					id: isAgama && papbMpId != null ? papbMpId : mp.id,
+					nama: isAgama ? 'Pendidikan Agama dan Budi Pekerti' : mp.nama
+				};
+				guruMapelSubjects = [guruMapelSubject];
+			}
 		}
 	}
 
@@ -812,7 +837,9 @@ export async function loadHarian(params: {
 		persentaseHarianRows,
 		jadwalSaatIni,
 		guruMapelSubject,
+		guruMapelSubjects,
 		isMapelOnJadwal,
+		bypassJadwal,
 		harianMapelId: firstMapelId,
 		simulasiHari: simHari,
 		simulasiJam: simJam,

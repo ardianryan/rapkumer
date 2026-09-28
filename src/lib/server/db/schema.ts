@@ -1057,6 +1057,7 @@ export const tablePresensiSettings = sqliteTable(
 			.notNull()
 			.default('wali_kelas_saja'),
 		presensiGuruEnabled: int({ mode: 'boolean' }).notNull().default(true),
+		bypassJadwal: int({ mode: 'boolean' }).notNull().default(true),
 		...audit
 	},
 	(table) => [unique().on(table.sekolahId, table.tahunAjaranId)]
@@ -1732,7 +1733,8 @@ export const tableDapodikPembelajaran = sqliteTable(
 		nama: text().notNull(),
 		...audit
 	},
-	(table) => [unique().on(table.pembelajaranId)]
+	// Komposit: satu pembelajaran rombel pilihan bisa dipakai lintas kelas.
+	(table) => [unique().on(table.kelasId, table.pembelajaranId)]
 );
 
 /**

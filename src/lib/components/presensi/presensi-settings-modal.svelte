@@ -24,6 +24,7 @@
 		tipePresensi?: string;
 		jenisPresensi?: string;
 		presensiGuruEnabled?: boolean;
+		bypassJadwal?: boolean;
 		liburNasional?: string;
 		liburSemester?: string;
 		onAction?: (actions: { submit: () => Promise<void>; cancel: () => void }) => void;
@@ -38,6 +39,7 @@
 		tipePresensi = 'masuk_pulang',
 		jenisPresensi = 'wali_kelas_saja',
 		presensiGuruEnabled = true,
+		bypassJadwal = true,
 		liburNasional = '[]',
 		liburSemester = '[]',
 		onAction
@@ -82,6 +84,8 @@
 	let jenisPresensiValue = $state(jenisPresensi);
 	// svelte-ignore state_referenced_locally
 	let presensiGuruEnabledValue = $state(presensiGuruEnabled);
+	// svelte-ignore state_referenced_locally
+	let bypassJadwalValue = $state(bypassJadwal);
 
 	let liburDates = $state<string[]>([]);
 	try {
@@ -226,6 +230,7 @@
 		formData.append('tipePresensi', tipePresensiValue);
 		formData.append('jenisPresensi', jenisPresensiValue);
 		formData.append('presensiGuruEnabled', presensiGuruEnabledValue ? '1' : '0');
+		formData.append('bypassJadwal', bypassJadwalValue ? '1' : '0');
 		formData.append('liburNasional', JSON.stringify(liburDates));
 		formData.append(
 			'liburSemester',
@@ -306,6 +311,31 @@
 	</div>
 
 	<div class="divider divider-middle text-sm font-semibold">Presensi Murid</div>
+
+	<div class="flex items-center justify-between">
+		<div>
+			<h4 class="font-semibold">Bypass / Abaikan Jadwal Pelajaran</h4>
+			<p class="text-base-content/70 text-xs">
+				Jika aktif, guru dapat mengisi presensi dan jurnal mengajar kapan saja tanpa dibatasi oleh
+				jadwal pelajaran.
+			</p>
+		</div>
+		<label class="flex cursor-pointer items-center gap-2">
+			<input
+				type="checkbox"
+				class="toggle toggle-primary"
+				bind:checked={bypassJadwalValue}
+				disabled={submitting}
+			/>
+			<span class="text-sm font-semibold">
+				{#if bypassJadwalValue}
+					<span class="text-primary">Aktif</span>
+				{:else}
+					<span class="text-base-content/50">Nonaktif</span>
+				{/if}
+			</span>
+		</label>
+	</div>
 
 	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 		<label class="fieldset flex flex-col gap-1">
@@ -476,6 +506,7 @@
 					class="btn btn-soft btn-sm btn-error shadow-none"
 					onclick={() => removeSemesterRange(i)}
 					disabled={submitting}
+					aria-label="Hapus rentang tanggal"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"

@@ -112,6 +112,7 @@
 		id: number;
 		kelasId: number;
 		mataPelajaranId: number;
+		jamPelajaran?: string;
 		lingkupMateri: string;
 		tujuanPembelajaranId: number | null;
 		catatan: string;
@@ -129,6 +130,7 @@
 				tujuanPembelajaranList: data.tujuanPembelajaranList,
 				lingkupMateriList: data.lingkupMateriList,
 				userType: data.userType ?? '',
+				bypassJadwal: data.bypassJadwal,
 				onAction: (a: { submit: () => void }) => {
 					actions = a;
 				},
@@ -265,6 +267,7 @@
 											id: item.id,
 											kelasId: item.kelasId,
 											mataPelajaranId: item.mataPelajaranId,
+											jamPelajaran: item.jamPelajaran,
 											lingkupMateri: item.lingkupMateri,
 											tujuanPembelajaranId: item.tpId,
 											catatan: item.catatan

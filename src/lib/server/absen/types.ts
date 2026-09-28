@@ -119,6 +119,8 @@ export type AbsenLoadData = {
 	jadwalSaatIni: JadwalSaatIni | null;
 	guruMapelSubject: { id: number; nama: string } | null;
 	isMapelOnJadwal: boolean;
+	bypassJadwal: boolean;
+	guruMapelSubjects: Array<{ id: number; nama: string }>;
 	harianMapelId: number | null;
 	simulasiHari: string | null;
 	simulasiJam: string | null;

@@ -1298,6 +1298,13 @@ async function ensureGuruAccounts(
 		let kelasLinked = 0;
 		for (const userId of allLinkedUserIds) {
 			const userKelas = new Set<number>();
+			const userAccount = allAccounts.find((a) => a.id === userId);
+			// Include own wali class
+			if (userAccount?.pegawaiId != null) {
+				for (const kelasId of kelasIdsByWali.get(userAccount.pegawaiId) ?? []) {
+					userKelas.add(kelasId);
+				}
+			}
 			const userLinks = await db
 				.select({ mataPelajaranId: tableAuthUserMataPelajaran.mataPelajaranId })
 				.from(tableAuthUserMataPelajaran)
@@ -1314,9 +1321,11 @@ async function ensureGuruAccounts(
 				kelasLinked++;
 			}
 			if (userKelas.size > 1) {
-				const user = allAccounts.find((a) => a.id === userId);
-				if (user && !(user.permissions as string[]).includes('kelas_pindah')) {
-					const updated = [...(user.permissions as string[]), 'kelas_pindah'] as UserPermission[];
+				if (userAccount && !(userAccount.permissions as string[]).includes('kelas_pindah')) {
+					const updated = [
+						...(userAccount.permissions as string[]),
+						'kelas_pindah'
+					] as UserPermission[];
 					await db
 						.update(tableAuthUser)
 						.set({ permissions: updated })
@@ -1950,9 +1959,8 @@ async function upsertPembelajaran(
 						nama: namaMapel
 					})
 					.onConflictDoUpdate({
-						target: tableDapodikPembelajaran.pembelajaranId,
+						target: [tableDapodikPembelajaran.kelasId, tableDapodikPembelajaran.pembelajaranId],
 						set: {
-							kelasId: sql`excluded.kelas_id`,
 							mataPelajaranId: sql`excluded.mata_pelajaran_id`,
 							nama: sql`excluded.nama`
 						}
@@ -2342,9 +2350,8 @@ async function syncMapelPilihan(
 								updatedAt: now
 							})
 							.onConflictDoUpdate({
-								target: tableDapodikPembelajaran.pembelajaranId,
+								target: [tableDapodikPembelajaran.kelasId, tableDapodikPembelajaran.pembelajaranId],
 								set: {
-									kelasId,
 									nama: sql`excluded.nama`,
 									mataPelajaranId: sql`excluded.mata_pelajaran_id`,
 									updatedAt: now

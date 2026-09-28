@@ -16,24 +16,60 @@
 		kelasId = 0,
 		tanggal,
 		mataPelajaranId,
+		daftarMataPelajaran = [],
 		namaMataPelajaran,
 		perkiraanJam,
 		simulasiHari,
 		simulasiJam,
 		tipePresensi = 'awal_mapel',
-		jenisPresensi = 'wali_kelas_saja'
+		jenisPresensi = 'wali_kelas_saja',
+		bypassJadwal = false
 	}: {
 		daftarMurid: MuridItem[];
 		kelasId?: number;
 		tanggal: string;
 		mataPelajaranId?: number | null;
+		daftarMataPelajaran?: Array<{ id: number; nama: string }>;
 		namaMataPelajaran?: string;
 		perkiraanJam?: string;
 		simulasiHari?: string | null;
 		simulasiJam?: string | null;
 		tipePresensi?: string;
 		jenisPresensi?: string;
+		bypassJadwal?: boolean;
 	} = $props();
+
+	// svelte-ignore state_referenced_locally
+	let selectedMapelId = $state<number | null>(
+		mataPelajaranId ?? daftarMataPelajaran[0]?.id ?? null
+	);
+	// svelte-ignore state_referenced_locally
+	let selectedJamKe = $state<string>(perkiraanJam || '1-2');
+
+	const currentMapelNama = $derived.by(() => {
+		if (selectedMapelId && daftarMataPelajaran.length > 0) {
+			const found = daftarMataPelajaran.find((m) => m.id === selectedMapelId);
+			if (found) return found.nama;
+		}
+		return namaMataPelajaran ?? '';
+	});
+
+	function saveActiveSession() {
+		if (typeof window !== 'undefined' && kelasId && selectedMapelId) {
+			try {
+				const sessionData = {
+					tanggal,
+					kelasId,
+					mataPelajaranId: selectedMapelId,
+					namaMataPelajaran: currentMapelNama,
+					jamKe: selectedJamKe
+				};
+				localStorage.setItem('active_teaching_session', JSON.stringify(sessionData));
+			} catch {
+				// ignore localStorage issues
+			}
+		}
+	}
 
 	let step = $state<'pilih-mode' | 'pilih-murid'>('pilih-mode');
 	let pilihanHadirSemua = $state<string>('');
@@ -157,7 +193,8 @@
 			fd.set('mode', 'hadir_semua');
 			fd.set('kelasId', String(kelasId));
 			fd.set('tanggal', tanggal);
-			if (mataPelajaranId != null) fd.set('mataPelajaranId', String(mataPelajaranId));
+			const targetMapelId = selectedMapelId ?? mataPelajaranId;
+			if (targetMapelId != null) fd.set('mataPelajaranId', String(targetMapelId));
 			if (simulasiHari) fd.set('simHari', simulasiHari);
 			if (simulasiJam) fd.set('simJam', simulasiJam);
 			if (isAwalAkhir) fd.set('sessionType', sessionType);
@@ -167,8 +204,10 @@
 				const err = await res.json().catch(() => ({ fail: 'Gagal menyimpan' }));
 				throw new Error(err.fail ?? `Error ${res.status}`);
 			}
+			saveActiveSession();
 			hideModal();
 			await invalidate('app:absen');
+			toast('Kehadiran disimpan! Sesi mengajar tersinkron ke Jurnal.', 'success');
 		} catch (e) {
 			toast(e instanceof Error ? e.message : 'Gagal menyimpan', 'error');
 		}
@@ -188,7 +227,8 @@
 			fd.set('mode', 'selected');
 			fd.set('kelasId', String(kelasId));
 			fd.set('tanggal', tanggal);
-			if (mataPelajaranId != null) fd.set('mataPelajaranId', String(mataPelajaranId));
+			const targetMapelId = selectedMapelId ?? mataPelajaranId;
+			if (targetMapelId != null) fd.set('mataPelajaranId', String(targetMapelId));
 			if (simulasiHari) fd.set('simHari', simulasiHari);
 			if (simulasiJam) fd.set('simJam', simulasiJam);
 			if (isAwalAkhir) fd.set('sessionType', sessionType);
@@ -199,8 +239,10 @@
 				const err = await res.json().catch(() => ({ fail: 'Gagal menyimpan' }));
 				throw new Error(err.fail ?? `Error ${res.status}`);
 			}
+			saveActiveSession();
 			hideModal();
 			await invalidate('app:absen');
+			toast('Kehadiran disimpan! Sesi mengajar tersinkron ke Jurnal.', 'success');
 		} catch (e) {
 			toast(e instanceof Error ? e.message : 'Gagal menyimpan', 'error');
 		}
@@ -225,6 +267,44 @@
 
 {#if step === 'pilih-mode'}
 	<div class="flex flex-col gap-4">
+		{#if daftarMataPelajaran.length > 1}
+			<div class="flex flex-col gap-1">
+				<span class="text-xs font-semibold text-base-content/70">Mata Pelajaran</span>
+				<select
+					class="select select-sm bg-base-200 dark:bg-base-300 w-full dark:border-none"
+					bind:value={selectedMapelId}
+				>
+					{#each daftarMataPelajaran as mp (mp.id)}
+						<option value={mp.id}>{mp.nama}</option>
+					{/each}
+				</select>
+			</div>
+		{/if}
+
+		{#if selectedMapelId || namaMataPelajaran}
+			<div class="flex flex-col gap-1">
+				<span class="text-xs font-semibold text-base-content/70">Jam Pelajaran ke-</span>
+				<select
+					class="select select-sm bg-base-200 dark:bg-base-300 w-full dark:border-none"
+					bind:value={selectedJamKe}
+				>
+					<option value="1-2">Jam 1-2</option>
+					<option value="3-4">Jam 3-4</option>
+					<option value="5-6">Jam 5-6</option>
+					<option value="7-8">Jam 7-8</option>
+					<option value="9-10">Jam 9-10</option>
+					<option value="1">Jam 1</option>
+					<option value="2">Jam 2</option>
+					<option value="3">Jam 3</option>
+					<option value="4">Jam 4</option>
+					<option value="5">Jam 5</option>
+					<option value="6">Jam 6</option>
+					<option value="7">Jam 7</option>
+					<option value="8">Jam 8</option>
+				</select>
+			</div>
+		{/if}
+
 		{#if isAwalAkhir}
 			<select
 				class="select select-sm bg-base-200 dark:bg-base-300 w-full dark:border-none"
@@ -243,10 +323,10 @@
 				<option value="pulang">Presensi Pulang</option>
 			</select>
 		{/if}
-		{#if namaMataPelajaran}
+		{#if currentMapelNama}
 			<p class="text-base-content text-lg font-medium">
-				Apakah hadir semua pada mata pelajaran {namaMataPelajaran}
-				{perkiraanJam ? `- ${perkiraanJam}` : ''}?
+				Apakah hadir semua pada mata pelajaran {currentMapelNama}
+				{selectedJamKe ? `(Jam ${selectedJamKe})` : ''}?
 			</p>
 		{:else}
 			<p class="text-base-content text-lg font-medium">Apakah hadir semua hari ini?</p>

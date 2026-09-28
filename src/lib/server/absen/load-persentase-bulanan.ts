@@ -437,7 +437,9 @@ export async function loadPersentaseBulanan(params: {
 		jadwalSaatIni: null,
 		harianMapelId: null,
 		guruMapelSubject: null,
+		guruMapelSubjects: [],
 		isMapelOnJadwal: false,
+		bypassJadwal: !!(presensiSettings as { bypassJadwal?: boolean | number })?.bypassJadwal,
 		simulasiHari: simHari,
 		simulasiJam: simJam,
 		isLibur: false

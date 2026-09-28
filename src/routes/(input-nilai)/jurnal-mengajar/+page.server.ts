@@ -5,6 +5,7 @@ import {
 	tableJurnalMengajar,
 	tableKelas,
 	tableMataPelajaran,
+	tablePresensiSettings,
 	tableTujuanPembelajaran
 } from '$lib/server/db/schema';
 import { fail, redirect } from '@sveltejs/kit';
@@ -47,6 +48,13 @@ export async function load({ locals, url, depends, parent }) {
 	const pageNumber =
 		Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
 
+	const presensiSettings = sekolahId
+		? await db.query.tablePresensiSettings.findFirst({
+				where: eq(tablePresensiSettings.sekolahId, sekolahId)
+			})
+		: null;
+	const bypassJadwal = presensiSettings?.bypassJadwal ?? true;
+
 	if (!sekolahId || !kelasIds.length) {
 		return {
 			meta: { title: 'Jurnal Mengajar' },
@@ -56,6 +64,8 @@ export async function load({ locals, url, depends, parent }) {
 			lingkupMateriList: [],
 			mataPelajaranList: [],
 			hasAnyMapel: false,
+			bypassJadwal,
+			userType: user?.type ?? '',
 			mapelId: null,
 			tanggal: null,
 			page: {
@@ -144,6 +154,15 @@ export async function load({ locals, url, depends, parent }) {
 				.map((kode) => kodeToMpMap.get(kode))
 				.filter((mp): mp is { id: number; nama: string } => !!mp)
 				.map((mp) => ({ ...mp, kode: null }));
+			mapelIds = mataPelajaranList.map((mp) => mp.id);
+		}
+
+		if (bypassJadwal || mataPelajaranList.length === 0) {
+			mataPelajaranList = allMapelForClass.map((mp) => ({
+				id: mp.id,
+				nama: mp.nama,
+				kode: null
+			}));
 			mapelIds = mataPelajaranList.map((mp) => mp.id);
 		}
 	} else if (userType === 'user') {
@@ -247,6 +266,15 @@ export async function load({ locals, url, depends, parent }) {
 				});
 				mapelIds = mataPelajaranList.map((mp) => mp.id);
 			}
+		}
+
+		if (bypassJadwal || mataPelajaranList.length === 0) {
+			mataPelajaranList = userMapels.map((mp) => ({
+				id: mp.id,
+				nama: mp.nama,
+				kode: null
+			}));
+			mapelIds = mataPelajaranList.map((mp) => mp.id);
 		}
 	}
 
@@ -360,6 +388,7 @@ export async function load({ locals, url, depends, parent }) {
 		lingkupMateriList,
 		mataPelajaranList,
 		hasAnyMapel,
+		bypassJadwal,
 		mapelId,
 		tanggal,
 		userType,
@@ -428,9 +457,10 @@ export const actions = {
 
 		const now = new Date().toISOString();
 		const id = idRaw ? Number(idRaw) : null;
+		const jamPelajaranInput = formData.get('jamPelajaran')?.toString()?.trim();
 
 		if (id) {
-			// Edit existing — preserve original tanggal & jamPelajaran
+			// Edit existing — preserve original tanggal & jamPelajaran unless provided
 			const existing = await db.query.tableJurnalMengajar.findFirst({
 				columns: { id: true, authUserId: true },
 				where: eq(tableJurnalMengajar.id, id)
@@ -452,62 +482,77 @@ export const actions = {
 					mataPelajaranId,
 					lingkupMateri,
 					tujuanPembelajaranId,
+					...(jamPelajaranInput ? { jamPelajaran: jamPelajaranInput } : {}),
 					catatan: catatan || null,
 					updatedAt: now
 				})
 				.where(eq(tableJurnalMengajar.id, id));
 		} else {
-			// Create new — auto-derive tanggal & jamPelajaran
-			const dayNames = ['minggu', 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
+			// Create new — derive or use input jamPelajaran
+			const presensiSettings = sekolahId
+				? await db.query.tablePresensiSettings.findFirst({
+						where: eq(tablePresensiSettings.sekolahId, sekolahId)
+					})
+				: null;
+			const bypassJadwal = presensiSettings?.bypassJadwal ?? true;
+
 			if (!tanggal) {
 				return fail(400, { fail: 'Tanggal tidak valid' });
 			}
-			const dateObj = new Date(tanggal + 'T00:00:00');
-			const hari = dayNames[dateObj.getDay()];
 
-			const mpRow = await db.query.tableMataPelajaran.findFirst({
-				columns: { kode: true, nama: true },
-				where: eq(tableMataPelajaran.id, mataPelajaranId)
-			});
+			let jamPelajaran = jamPelajaranInput || '';
 
-			if (!mpRow?.kode) {
-				return fail(400, { fail: 'Mata pelajaran tidak memiliki kode jadwal' });
-			}
+			if (!jamPelajaran) {
+				const dayNames = ['minggu', 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
+				const dateObj = new Date(tanggal + 'T00:00:00');
+				const hari = dayNames[dateObj.getDay()];
 
-			let jadwalEntries = await db.query.tableJadwalPelajaran.findMany({
-				columns: { jamKe: true },
-				where: and(
-					eq(tableJadwalPelajaran.sekolahId, sekolahId),
-					eq(tableJadwalPelajaran.kelasId, kelasId),
-					eq(tableJadwalPelajaran.hari, hari),
-					eq(tableJadwalPelajaran.kodeKegiatan, mpRow.kode)
-				),
-				orderBy: [asc(tableJadwalPelajaran.jamKe)]
-			});
+				const mpRow = await db.query.tableMataPelajaran.findFirst({
+					columns: { kode: true, nama: true },
+					where: eq(tableMataPelajaran.id, mataPelajaranId)
+				});
 
-			if (jadwalEntries.length === 0) {
-				if (mpRow.nama && agamaMapelNames.includes(mpRow.nama)) {
-					jadwalEntries = await db.query.tableJadwalPelajaran.findMany({
+				if (mpRow?.kode) {
+					let jadwalEntries = await db.query.tableJadwalPelajaran.findMany({
 						columns: { jamKe: true },
 						where: and(
 							eq(tableJadwalPelajaran.sekolahId, sekolahId),
 							eq(tableJadwalPelajaran.kelasId, kelasId),
 							eq(tableJadwalPelajaran.hari, hari),
-							eq(tableJadwalPelajaran.kodeKegiatan, 'PAPB')
+							eq(tableJadwalPelajaran.kodeKegiatan, mpRow.kode)
 						),
 						orderBy: [asc(tableJadwalPelajaran.jamKe)]
 					});
+
+					if (jadwalEntries.length === 0 && mpRow.nama && agamaMapelNames.includes(mpRow.nama)) {
+						jadwalEntries = await db.query.tableJadwalPelajaran.findMany({
+							columns: { jamKe: true },
+							where: and(
+								eq(tableJadwalPelajaran.sekolahId, sekolahId),
+								eq(tableJadwalPelajaran.kelasId, kelasId),
+								eq(tableJadwalPelajaran.hari, hari),
+								eq(tableJadwalPelajaran.kodeKegiatan, 'PAPB')
+							),
+							orderBy: [asc(tableJadwalPelajaran.jamKe)]
+						});
+					}
+
+					if (jadwalEntries.length > 0) {
+						jamPelajaran =
+							jadwalEntries.length === 1
+								? String(jadwalEntries[0].jamKe)
+								: `${Math.min(...jadwalEntries.map((j) => j.jamKe))}-${Math.max(...jadwalEntries.map((j) => j.jamKe))}`;
+					}
 				}
 			}
 
-			if (jadwalEntries.length === 0) {
-				return fail(400, { fail: 'Tidak ada jadwal untuk mata pelajaran ini hari ini' });
+			if (!jamPelajaran) {
+				if (bypassJadwal) {
+					jamPelajaran = '1-2';
+				} else {
+					return fail(400, { fail: 'Tidak ada jadwal untuk mata pelajaran ini hari ini' });
+				}
 			}
-
-			const jamPelajaran =
-				jadwalEntries.length === 1
-					? String(jadwalEntries[0].jamKe)
-					: `${Math.min(...jadwalEntries.map((j) => j.jamKe))}-${Math.max(...jadwalEntries.map((j) => j.jamKe))}`;
 
 			await db.insert(tableJurnalMengajar).values({
 				authUserId: user.id,

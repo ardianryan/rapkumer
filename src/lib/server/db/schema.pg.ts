@@ -1075,6 +1075,7 @@ export const tablePresensiSettings = pgTable(
 			.notNull()
 			.default('wali_kelas_saja'),
 		presensiGuruEnabled: boolean().notNull().default(true),
+		bypassJadwal: boolean().notNull().default(true),
 		...audit
 	},
 	(table) => [unique().on(table.sekolahId, table.tahunAjaranId)]
@@ -1750,7 +1751,8 @@ export const tableDapodikPembelajaran = pgTable(
 		nama: text().notNull(),
 		...audit
 	},
-	(table) => [unique().on(table.pembelajaranId)]
+	// Komposit: satu pembelajaran rombel pilihan bisa dipakai lintas kelas.
+	(table) => [unique().on(table.kelasId, table.pembelajaranId)]
 );
 
 /**

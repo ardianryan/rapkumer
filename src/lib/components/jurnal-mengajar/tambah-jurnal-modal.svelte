@@ -19,6 +19,7 @@
 		id: number;
 		kelasId: number;
 		mataPelajaranId: number;
+		jamPelajaran?: string;
 		lingkupMateri: string;
 		tujuanPembelajaranId: number | null;
 		catatan: string;
@@ -33,6 +34,7 @@
 		tujuanPembelajaranList: TujuanPembelajaranItem[];
 		lingkupMateriList: string[];
 		userType: string;
+		bypassJadwal?: boolean;
 		onAction?: (actions: { submit: () => void }) => void;
 		onSuccess?: (params: { data?: Record<string, unknown> }) => void | Promise<void>;
 	}
@@ -46,6 +48,7 @@
 		tujuanPembelajaranList,
 		lingkupMateriList,
 		userType,
+		bypassJadwal,
 		onAction,
 		onSuccess
 	}: Props = $props();
@@ -59,11 +62,38 @@
 	// svelte-ignore state_referenced_locally
 	let formMapelId = $state(defaultMapelId);
 	// svelte-ignore state_referenced_locally
+	let formJamPelajaran = $state(editData?.jamPelajaran ?? '');
+	// svelte-ignore state_referenced_locally
 	let formLingkupMateri = $state(editData?.lingkupMateri ?? '');
 	// svelte-ignore state_referenced_locally
 	let formTujuanPembelajaranId = $state(editData?.tujuanPembelajaranId ?? null);
 	// svelte-ignore state_referenced_locally
 	let formCatatan = $state(editData?.catatan ?? '');
+
+	$effect(() => {
+		if (typeof window !== 'undefined' && !editData) {
+			const saved = localStorage.getItem('active_teaching_session');
+			if (saved) {
+				try {
+					const session = JSON.parse(saved);
+					const matchesDate = !tanggal || session.tanggal === tanggal;
+					const matchesKelas = !formKelasId || session.kelasId === formKelasId;
+					if (matchesDate && matchesKelas) {
+						if (!formMapelId && session.mataPelajaranId) {
+							if (mataPelajaranList.some((m) => m.id === session.mataPelajaranId)) {
+								formMapelId = session.mataPelajaranId;
+							}
+						}
+						if (!formJamPelajaran && session.jamKe) {
+							formJamPelajaran = session.jamKe;
+						}
+					}
+				} catch {
+					// ignore
+				}
+			}
+		}
+	});
 
 	const formId = 'tambah-jurnal-form';
 
@@ -138,6 +168,21 @@
 				</select>
 			</fieldset>
 		{/if}
+
+		<fieldset class="fieldset">
+			<legend class="fieldset-legend">Jam Ke</legend>
+			<input
+				type="text"
+				name="jamPelajaran"
+				class="input w-full dark:border-none dark:bg-base-300 bg-base-200"
+				placeholder="Contoh: 1-2, 3-4, atau 1"
+				value={formJamPelajaran}
+				oninput={(e) => {
+					formJamPelajaran = (e.currentTarget as HTMLInputElement).value;
+				}}
+			/>
+			<p class="label">Jam pembelajaran (otomatis tersinkron jika presensi murid sudah diisi)</p>
+		</fieldset>
 
 		<fieldset class="fieldset">
 			<legend class="fieldset-legend">Lingkup Materi</legend>
