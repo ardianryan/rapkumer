@@ -300,10 +300,19 @@ interface UpdateDownloadStatus {
 declare module 'exceljs' {
 	export interface Cell {
 		value: unknown;
+		font?: unknown;
+		alignment?: unknown;
+		fill?: unknown;
+		border?: unknown;
 	}
 
 	export interface Row {
+		values?: unknown;
+		height?: number;
+		font?: unknown;
+		alignment?: unknown;
 		getCell(col: number | string): Cell;
+		eachCell(callback: (cell: Cell, colNumber: number) => void): void;
 	}
 
 	export interface Worksheet {
@@ -315,11 +324,14 @@ declare module 'exceljs' {
 		addRows(rows: Array<unknown>): void;
 		getColumn(index: number): { width?: number; hidden?: boolean };
 		views?: unknown;
+		eachRow(callback: (row: Row, rowNumber: number) => void): void;
 	}
 
 	export class Workbook {
+		creator?: string;
+		created?: Date;
 		worksheets: Worksheet[];
-		addWorksheet(name: string): Worksheet;
+		addWorksheet(name: string, options?: unknown): Worksheet;
 		xlsx: {
 			load(data: Buffer | ArrayBuffer): Promise<Workbook>;
 			writeBuffer(): Promise<ArrayBuffer | Buffer>;

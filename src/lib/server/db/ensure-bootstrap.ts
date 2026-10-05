@@ -27,6 +27,7 @@ import { ensureZitadelSchema } from './ensure-zitadel';
 import { ensurePembelajaranSchema } from './ensure-pembelajaran';
 import { ensureNilaiAkhirMapelSchema } from './ensure-nilai-akhir-mapel';
 import { ensureModulAjarSchema } from './ensure-modul-ajar';
+import { ensureRaporSisipanSchema } from './ensure-rapor-sisipan';
 import { resetEnsuredSchemas } from './ensure-helper';
 
 let startupEnsuresDone = false;
@@ -75,6 +76,7 @@ export async function runStartupEnsures() {
 			await ensurePembelajaranSchema();
 			await ensureNilaiAkhirMapelSchema();
 			await ensureModulAjarSchema();
+			await ensureRaporSisipanSchema();
 			startupEnsuresDone = true;
 		} finally {
 			startupEnsuresPromise = null;

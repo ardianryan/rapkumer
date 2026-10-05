@@ -1829,3 +1829,165 @@ export const tableNilaiAkhirMapelRelations = relations(tableNilaiAkhirMapel, ({ 
 		references: [tableAuthUser.id]
 	})
 }));
+
+/**
+ * ============================================================================
+ * MODUL RAPOR SISIPAN TENGAH SEMESTER (STS / PTS)
+ * ============================================================================
+ */
+
+export type RtsKomponenFormatifItem = {
+	kode: string;
+	nama: string;
+};
+
+export type RtsKomponenSumatifItem = {
+	kode: string;
+	lingkupMateri: string;
+	tpDeskripsi: string;
+	tpId?: number;
+};
+
+/**
+ * Konfigurasi Asesmen Tengah Semester per Kelas dan Mata Pelajaran
+ */
+export const tableRtsMapelSetup = pgTable(
+	'rts_mapel_setup',
+	{
+		id: serial().primaryKey(),
+		sekolahId: integer()
+			.references(() => tableSekolah.id, { onDelete: 'cascade' })
+			.notNull(),
+		kelasId: integer()
+			.references(() => tableKelas.id, { onDelete: 'cascade' })
+			.notNull(),
+		mataPelajaranId: integer()
+			.references(() => tableMataPelajaran.id, { onDelete: 'cascade' })
+			.notNull(),
+		komponenFormatif: jsonb().$type<RtsKomponenFormatifItem[]>().notNull(),
+		komponenSumatif: jsonb().$type<RtsKomponenSumatifItem[]>().notNull(),
+		adaStsTes: boolean().default(true).notNull(),
+		adaStsNonTes: boolean().default(false).notNull(),
+		bobotSumatifTp: real().default(70),
+		bobotSts: real().default(30),
+		...audit
+	},
+	(table) => [
+		unique().on(table.kelasId, table.mataPelajaranId),
+		index('rts_setup_kelas_mapel_idx').on(table.kelasId, table.mataPelajaranId)
+	]
+);
+
+export const tableRtsMapelSetupRelations = relations(tableRtsMapelSetup, ({ one }) => ({
+	sekolah: one(tableSekolah, {
+		fields: [tableRtsMapelSetup.sekolahId],
+		references: [tableSekolah.id]
+	}),
+	kelas: one(tableKelas, {
+		fields: [tableRtsMapelSetup.kelasId],
+		references: [tableKelas.id]
+	}),
+	mataPelajaran: one(tableMataPelajaran, {
+		fields: [tableRtsMapelSetup.mataPelajaranId],
+		references: [tableMataPelajaran.id]
+	})
+}));
+
+/**
+ * Data Nilai Tengah Semester Siswa per Mata Pelajaran
+ */
+export const tableRtsNilaiSiswa = pgTable(
+	'rts_nilai_siswa',
+	{
+		id: serial().primaryKey(),
+		sekolahId: integer()
+			.references(() => tableSekolah.id, { onDelete: 'cascade' })
+			.notNull(),
+		kelasId: integer()
+			.references(() => tableKelas.id, { onDelete: 'cascade' })
+			.notNull(),
+		mataPelajaranId: integer()
+			.references(() => tableMataPelajaran.id, { onDelete: 'cascade' })
+			.notNull(),
+		muridId: integer()
+			.references(() => tableMurid.id, { onDelete: 'cascade' })
+			.notNull(),
+		nilaiFormatif: jsonb().$type<Record<string, number | null>>(),
+		rataFormatif: real(),
+		nilaiSumatif: jsonb().$type<Record<string, number | null>>(),
+		rataSumatifTp: real(),
+		stsTes: real(),
+		stsNonTes: real(),
+		nilaiSts: real(),
+		nilaiAkhirRts: real(),
+		catatanGuru: text(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.kelasId, table.mataPelajaranId, table.muridId),
+		index('rts_nilai_murid_idx').on(table.muridId),
+		index('rts_nilai_kelas_mapel_idx').on(table.kelasId, table.mataPelajaranId)
+	]
+);
+
+export const tableRtsNilaiSiswaRelations = relations(tableRtsNilaiSiswa, ({ one }) => ({
+	sekolah: one(tableSekolah, {
+		fields: [tableRtsNilaiSiswa.sekolahId],
+		references: [tableSekolah.id]
+	}),
+	kelas: one(tableKelas, {
+		fields: [tableRtsNilaiSiswa.kelasId],
+		references: [tableKelas.id]
+	}),
+	mataPelajaran: one(tableMataPelajaran, {
+		fields: [tableRtsNilaiSiswa.mataPelajaranId],
+		references: [tableMataPelajaran.id]
+	}),
+	murid: one(tableMurid, {
+		fields: [tableRtsNilaiSiswa.muridId],
+		references: [tableMurid.id]
+	})
+}));
+
+/**
+ * Catatan Wali Kelas & Presensi Tengah Semester
+ */
+export const tableRtsCatatanWali = pgTable(
+	'rts_catatan_wali',
+	{
+		id: serial().primaryKey(),
+		sekolahId: integer()
+			.references(() => tableSekolah.id, { onDelete: 'cascade' })
+			.notNull(),
+		kelasId: integer()
+			.references(() => tableKelas.id, { onDelete: 'cascade' })
+			.notNull(),
+		muridId: integer()
+			.references(() => tableMurid.id, { onDelete: 'cascade' })
+			.notNull(),
+		catatanWali: text(),
+		sakit: integer(),
+		izin: integer(),
+		alfa: integer(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.kelasId, table.muridId),
+		index('rts_catatan_wali_murid_idx').on(table.muridId)
+	]
+);
+
+export const tableRtsCatatanWaliRelations = relations(tableRtsCatatanWali, ({ one }) => ({
+	sekolah: one(tableSekolah, {
+		fields: [tableRtsCatatanWali.sekolahId],
+		references: [tableSekolah.id]
+	}),
+	kelas: one(tableKelas, {
+		fields: [tableRtsCatatanWali.kelasId],
+		references: [tableKelas.id]
+	}),
+	murid: one(tableMurid, {
+		fields: [tableRtsCatatanWali.muridId],
+		references: [tableMurid.id]
+	})
+}));

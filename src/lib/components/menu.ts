@@ -71,6 +71,11 @@ export const appMenuItems: MenuItem[] = [
 				]
 			},
 			{
+				title: 'Rapor Sisipan (STS)',
+				path: '/rapor-sisipan',
+				tags: ['pts', 'sts', 'tengah semester', 'sisipan', 'nilai', 'formatif', 'sumatif']
+			},
+			{
 				title: 'Kokurikuler',
 				path: '/asesmen-kokurikuler'
 			},

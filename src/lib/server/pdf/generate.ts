@@ -10,9 +10,17 @@ import { renderKeasramaanHTML } from './templates/keasramaan';
 import { renderPiagamHTML } from './templates/piagam';
 import { renderJurnalMengajarHTML } from './templates/jurnal-mengajar';
 import { renderBukuTamuHTML } from './templates/buku-tamu';
+import { renderRaporSisipanHTML } from './templates/rapor-sisipan';
 
 export type DocumentType =
-	'cover' | 'rapor' | 'biodata' | 'keasramaan' | 'piagam' | 'jurnal-mengajar' | 'buku-tamu';
+	| 'cover'
+	| 'rapor'
+	| 'rapor-sisipan'
+	| 'biodata'
+	| 'keasramaan'
+	| 'piagam'
+	| 'jurnal-mengajar'
+	| 'buku-tamu';
 
 export function renderHTML(
 	docType: DocumentType,
@@ -24,6 +32,8 @@ export function renderHTML(
 			return renderCoverHTML(data as never);
 		case 'rapor':
 			return renderRaporHTML(data as never);
+		case 'rapor-sisipan':
+			return renderRaporSisipanHTML(data as never);
 		case 'biodata':
 			return renderBiodataHTML(data as never);
 		case 'keasramaan':
