@@ -24,11 +24,11 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	<div class="alert alert-warning mt-3">
-		<Icon name="alert" />
+	<div class="alert alert-info alert-soft mt-3">
+		<Icon name="info" />
 		<span>
-			Menggunakan fitur ini membuat penilaian menjadi tidak objektif. Resiko dan beban moral
-			ditanggung masing-masing.
+			Fitur ini mendistribusikan nilai capaian Tujuan Pembelajaran, STS, dan SAS secara proporsional
+			sesuai target nilai akhir yang Anda tentukan.
 		</span>
 	</div>
 
