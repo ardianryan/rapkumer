@@ -1078,6 +1078,12 @@ export const tablePresensiSettings = pgTable(
 			.default('wali_kelas_saja'),
 		presensiGuruEnabled: boolean().notNull().default(true),
 		bypassJadwal: boolean().notNull().default(true),
+		// Mode sumber data presensi: lokal (manual di Rapkumer) atau akas (terintegrasi AKAS)
+		sumberPresensi: text({ enum: ['lokal', 'akas'] })
+			.notNull()
+			.default('lokal'),
+		akasBaseUrl: text().default('https://akas.smage.my.id'),
+		akasApiKey: text(),
 		...audit
 	},
 	(table) => [unique().on(table.sekolahId, table.tahunAjaranId)]

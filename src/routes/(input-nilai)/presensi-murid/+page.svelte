@@ -1,11 +1,14 @@
 <script lang="ts">
+	/* eslint-disable svelte/prefer-writable-derived */
 	import { goto, invalidate } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Icon from '$lib/components/icon.svelte';
 	import { showModal } from '$lib/components/global-modal.svelte';
 	import IsiSekaligusModal from '$lib/components/absen/isi-sekaligus-modal.svelte';
 	import DownloadRekapModal from '$lib/components/absen/download-rekap-modal.svelte';
 	import HapusPresensiModal from '$lib/components/absen/hapus-presensi-modal.svelte';
+	import TarikAkasModal from '$lib/components/absen/tarik-akas-modal.svelte';
 	import TableHarian from '$lib/components/absen/table-harian.svelte';
 	import TableBulanan from '$lib/components/absen/table-bulanan.svelte';
 	import TableRapor from '$lib/components/absen/table-rapor.svelte';
@@ -139,9 +142,12 @@
 		simulasiHari: string | null;
 		simulasiJam: string | null;
 		isLibur: boolean;
+		sumberPresensi?: 'lokal' | 'akas';
 	};
 
 	let { data }: { data: PageData } = $props();
+
+	const isAkasMode = $derived(data.sumberPresensi === 'akas');
 
 	const kelasAktif = $derived(page.data.kelasAktif ?? null);
 	const kelasAktifLabel = $derived.by(() => {
@@ -159,11 +165,26 @@
 		return `${base} - ${presensiLabel} - ${tipeLabel}`;
 	});
 
-	// Restrict editing: only admin, kepala sekolah, and wali_kelas can edit
+	// Restrict editing: only admin, kepala sekolah, and wali_kelas can edit (blocked if isAkasMode)
 	const canEdit = $derived.by(() => {
+		if (isAkasMode) return false;
 		const u = page.data.user as { type?: string } | null | undefined;
 		return u?.type === 'admin' || u?.type === 'kepala_sekolah' || u?.type === 'wali_kelas';
 	});
+
+	function openTarikAkas() {
+		showModal({
+			title: 'Tarik Presensi dari AKAS v2',
+			body: TarikAkasModal,
+			bodyProps: {
+				kelasId: kelasAktif?.id ?? undefined,
+				kelasNama: kelasAktif?.nama ?? '',
+				tanggal: data.tanggal,
+				isAdmin: page.data.user?.type === 'admin' || page.data.user?.type === 'kepala_sekolah'
+			},
+			dismissible: true
+		});
+	}
 
 	const currentPage = $derived.by(() => data.page?.currentPage ?? 1);
 	const totalPages = $derived.by(() => Math.max(1, data.page?.totalPages ?? 1));
@@ -342,6 +363,7 @@
 		return data.tanggal === `${y}-${m}-${day}`;
 	});
 
+	// svelte-ignore state_referenced_locally
 	let selectedMode = $state<
 		| 'harian'
 		| 'bulanan'
@@ -349,20 +371,17 @@
 		| 'persentase_harian'
 		| 'persentase_bulanan'
 		| 'persentase_semester'
-		// svelte-ignore state_referenced_locally
 	>(data.mode);
+	// svelte-ignore state_referenced_locally
 	let selectedBulan = $state(
-		// svelte-ignore state_referenced_locally
 		data.mode === 'bulanan' || data.mode === 'persentase_bulanan'
-			? // svelte-ignore state_referenced_locally
-				data.bulan
+			? data.bulan
 			: serverTime.now.getMonth() + 1
 	);
+	// svelte-ignore state_referenced_locally
 	let selectedTahun = $state(
-		// svelte-ignore state_referenced_locally
 		data.mode === 'bulanan' || data.mode === 'persentase_bulanan'
-			? // svelte-ignore state_referenced_locally
-				data.tahun
+			? data.tahun
 			: serverTime.now.getFullYear()
 	);
 
@@ -533,7 +552,7 @@
 				class: 'btn-primary',
 				action: ({ close }) => {
 					close();
-					goto('/akademik');
+					goto(resolve('/akademik'));
 				}
 			},
 			onNeutral: {
@@ -629,95 +648,110 @@
 					{#if data.mode === 'harian' || data.mode === 'persentase_harian'}
 						- {data.isLibur ? 'Libur' : 'Masuk'}
 					{/if}
+					{#if isAkasMode}
+						<span class="badge badge-sm badge-info font-medium ml-1">AKAS</span>
+					{/if}
 				</p>
 			{/if}
 		</div>
-		{#if data.mode === 'rapor' || data.mode === 'persentase_bulanan' || data.mode === 'persentase_semester' || data.mode === 'bulanan'}{:else}
-			{@const currentMapel = data.jadwalSaatIni}
-			<div class="flex max-sm:w-full">
+		<div class="flex items-center gap-2 max-sm:w-full">
+			{#if isAkasMode}
 				<button
 					type="button"
-					class="btn btn-primary btn-soft flex-1 rounded-r-none shadow-none max-sm:flex-1"
-					disabled={!canEdit && page.data.user?.type !== 'user'}
-					title={!canEdit && page.data.user?.type !== 'user'
-						? 'Anda tidak memiliki izin untuk mengisi sekaligus'
-						: ''}
-					onclick={() => {
-						if (!data.presensiReady) {
-							presensiNotReady();
-							return;
-						}
-						if (!data.bypassJadwal && jadwalBelumDimulai) {
-							toast({ message: 'Jam pelajaran bapak/ibu belum dimulai', type: 'warning' });
-							return;
-						}
-						if (!data.bypassJadwal && page.data.user?.type === 'user' && !data.isMapelOnJadwal) {
-							toast({
-								message: 'Mata pelajaran tidak dijadwalkan pada tanggal ini',
-								type: 'warning'
-							});
-							return;
-						}
-						const useMapelData = page.data.user?.type === 'user';
-						const fallbackSubject = data.guruMapelSubject;
-						const isiMapelId = useMapelData
-							? (currentMapel?.mataPelajaranId ?? fallbackSubject?.id ?? null)
-							: (data.harianMapelId ?? null);
-						showModal({
-							title: 'Isi Kehadiran Sekaligus',
-							body: IsiSekaligusModal,
-							bodyProps: {
-								daftarMurid: data.semuaMurid,
-								kelasId: kelasAktif?.id ?? undefined,
-								tanggal: data.tanggal,
-								mataPelajaranId: isiMapelId,
-								daftarMataPelajaran: data.guruMapelSubjects ?? [],
-								namaMataPelajaran: useMapelData
-									? (currentMapel?.namaMataPelajaran ?? fallbackSubject?.nama ?? undefined)
-									: undefined,
-								perkiraanJam: useMapelData ? (currentMapel?.perkiraanJam ?? undefined) : undefined,
-								simulasiHari: data.simulasiHari,
-								simulasiJam: data.simulasiJam,
-								tipePresensi: data.tipePresensi,
-								jenisPresensi: data.jenisPresensi,
-								bypassJadwal: data.bypassJadwal ?? false
-							},
-							dismissible: true
-						});
-					}}
+					class="btn btn-primary btn-soft shadow-none gap-1 max-sm:w-full"
+					onclick={openTarikAkas}
 				>
-					<Icon name="copy" /> Isi Sekaligus
+					<Icon name="download" /> Tarik dari AKAS
 				</button>
-				<div class="dropdown dropdown-end max-sm:flex-none">
+			{:else if data.mode !== 'rapor' && data.mode !== 'persentase_bulanan' && data.mode !== 'persentase_semester' && data.mode !== 'bulanan'}
+				{@const currentMapel = data.jadwalSaatIni}
+				<div class="flex max-sm:w-full">
 					<button
 						type="button"
-						tabindex="0"
-						class="btn btn-primary btn-soft rounded-l-none shadow-none"
+						class="btn btn-primary btn-soft flex-1 rounded-r-none shadow-none max-sm:flex-1"
+						disabled={!canEdit && page.data.user?.type !== 'user'}
+						title={!canEdit && page.data.user?.type !== 'user'
+							? 'Anda tidak memiliki izin untuk mengisi sekaligus'
+							: ''}
+						onclick={() => {
+							if (!data.presensiReady) {
+								presensiNotReady();
+								return;
+							}
+							if (!data.bypassJadwal && jadwalBelumDimulai) {
+								toast({ message: 'Jam pelajaran bapak/ibu belum dimulai', type: 'warning' });
+								return;
+							}
+							if (!data.bypassJadwal && page.data.user?.type === 'user' && !data.isMapelOnJadwal) {
+								toast({
+									message: 'Mata pelajaran tidak dijadwalkan pada tanggal ini',
+									type: 'warning'
+								});
+								return;
+							}
+							const useMapelData = page.data.user?.type === 'user';
+							const fallbackSubject = data.guruMapelSubject;
+							const isiMapelId = useMapelData
+								? (currentMapel?.mataPelajaranId ?? fallbackSubject?.id ?? null)
+								: (data.harianMapelId ?? null);
+							showModal({
+								title: 'Isi Kehadiran Sekaligus',
+								body: IsiSekaligusModal,
+								bodyProps: {
+									daftarMurid: data.semuaMurid,
+									kelasId: kelasAktif?.id ?? undefined,
+									tanggal: data.tanggal,
+									mataPelajaranId: isiMapelId,
+									daftarMataPelajaran: data.guruMapelSubjects ?? [],
+									namaMataPelajaran: useMapelData
+										? (currentMapel?.namaMataPelajaran ?? fallbackSubject?.nama ?? undefined)
+										: undefined,
+									perkiraanJam: useMapelData
+										? (currentMapel?.perkiraanJam ?? undefined)
+										: undefined,
+									simulasiHari: data.simulasiHari,
+									simulasiJam: data.simulasiJam,
+									tipePresensi: data.tipePresensi,
+									jenisPresensi: data.jenisPresensi,
+									bypassJadwal: data.bypassJadwal ?? false
+								},
+								dismissible: true
+							});
+						}}
 					>
-						<Icon name="down" />
+						<Icon name="copy" /> Isi Sekaligus
 					</button>
-					<ul
-						tabindex="-1"
-						class="dropdown-content menu bg-base-100 border-base-300 z-50 mt-2 w-49 rounded-md border p-2 shadow-lg"
-					>
-						<li>
-							<button
-								type="button"
-								class="w-full text-left {simActive ? 'text-warning' : ''}"
-								aria-label="Simulasi hari & jam"
-								title={simActive
-									? `Simulasi: ${data.simulasiHari} ${data.simulasiJam}`
-									: 'Simulasi hari & jam'}
-								onclick={() => (showSimulasi = !showSimulasi)}
-							>
-								<Icon name={simActive ? 'pause' : 'play'} />
-								Simulasi
-							</button>
-						</li>
-					</ul>
+					<div class="dropdown dropdown-end max-sm:flex-none">
+						<button
+							type="button"
+							tabindex="0"
+							class="btn btn-primary btn-soft rounded-l-none shadow-none"
+						>
+							<Icon name="down" />
+						</button>
+						<ul
+							tabindex="-1"
+							class="dropdown-content menu bg-base-100 border-base-300 z-50 mt-2 w-49 rounded-md border p-2 shadow-lg"
+						>
+							<li>
+								<button
+									type="button"
+									class="w-full text-left {simActive ? 'text-warning' : ''}"
+									aria-label="Simulasi hari & jam"
+									title={simActive
+										? `Simulasi: ${data.simulasiHari} ${data.simulasiJam}`
+										: 'Simulasi hari & jam'}
+									onclick={() => (showSimulasi = !showSimulasi)}
+								>
+									<Icon name={simActive ? 'pause' : 'play'} />
+									Simulasi
+								</button>
+							</li>
+						</ul>
+					</div>
 				</div>
-			</div>
-		{/if}
+			{/if}
+		</div>
 	</div>
 
 	<div class="mb-4 flex items-start justify-between gap-2 max-sm:flex-col sm:flex-row">

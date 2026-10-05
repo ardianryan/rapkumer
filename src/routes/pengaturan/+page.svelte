@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/icon.svelte';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
@@ -11,6 +12,7 @@
 	import BukuTamuPasskeyCard from '$lib/components/settings/buku-tamu-passkey-card.svelte';
 	import AiKeyCard from '$lib/components/settings/ai-key-card.svelte';
 	import MenuVisibilityCard from '$lib/components/settings/menu-visibility-card.svelte';
+	import AkasSettingsCard from '$lib/components/settings/akas-settings-card.svelte';
 	import type { PageData } from './$types';
 
 	const { data } = $props<{ data: PageData }>();
@@ -76,12 +78,12 @@
 		</p>
 	</div>
 	<div class="flex items-center gap-2">
-		<a class="btn btn-sm btn-soft btn-success shadow-none" href="/pengaturan/profil">
+		<a class="btn btn-sm btn-soft btn-success shadow-none" href={resolve('/pengaturan/profil')}>
 			<Icon name="user" />
 			Edit Profil
 		</a>
 		{#if isAdmin}
-			<a class="btn btn-sm btn-soft btn-info shadow-none" href="/pengguna">
+			<a class="btn btn-sm btn-soft btn-info shadow-none" href={resolve('/pengguna')}>
 				<Icon name="users" />
 				Manajemen Pengguna
 			</a>
@@ -223,6 +225,10 @@
 			protocol={data.protocol ?? 'http:'}
 			{isAdmin}
 		/>
+
+		{#if data.akas}
+			<AkasSettingsCard akasData={data.akas} />
+		{/if}
 
 		{#if user?.type === 'admin' && data.storage}
 			<StorageLocationCard storage={data.storage} />

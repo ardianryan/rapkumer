@@ -125,4 +125,6 @@ export type AbsenLoadData = {
 	simulasiHari: string | null;
 	simulasiJam: string | null;
 	isLibur: boolean;
+	sumberPresensi?: 'lokal' | 'akas';
+	akasBaseUrl?: string | null;
 };

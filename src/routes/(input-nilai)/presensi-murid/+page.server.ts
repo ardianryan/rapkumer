@@ -27,6 +27,7 @@ export const load: PageServerLoad = async ({ parent, locals, url, depends }) => 
 	depends('app:absen');
 
 	if (!locals.user) throw redirect(303, '/login');
+	const currentUser = locals.user;
 
 	await ensurePresensiSettingsSchema();
 	await ensureAbsensiSchema();
@@ -78,41 +79,261 @@ export const load: PageServerLoad = async ({ parent, locals, url, depends }) => 
 			? 'persentase_harian'
 			: 'harian');
 
-	if (mode === 'bulanan') {
+	async function executeLoad(): Promise<AbsenLoadData> {
+		if (mode === 'bulanan') {
+			if (!sekolahId || !kelasAktif?.id) {
+				return defaultEmpty(
+					'bulanan',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					presensiReady,
+					presensiWarningMessage,
+					presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
+					presensiSettings?.tipePresensi
+				);
+			}
+			const bulanParam = url.searchParams.get('bulan');
+			const tahunParam = url.searchParams.get('tahun');
+			const now = new Date();
+			const bulan = bulanParam ? Number(bulanParam) : now.getMonth() + 1;
+			const tahun = tahunParam ? Number(tahunParam) : now.getFullYear();
+			if (!Number.isInteger(bulan) || bulan < 1 || bulan > 12) {
+				return defaultEmpty(
+					'bulanan',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					presensiReady,
+					presensiWarningMessage,
+					presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
+					presensiSettings?.tipePresensi
+				);
+			}
+			if (!Number.isInteger(tahun) || tahun < 2000 || tahun > 2099) {
+				return defaultEmpty(
+					'bulanan',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					presensiReady,
+					presensiWarningMessage,
+					presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
+					presensiSettings?.tipePresensi
+				);
+			}
+			if (!presensiSettings) {
+				return defaultEmpty(
+					'bulanan',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					presensiReady,
+					presensiWarningMessage,
+					'wali_kelas_saja'
+				);
+			}
+			return loadBulanan({
+				sekolahId,
+				kelasId: kelasAktif.id,
+				search,
+				pageNumber,
+				bulan,
+				tahun,
+				presensiSettings,
+				simHari,
+				simJam,
+				url
+			});
+		}
+
+		if (mode === 'persentase_bulanan') {
+			if (!sekolahId || !kelasAktif?.id) {
+				return defaultEmpty(
+					'persentase_bulanan',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					presensiReady,
+					presensiWarningMessage,
+					presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
+					presensiSettings?.tipePresensi
+				);
+			}
+			const bulanParam = url.searchParams.get('bulan');
+			const tahunParam = url.searchParams.get('tahun');
+			const now = new Date();
+			const bulan = bulanParam ? Number(bulanParam) : now.getMonth() + 1;
+			const tahun = tahunParam ? Number(tahunParam) : now.getFullYear();
+			if (!Number.isInteger(bulan) || bulan < 1 || bulan > 12) {
+				return defaultEmpty(
+					'persentase_bulanan',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					presensiReady,
+					presensiWarningMessage,
+					presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
+					presensiSettings?.tipePresensi
+				);
+			}
+			if (!Number.isInteger(tahun) || tahun < 2000 || tahun > 2099) {
+				return defaultEmpty(
+					'persentase_bulanan',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					presensiReady,
+					presensiWarningMessage,
+					presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
+					presensiSettings?.tipePresensi
+				);
+			}
+			if (!presensiSettings) {
+				return defaultEmpty(
+					'persentase_bulanan',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					presensiReady,
+					presensiWarningMessage,
+					'wali_kelas_saja'
+				);
+			}
+			return loadPersentaseBulanan({
+				sekolahId,
+				kelasId: kelasAktif.id,
+				search,
+				pageNumber,
+				bulan,
+				tahun,
+				presensiSettings,
+				simHari,
+				simJam,
+				url
+			});
+		}
+
+		if (mode === 'persentase_semester') {
+			if (!sekolahId || !kelasAktif?.id) {
+				return defaultEmpty(
+					'persentase_semester',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					presensiReady,
+					presensiWarningMessage,
+					presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
+					presensiSettings?.tipePresensi
+				);
+			}
+			if (!presensiSettings) {
+				return defaultEmpty(
+					'persentase_semester',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					presensiReady,
+					presensiWarningMessage,
+					'wali_kelas_saja'
+				);
+			}
+			if (!tahunAjaranId || !kelasSemesterId) {
+				return defaultEmpty(
+					'persentase_semester',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					false,
+					'Kelas belum memiliki tahun ajaran atau semester. Atur di halaman /akademik.',
+					presensiSettings.jenisPresensi ?? 'wali_kelas_saja',
+					presensiSettings.tipePresensi
+				);
+			}
+			return loadPersentaseSemester({
+				sekolahId,
+				kelasId: kelasAktif.id,
+				search,
+				pageNumber,
+				academicContext,
+				presensiSettings,
+				simHari,
+				simJam,
+				url,
+				tahunAjaranId,
+				semesterId: kelasSemesterId
+			});
+		}
+
+		if (mode === 'rapor') {
+			if (!sekolahId || !kelasAktif?.id) {
+				return defaultEmpty(
+					'rapor',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					presensiReady,
+					presensiWarningMessage,
+					presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
+					presensiSettings?.tipePresensi
+				);
+			}
+			if (!presensiSettings) {
+				return defaultEmpty(
+					'rapor',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					presensiReady,
+					presensiWarningMessage,
+					'wali_kelas_saja'
+				);
+			}
+			if (!tahunAjaranId || !kelasSemesterId) {
+				return defaultEmpty(
+					'rapor',
+					search,
+					tanggal,
+					simHari,
+					simJam,
+					false,
+					'Kelas belum memiliki tahun ajaran atau semester. Atur di halaman /akademik.',
+					presensiSettings.jenisPresensi ?? 'wali_kelas_saja',
+					presensiSettings.tipePresensi
+				);
+			}
+			return loadRapor({
+				sekolahId,
+				kelasId: kelasAktif.id,
+				search,
+				pageNumber,
+				academicContext,
+				presensiSettings,
+				simHari,
+				simJam,
+				url,
+				tahunAjaranId,
+				semesterId: kelasSemesterId
+			});
+		}
+
+		// harian / persentase_harian
 		if (!sekolahId || !kelasAktif?.id) {
 			return defaultEmpty(
-				'bulanan',
-				search,
-				tanggal,
-				simHari,
-				simJam,
-				presensiReady,
-				presensiWarningMessage,
-				presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
-				presensiSettings?.tipePresensi
-			);
-		}
-		const bulanParam = url.searchParams.get('bulan');
-		const tahunParam = url.searchParams.get('tahun');
-		const now = new Date();
-		const bulan = bulanParam ? Number(bulanParam) : now.getMonth() + 1;
-		const tahun = tahunParam ? Number(tahunParam) : now.getFullYear();
-		if (!Number.isInteger(bulan) || bulan < 1 || bulan > 12) {
-			return defaultEmpty(
-				'bulanan',
-				search,
-				tanggal,
-				simHari,
-				simJam,
-				presensiReady,
-				presensiWarningMessage,
-				presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
-				presensiSettings?.tipePresensi
-			);
-		}
-		if (!Number.isInteger(tahun) || tahun < 2000 || tahun > 2099) {
-			return defaultEmpty(
-				'bulanan',
+				mode as 'harian' | 'persentase_harian',
 				search,
 				tanggal,
 				simHari,
@@ -125,7 +346,7 @@ export const load: PageServerLoad = async ({ parent, locals, url, depends }) => 
 		}
 		if (!presensiSettings) {
 			return defaultEmpty(
-				'bulanan',
+				mode as 'harian' | 'persentase_harian',
 				search,
 				tanggal,
 				simHari,
@@ -135,241 +356,30 @@ export const load: PageServerLoad = async ({ parent, locals, url, depends }) => 
 				'wali_kelas_saja'
 			);
 		}
-		return loadBulanan({
+
+		return loadHarian({
 			sekolahId,
 			kelasId: kelasAktif.id,
 			search,
 			pageNumber,
-			bulan,
-			tahun,
+			tanggal,
 			presensiSettings,
+			bellSettings,
+			kegiatanCustom,
+			user: currentUser!,
 			simHari,
 			simJam,
+			mode: mode as 'harian' | 'persentase_harian',
 			url
 		});
 	}
 
-	if (mode === 'persentase_bulanan') {
-		if (!sekolahId || !kelasAktif?.id) {
-			return defaultEmpty(
-				'persentase_bulanan',
-				search,
-				tanggal,
-				simHari,
-				simJam,
-				presensiReady,
-				presensiWarningMessage,
-				presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
-				presensiSettings?.tipePresensi
-			);
-		}
-		const bulanParam = url.searchParams.get('bulan');
-		const tahunParam = url.searchParams.get('tahun');
-		const now = new Date();
-		const bulan = bulanParam ? Number(bulanParam) : now.getMonth() + 1;
-		const tahun = tahunParam ? Number(tahunParam) : now.getFullYear();
-		if (!Number.isInteger(bulan) || bulan < 1 || bulan > 12) {
-			return defaultEmpty(
-				'persentase_bulanan',
-				search,
-				tanggal,
-				simHari,
-				simJam,
-				presensiReady,
-				presensiWarningMessage,
-				presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
-				presensiSettings?.tipePresensi
-			);
-		}
-		if (!Number.isInteger(tahun) || tahun < 2000 || tahun > 2099) {
-			return defaultEmpty(
-				'persentase_bulanan',
-				search,
-				tanggal,
-				simHari,
-				simJam,
-				presensiReady,
-				presensiWarningMessage,
-				presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
-				presensiSettings?.tipePresensi
-			);
-		}
-		if (!presensiSettings) {
-			return defaultEmpty(
-				'persentase_bulanan',
-				search,
-				tanggal,
-				simHari,
-				simJam,
-				presensiReady,
-				presensiWarningMessage,
-				'wali_kelas_saja'
-			);
-		}
-		return loadPersentaseBulanan({
-			sekolahId,
-			kelasId: kelasAktif.id,
-			search,
-			pageNumber,
-			bulan,
-			tahun,
-			presensiSettings,
-			simHari,
-			simJam,
-			url
-		});
-	}
-
-	if (mode === 'persentase_semester') {
-		if (!sekolahId || !kelasAktif?.id) {
-			return defaultEmpty(
-				'persentase_semester',
-				search,
-				tanggal,
-				simHari,
-				simJam,
-				presensiReady,
-				presensiWarningMessage,
-				presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
-				presensiSettings?.tipePresensi
-			);
-		}
-		if (!presensiSettings) {
-			return defaultEmpty(
-				'persentase_semester',
-				search,
-				tanggal,
-				simHari,
-				simJam,
-				presensiReady,
-				presensiWarningMessage,
-				'wali_kelas_saja'
-			);
-		}
-		if (!tahunAjaranId || !kelasSemesterId) {
-			return defaultEmpty(
-				'persentase_semester',
-				search,
-				tanggal,
-				simHari,
-				simJam,
-				false,
-				'Kelas belum memiliki tahun ajaran atau semester. Atur di halaman /akademik.',
-				presensiSettings.jenisPresensi ?? 'wali_kelas_saja',
-				presensiSettings.tipePresensi
-			);
-		}
-		return loadPersentaseSemester({
-			sekolahId,
-			kelasId: kelasAktif.id,
-			search,
-			pageNumber,
-			academicContext,
-			presensiSettings,
-			simHari,
-			simJam,
-			url,
-			tahunAjaranId,
-			semesterId: kelasSemesterId
-		});
-	}
-
-	if (mode === 'rapor') {
-		if (!sekolahId || !kelasAktif?.id) {
-			return defaultEmpty(
-				'rapor',
-				search,
-				tanggal,
-				simHari,
-				simJam,
-				presensiReady,
-				presensiWarningMessage,
-				presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
-				presensiSettings?.tipePresensi
-			);
-		}
-		if (!presensiSettings) {
-			return defaultEmpty(
-				'rapor',
-				search,
-				tanggal,
-				simHari,
-				simJam,
-				presensiReady,
-				presensiWarningMessage,
-				'wali_kelas_saja'
-			);
-		}
-		if (!tahunAjaranId || !kelasSemesterId) {
-			return defaultEmpty(
-				'rapor',
-				search,
-				tanggal,
-				simHari,
-				simJam,
-				false,
-				'Kelas belum memiliki tahun ajaran atau semester. Atur di halaman /akademik.',
-				presensiSettings.jenisPresensi ?? 'wali_kelas_saja',
-				presensiSettings.tipePresensi
-			);
-		}
-		return loadRapor({
-			sekolahId,
-			kelasId: kelasAktif.id,
-			search,
-			pageNumber,
-			academicContext,
-			presensiSettings,
-			simHari,
-			simJam,
-			url,
-			tahunAjaranId,
-			semesterId: kelasSemesterId
-		});
-	}
-
-	// harian / persentase_harian
-	if (!sekolahId || !kelasAktif?.id) {
-		return defaultEmpty(
-			mode as 'harian' | 'persentase_harian',
-			search,
-			tanggal,
-			simHari,
-			simJam,
-			presensiReady,
-			presensiWarningMessage,
-			presensiSettings?.jenisPresensi ?? 'wali_kelas_saja',
-			presensiSettings?.tipePresensi
-		);
-	}
-	if (!presensiSettings) {
-		return defaultEmpty(
-			mode as 'harian' | 'persentase_harian',
-			search,
-			tanggal,
-			simHari,
-			simJam,
-			presensiReady,
-			presensiWarningMessage,
-			'wali_kelas_saja'
-		);
-	}
-
-	return loadHarian({
-		sekolahId,
-		kelasId: kelasAktif.id,
-		search,
-		pageNumber,
-		tanggal,
-		presensiSettings,
-		bellSettings,
-		kegiatanCustom,
-		user: locals.user,
-		simHari,
-		simJam,
-		mode: mode as 'harian' | 'persentase_harian',
-		url
-	});
+	const loadData = await executeLoad();
+	return {
+		...loadData,
+		sumberPresensi: (presensiSettings?.sumberPresensi as 'lokal' | 'akas') ?? 'lokal',
+		akasBaseUrl: presensiSettings?.akasBaseUrl ?? null
+	};
 };
 
 function defaultEmpty(

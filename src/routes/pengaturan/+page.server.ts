@@ -38,6 +38,8 @@ import {
 	saveUserAiSettings
 } from '$lib/server/ai';
 import { isR2Configured } from '$lib/server/storage-r2';
+import { resolveSekolahAcademicContext } from '$lib/server/db/academic';
+import { getAkasConfig, maskAkasApiKey } from '$lib/server/akas/client';
 import path from 'node:path';
 
 interface AddressEntry {
@@ -136,6 +138,21 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 
 	const storedGemini = isAdminOrKepalaSekolah ? await getStoredAiSettings() : null;
 
+	let akasData = null;
+	if (isAdminOrKepalaSekolah && locals.sekolah?.id) {
+		const academicContext = await resolveSekolahAcademicContext(locals.sekolah.id);
+		const akasConfig = await getAkasConfig(
+			locals.sekolah.id,
+			academicContext?.activeTahunAjaranId ?? undefined
+		);
+		akasData = {
+			baseUrl: akasConfig.baseUrl,
+			maskedKey: akasConfig.apiKey ? maskAkasApiKey(akasConfig.apiKey) : null,
+			keySet: Boolean(akasConfig.apiKey),
+			sumberPresensi: akasConfig.sumberPresensi
+		};
+	}
+
 	// Personal AI key card is offered to every non-admin role (guru mapel,
 	// wali kelas, wali asuh) — each user must bring their own key.
 	const isGuruOrUser =
@@ -168,7 +185,8 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 			baseUrl: storedPersonalAi?.baseUrl ?? '',
 			envKeyPresent: Boolean(process.env.GEMINI_API_KEY)
 		},
-		hiddenMenuPaths: (locals.sekolah?.hiddenMenuPaths as string[]) ?? []
+		hiddenMenuPaths: (locals.sekolah?.hiddenMenuPaths as string[]) ?? [],
+		akas: akasData
 	};
 };
 
