@@ -12,6 +12,7 @@ import {
 } from '$lib/server/db/schema';
 import { agamaVariantNames, pksVariantNames } from '$lib/statics';
 import { and, eq, inArray } from 'drizzle-orm';
+import { isAdminUser } from '../../pengguna/permissions';
 
 type MataPelajaranBase = Omit<MataPelajaran, 'tujuanPembelajaran'>;
 type MataPelajaranWithTp = MataPelajaranBase & {
@@ -320,7 +321,8 @@ export async function load({ depends, url, parent }) {
 	return {
 		kelasId,
 		mapel: { daftarMapel },
-		adaDataDapodik
+		adaDataDapodik,
+		isAdmin: isAdminUser(user as Parameters<typeof isAdminUser>[0])
 	};
 }
 

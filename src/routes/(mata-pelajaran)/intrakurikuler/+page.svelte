@@ -28,8 +28,13 @@
 	};
 	let {
 		data
-	}: { data: { mapel: { daftarMapel: MapelWithIndicator[] }; adaDataDapodik?: boolean } } =
-		$props();
+	}: {
+		data: {
+			mapel: { daftarMapel: MapelWithIndicator[] };
+			adaDataDapodik?: boolean;
+			isAdmin?: boolean;
+		};
+	} = $props();
 
 	let importMapelOpen = $state(false);
 
@@ -210,14 +215,16 @@
 			{/if}
 		</div>
 
-		<div class="tabs tabs-boxed bg-base-200/80 p-1">
-			<a class="tab tab-active text-xs sm:text-sm font-semibold" href="/intrakurikuler">
-				📋 Per Rombel Aktif
-			</a>
-			<a class="tab text-xs sm:text-sm" href="/intrakurikuler/distribusi">
-				🌐 Per Mata Pelajaran (Gaya AIO)
-			</a>
-		</div>
+		{#if data.isAdmin}
+			<div class="tabs tabs-boxed bg-base-200/80 p-1">
+				<a class="tab tab-active text-xs sm:text-sm font-semibold" href="/intrakurikuler">
+					📋 Per Rombel Aktif
+				</a>
+				<a class="tab text-xs sm:text-sm" href="/intrakurikuler/distribusi">
+					🌐 Per Mata Pelajaran (Gaya AIO)
+				</a>
+			</div>
+		{/if}
 	</div>
 
 	<div

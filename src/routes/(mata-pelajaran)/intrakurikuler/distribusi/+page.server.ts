@@ -10,16 +10,11 @@ import {
 import { parseJenjangKelas, sortKelasNatural } from '$lib/utils';
 import { fail, redirect, type RequestEvent, type ServerLoadEvent } from '@sveltejs/kit';
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import { authority } from '../../../pengguna/utils.server';
+import { adminOnly } from '../../../pengguna/utils.server';
 
-export async function load({ parent, url, locals }: ServerLoadEvent) {
-	const { user } = await parent();
-	const userType = (user as { type?: string } | null)?.type;
-
-	// Hanya admin, kepala_sekolah, atau user dengan izin yang dapat mengelola distribusi
-	if (userType !== 'admin' && userType !== 'kepala_sekolah') {
-		authority('mata_pelajaran_intrakurikuler');
-	}
+export async function load({ url, locals }: ServerLoadEvent) {
+	// Hanya admin atau kepala_sekolah yang dapat mengelola distribusi mapel se-sekolah
+	adminOnly();
 
 	const sekolahId = locals.sekolah?.id;
 	if (!sekolahId) {
@@ -128,11 +123,8 @@ export async function load({ parent, url, locals }: ServerLoadEvent) {
 }
 
 export const actions = {
-	async save_assignments({ request, locals }: RequestEvent) {
-		const userType = (locals.user as { type?: string } | null)?.type;
-		if (userType !== 'admin' && userType !== 'kepala_sekolah') {
-			authority('mata_pelajaran_intrakurikuler');
-		}
+	async save_assignments({ request }: RequestEvent) {
+		adminOnly();
 
 		const formData = await request.formData();
 		const rawPayload = formData.get('assignments')?.toString();
@@ -209,11 +201,8 @@ export const actions = {
 		};
 	},
 
-	async bulk_distribute_tp({ request, locals }: RequestEvent) {
-		const userType = (locals.user as { type?: string } | null)?.type;
-		if (userType !== 'admin' && userType !== 'kepala_sekolah') {
-			authority('mata_pelajaran_intrakurikuler');
-		}
+	async bulk_distribute_tp({ request }: RequestEvent) {
+		adminOnly();
 
 		const formData = await request.formData();
 		const sourceMapelId = Number(formData.get('sourceMapelId'));
