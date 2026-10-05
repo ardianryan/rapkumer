@@ -167,7 +167,8 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 			model: storedPersonalAi?.model ?? '',
 			baseUrl: storedPersonalAi?.baseUrl ?? '',
 			envKeyPresent: Boolean(process.env.GEMINI_API_KEY)
-		}
+		},
+		hiddenMenuPaths: (locals.sekolah?.hiddenMenuPaths as string[]) ?? []
 	};
 };
 

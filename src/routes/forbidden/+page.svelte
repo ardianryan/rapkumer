@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import Icon from '$lib/components/icon.svelte';
 
+	const isMenuDisabled = $derived(page.url.searchParams.get('reason') === 'menu_disabled');
 	const required = $derived(
 		(page.url.searchParams.get('required') ?? '')
 			.split(',')
@@ -24,9 +25,13 @@
 						<Icon name="lock" class="text-4xl text-white" />
 					</div>
 					<div>
-						<h1 class="text-2xl font-semibold">Akses Ditolak</h1>
+						<h1 class="text-2xl font-semibold">
+							{isMenuDisabled ? 'Menu Dinonaktifkan' : 'Akses Ditolak'}
+						</h1>
 						<p class="mt-1 text-sm opacity-90">
-							Anda tidak memiliki izin yang diperlukan untuk membuka halaman ini.
+							{isMenuDisabled
+								? 'Menu ini sedang dinonaktifkan sementara oleh Administrator atau Kurikulum Sekolah.'
+								: 'Anda tidak memiliki izin yang diperlukan untuk membuka halaman ini.'}
 						</p>
 					</div>
 				</div>
@@ -35,15 +40,23 @@
 			<div class="bg-base-100 p-6">
 				<div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
 					<div class="flex-1">
-						<h3 class="text-lg font-medium">Izin yang dibutuhkan</h3>
-						{#if required.length}
-							<div class="mt-3 flex flex-wrap gap-2">
-								{#each required as perm (perm)}
-									<span class="badge badge-error">{perm}</span>
-								{/each}
-							</div>
+						{#if isMenuDisabled}
+							<h3 class="text-lg font-medium">Informasi Visibilitas Menu</h3>
+							<p class="text-muted mt-2 text-sm">
+								Halaman ini disembunyikan dari antarmuka guru untuk menjaga fokus pengisian pada
+								modul lain yang sedang berlangsung (misalnya periode Rapor Sisipan).
+							</p>
 						{:else}
-							<p class="text-muted mt-2 text-sm">Tidak ada informasi izin tersedia.</p>
+							<h3 class="text-lg font-medium">Izin yang dibutuhkan</h3>
+							{#if required.length}
+								<div class="mt-3 flex flex-wrap gap-2">
+									{#each required as perm (perm)}
+										<span class="badge badge-error">{perm}</span>
+									{/each}
+								</div>
+							{:else}
+								<p class="text-muted mt-2 text-sm">Tidak ada informasi izin tersedia.</p>
+							{/if}
 						{/if}
 					</div>
 
@@ -57,7 +70,7 @@
 				</div>
 
 				<p class="text-muted mt-6 text-sm">
-					Hubungi administrator sekolah jika memang membutuhkan akses ke halaman ini.
+					Hubungi administrator sekolah jika Anda merasa membutuhkan akses ke halaman ini.
 				</p>
 			</div>
 		</div>

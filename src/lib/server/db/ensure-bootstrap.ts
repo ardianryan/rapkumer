@@ -28,6 +28,7 @@ import { ensurePembelajaranSchema } from './ensure-pembelajaran';
 import { ensureNilaiAkhirMapelSchema } from './ensure-nilai-akhir-mapel';
 import { ensureModulAjarSchema } from './ensure-modul-ajar';
 import { ensureRaporSisipanSchema } from './ensure-rapor-sisipan';
+import { ensureMenuVisibilitySchema } from './ensure-menu-visibility';
 import { resetEnsuredSchemas } from './ensure-helper';
 
 let startupEnsuresDone = false;
@@ -77,6 +78,7 @@ export async function runStartupEnsures() {
 			await ensureNilaiAkhirMapelSchema();
 			await ensureModulAjarSchema();
 			await ensureRaporSisipanSchema();
+			await ensureMenuVisibilitySchema();
 			startupEnsuresDone = true;
 		} finally {
 			startupEnsuresPromise = null;

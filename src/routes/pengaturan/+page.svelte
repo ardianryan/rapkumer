@@ -10,6 +10,7 @@
 	import DatabaseCard from '$lib/components/settings/database-card.svelte';
 	import BukuTamuPasskeyCard from '$lib/components/settings/buku-tamu-passkey-card.svelte';
 	import AiKeyCard from '$lib/components/settings/ai-key-card.svelte';
+	import MenuVisibilityCard from '$lib/components/settings/menu-visibility-card.svelte';
 	import type { PageData } from './$types';
 
 	const { data } = $props<{ data: PageData }>();
@@ -73,6 +74,12 @@
 {#if isAdmin}
 	<div class="mt-4">
 		<BukuTamuPasskeyCard passkeySet={data.bukuTamuPasskeySet} />
+	</div>
+{/if}
+
+{#if isAdmin}
+	<div class="mt-4">
+		<MenuVisibilityCard initialHiddenPaths={data.hiddenMenuPaths} />
 	</div>
 {/if}
 

@@ -383,6 +383,30 @@ const cookieParser: Handle = async ({ event, resolve }) => {
 	}
 
 	event.locals.sekolah = sekolah as Omit<Sekolah, 'logo'> | undefined;
+
+	// Guard akses langsung ke rute yang sedang disembunyikan oleh admin
+	const currentUser = event.locals.user;
+	if (
+		currentUser &&
+		currentUser.type !== 'admin' &&
+		currentUser.type !== 'kepala_sekolah' &&
+		sekolah &&
+		'hiddenMenuPaths' in sekolah &&
+		Array.isArray(sekolah.hiddenMenuPaths) &&
+		sekolah.hiddenMenuPaths.length > 0 &&
+		!event.url.pathname.startsWith('/api/') &&
+		event.url.pathname !== '/forbidden'
+	) {
+		const currentPath = event.url.pathname.replace(/\/+$/, '');
+		const isHidden = (sekolah.hiddenMenuPaths as string[]).some((p: string) => {
+			const normalizedP = p.replace(/\/+$/, '');
+			return currentPath === normalizedP || currentPath.startsWith(normalizedP + '/');
+		});
+		if (isHidden) {
+			throw redirect(303, `/forbidden?reason=menu_disabled`);
+		}
+	}
+
 	return resolve(event);
 };
 

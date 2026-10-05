@@ -39,9 +39,20 @@
 		(page.data as { kelasAktif?: { id: number } | null } | null)?.kelasAktif ?? null
 	);
 
+	const hiddenMenuPaths = $derived(
+		(page.data as { sekolah?: { hiddenMenuPaths?: string[] } | null } | null)?.sekolah
+			?.hiddenMenuPaths ?? []
+	);
+
 	function isHiddenForUser(path?: string): boolean {
 		// Menu items without a path (parent groups) are filtered recursively via subMenu
 		if (!path) return false;
+
+		// Jika bukan admin / kepala_sekolah, sembunyikan jika ada di hiddenMenuPaths
+		if (user && user.type !== 'admin' && user.type !== 'kepala_sekolah') {
+			if (hiddenMenuPaths.includes(path)) return true;
+		}
+
 		if (path === '/presensi-guru' && !presensiGuruEnabled) return true;
 		// /dinas-luar is the permohonan feature for non-admin roles; admin & kepala
 		// sekolah manage perjalanan dinas via the full /sppd page instead.

@@ -61,6 +61,7 @@ async function verifyWaliKelasAccess(
 
 export const load: LayoutServerLoad = async ({ url, locals, cookies, depends }) => {
 	depends('app:presensi-guru-enabled');
+	depends('app:menu-visibility');
 
 	const meta: PageMeta = {
 		title:

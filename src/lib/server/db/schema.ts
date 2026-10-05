@@ -186,6 +186,8 @@ export const tableSekolah = sqliteTable('sekolah', {
 	statusKepalaSekolah: text({ enum: ['definitif', 'plt'] })
 		.default('definitif')
 		.notNull(),
+	// Daftar path menu yang disembunyikan untuk guru/non-admin
+	hiddenMenuPaths: text({ mode: 'json' }).$type<string[]>().default([]).notNull(),
 	...audit
 });
 
