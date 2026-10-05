@@ -19,6 +19,29 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	});
 	if (!kelas) throw error(404, 'Kelas tidak ditemukan');
 
+	const user = locals.user;
+	const typedUser = user as {
+		type?: string;
+		id?: number;
+		kelasId?: number | null;
+		ownKelasIds?: number[] | null;
+	};
+
+	const isWaliKelasOwn =
+		typedUser.type === 'wali_kelas' &&
+		(typedUser.kelasId === kelas.id ||
+			typedUser.ownKelasIds?.includes(kelas.id) ||
+			kelas.waliKelasId === typedUser.id);
+	const isAllowed =
+		typedUser.type === 'admin' || typedUser.type === 'kepala_sekolah' || isWaliKelasOwn;
+
+	if (!isAllowed) {
+		throw error(
+			403,
+			'Akses ditolak. Hanya Wali Kelas atau Administrator yang dapat mencetak rapor sisipan.'
+		);
+	}
+
 	const isBulk = url.searchParams.get('bulk') === 'true';
 	const muridIdParam = url.searchParams.get('murid_id');
 

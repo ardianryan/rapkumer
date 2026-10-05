@@ -62,6 +62,9 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 			? '2 (Genap)'
 			: '1 (Ganjil)';
 
+	const kepalaStatus =
+		data.kepalaSekolah.statusKepalaSekolah === 'plt' ? 'Plt. Kepala Sekolah' : 'Kepala Sekolah';
+
 	return `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -183,15 +186,22 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 		margin-bottom: 4px;
 		text-transform: uppercase;
 	}
+	.no-break {
+		page-break-inside: avoid;
+		break-inside: avoid;
+	}
 	.ttd-section {
 		width: 100%;
-		margin-top: 6px;
+		border-collapse: collapse;
+		margin-top: 10px;
 	}
 	.ttd-section td {
 		vertical-align: top;
 		text-align: center;
 		font-size: 8.5pt;
-		width: 33.33%;
+	}
+	.spacer-ttd {
+		height: 48px;
 	}
 </style>
 </head>
@@ -306,30 +316,62 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 </div>
 
 <!-- TANDA TANGAN -->
-<table class="ttd-section">
-	<tr>
-		<td>
-			<p>Mengetahui,</p>
-			<p>Orang Tua / Wali Murid</p>
-			<div style="height: 48px;"></div>
-			<p>( .................................................... )</p>
-		</td>
-		<td>
-			<p>${escHtml(data.ttdTempat || 'Tempat')}, ${escHtml(data.tanggalCetak)}</p>
-			<p>Wali Kelas</p>
-			<div style="height: 48px;"></div>
-			<p class="font-bold" style="text-decoration: underline;">${escHtml(data.waliKelas.nama)}</p>
-			<p>${data.waliKelas.nip ? 'NIP. ' + escHtml(data.waliKelas.nip) : 'NIP. -'}</p>
-		</td>
-		<td>
-			<p>&nbsp;</p>
-			<p>${escHtml(data.kepalaSekolah.statusKepalaSekolah || 'Kepala Sekolah')}</p>
-			<div style="height: 48px;"></div>
-			<p class="font-bold" style="text-decoration: underline;">${escHtml(data.kepalaSekolah.nama)}</p>
-			<p>${data.kepalaSekolah.nip ? 'NIP. ' + escHtml(data.kepalaSekolah.nip) : 'NIP. -'}</p>
-		</td>
-	</tr>
-</table>
+<div class="no-break" style="margin-top: 10pt;">
+	<table class="ttd-section">
+		<colgroup>
+			<col style="width: 50%;">
+			<col style="width: 50%;">
+		</colgroup>
+		<tbody>
+			<tr>
+				<td></td>
+				<td class="text-center" style="padding-bottom: 6pt;">
+					${escHtml(data.ttdTempat || 'Tempat')}, ${escHtml(data.tanggalCetak)}
+				</td>
+			</tr>
+			<tr>
+				<td class="text-center font-bold">Orang Tua / Wali Murid</td>
+				<td class="text-center font-bold">Wali Kelas</td>
+			</tr>
+			<tr>
+				<td class="spacer-ttd"></td>
+				<td class="spacer-ttd"></td>
+			</tr>
+			<tr>
+				<td class="text-center">( .................................................... )</td>
+				<td class="text-center font-bold" style="text-decoration: underline;">
+					${escHtml(data.waliKelas.nama)}
+				</td>
+			</tr>
+			<tr>
+				<td></td>
+				<td class="text-center">
+					${data.waliKelas.nip ? 'NIP. ' + escHtml(data.waliKelas.nip) : 'NIP. -'}
+				</td>
+			</tr>
+		</tbody>
+		<tbody>
+			<tr>
+				<td colspan="2" class="text-center font-bold" style="padding-top: 10pt;">
+					${kepalaStatus}
+				</td>
+			</tr>
+			<tr>
+				<td colspan="2" class="spacer-ttd"></td>
+			</tr>
+			<tr>
+				<td colspan="2" class="text-center font-bold" style="text-decoration: underline;">
+					${escHtml(data.kepalaSekolah.nama)}
+				</td>
+			</tr>
+			<tr>
+				<td colspan="2" class="text-center">
+					${data.kepalaSekolah.nip ? 'NIP. ' + escHtml(data.kepalaSekolah.nip) : 'NIP. -'}
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
 
 </body>
 </html>`;

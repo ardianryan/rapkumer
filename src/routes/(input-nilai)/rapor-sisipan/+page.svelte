@@ -73,7 +73,7 @@
 
 			<!-- ACTION BUTTONS & SHORTCUTS -->
 			<div class="flex flex-wrap items-center gap-2">
-				{#if kelasAktif}
+				{#if kelasAktif && data.isWaliKelasOrAdmin}
 					<a
 						href="/cetak/rapor-sisipan?kelas_id={kelasAktif.id}"
 						class="btn btn-sm btn-soft btn-primary shadow-xs"

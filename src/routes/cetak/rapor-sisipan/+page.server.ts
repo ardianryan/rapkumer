@@ -3,9 +3,31 @@ import { tableKelas, tableMurid } from '$lib/server/db/schema';
 import { and, asc, eq } from 'drizzle-orm';
 import { getRaporSisipanDataForStudent } from '$lib/server/pdf/rapor-sisipan-preview';
 import { renderRaporSisipanHTML } from '$lib/server/pdf/templates/rapor-sisipan';
+import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ parent, url, locals }) => {
+	if (!locals.user) {
+		throw redirect(303, '/login');
+	}
+
+	const user = locals.user;
+	const typedUser = user as {
+		type?: string;
+		id?: number;
+		kelasId?: number | null;
+		ownKelasIds?: number[] | null;
+	};
+
+	// Hanya wali kelas, kepala sekolah, atau admin yang berhak mencetak rapor
+	if (
+		typedUser.type !== 'admin' &&
+		typedUser.type !== 'kepala_sekolah' &&
+		typedUser.type !== 'wali_kelas'
+	) {
+		throw redirect(303, '/forbidden?required=wali_kelas');
+	}
+
 	const { kelasAktif, daftarKelas } = await parent();
 	const sekolah = locals.sekolah;
 	const meta: PageMeta = { title: 'Cetak Rapor Sisipan (STS)' };
@@ -17,21 +39,35 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 			daftarKelas: [],
 			muridList: [],
 			selectedMuridId: null,
-			previewHtml: null
+			previewHtml: null,
+			studentMapelNotes: []
 		};
 	}
 
+	// Filter daftar kelas agar wali kelas hanya melihat kelas binaannya sendiri
+	const filteredDaftarKelas =
+		typedUser.type === 'admin' || typedUser.type === 'kepala_sekolah'
+			? (daftarKelas ?? [])
+			: (daftarKelas ?? []).filter(
+					(k) => k.id === typedUser.kelasId || typedUser.ownKelasIds?.includes(k.id)
+				);
+
 	const requestedKelasId = Number(url.searchParams.get('kelas_id'));
-	const targetKelasId = requestedKelasId || (kelasAktif?.id ?? null);
+	const targetKelasId =
+		requestedKelasId ||
+		(typedUser.type === 'wali_kelas'
+			? (typedUser.kelasId ?? filteredDaftarKelas[0]?.id ?? null)
+			: (kelasAktif?.id ?? null));
 
 	if (!targetKelasId) {
 		return {
 			meta,
 			kelas: null,
-			daftarKelas: daftarKelas ?? [],
+			daftarKelas: filteredDaftarKelas,
 			muridList: [],
 			selectedMuridId: null,
-			previewHtml: null
+			previewHtml: null,
+			studentMapelNotes: []
 		};
 	}
 
@@ -44,11 +80,25 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 		return {
 			meta,
 			kelas: null,
-			daftarKelas: daftarKelas ?? [],
+			daftarKelas: filteredDaftarKelas,
 			muridList: [],
 			selectedMuridId: null,
-			previewHtml: null
+			previewHtml: null,
+			studentMapelNotes: []
 		};
+	}
+
+	// Pastikan bila wali_kelas, memang wali dari kelas target ini
+	const isWaliKelasOwn =
+		typedUser.type === 'wali_kelas' &&
+		(typedUser.kelasId === kelas.id ||
+			typedUser.ownKelasIds?.includes(kelas.id) ||
+			kelas.waliKelasId === typedUser.id);
+	const isAllowed =
+		typedUser.type === 'admin' || typedUser.type === 'kepala_sekolah' || isWaliKelasOwn;
+
+	if (!isAllowed) {
+		throw redirect(303, '/forbidden?required=wali_kelas');
 	}
 
 	const muridList = await db.query.tableMurid.findMany({
