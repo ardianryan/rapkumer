@@ -13,6 +13,7 @@
 		kelasId: number;
 		mapelId: number;
 		mapelNama: string;
+		isConfigured?: boolean;
 		initialKomponenFormatif?: RtsKomponenFormatifItem[];
 		initialKomponenSumatif?: RtsKomponenSumatifItem[];
 		initialAdaStsTes?: boolean;
@@ -29,6 +30,7 @@
 		kelasId,
 		mapelId,
 		mapelNama,
+		isConfigured = false,
 		initialKomponenFormatif = [],
 		initialKomponenSumatif = [],
 		initialAdaStsTes = true,
@@ -188,6 +190,37 @@
 			toast((err as Error).message, 'error');
 		} finally {
 			isSaving = false;
+		}
+	}
+
+	let isResetting = $state<boolean>(false);
+
+	async function handleReset() {
+		const confirmed = confirm(
+			`Apakah Anda yakin ingin menghapus konfigurasi komponen asesmen untuk mata pelajaran ${mapelNama}?\n\nPengaturan komponen dan nilai yang sudah diinput untuk mapel ini akan dihapus dan kembali ke kondisi awal (belum dikonfigurasi).`
+		);
+		if (!confirmed) return;
+
+		isResetting = true;
+		try {
+			const res = await fetch('/api/rapor-sisipan/setup', {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					kelasId,
+					mataPelajaranId: mapelId
+				})
+			});
+
+			const data = await res.json();
+			if (!res.ok) throw new Error(data.error || 'Gagal mereset konfigurasi.');
+
+			toast(data.message || 'Konfigurasi asesmen berhasil direset.', 'success');
+			onSaved?.();
+		} catch (err) {
+			toast((err as Error).message, 'error');
+		} finally {
+			isResetting = false;
 		}
 	}
 </script>
@@ -460,25 +493,51 @@
 		</div>
 
 		<!-- TOMBOL AKSI -->
-		<div class="flex items-center justify-end gap-2 pt-2">
-			{#if onClose}
-				<button type="button" class="btn btn-sm btn-ghost" onclick={onClose} disabled={isSaving}>
-					Batal
+		<div class="flex items-center justify-between gap-2 pt-2 border-t border-base-200">
+			{#if isConfigured}
+				<button
+					type="button"
+					class="btn btn-sm btn-outline btn-error"
+					onclick={handleReset}
+					disabled={isSaving || isResetting}
+				>
+					{#if isResetting}
+						<span class="loading loading-spinner loading-xs"></span>
+						Mereset...
+					{:else}
+						<Icon name="del" />
+						Reset ke Default
+					{/if}
 				</button>
+			{:else}
+				<div></div>
 			{/if}
-			<button
-				type="submit"
-				class="btn btn-sm btn-primary"
-				disabled={isSaving || bobotSumatif + bobotSts !== 100}
-			>
-				{#if isSaving}
-					<span class="loading loading-spinner loading-xs"></span>
-					Menyimpan...
-				{:else}
-					<Icon name="check" />
-					Simpan Pengaturan Asesmen
+
+			<div class="flex items-center gap-2">
+				{#if onClose}
+					<button
+						type="button"
+						class="btn btn-sm btn-ghost"
+						onclick={onClose}
+						disabled={isSaving || isResetting}
+					>
+						Batal
+					</button>
 				{/if}
-			</button>
+				<button
+					type="submit"
+					class="btn btn-sm btn-primary"
+					disabled={isSaving || isResetting || bobotSumatif + bobotSts !== 100}
+				>
+					{#if isSaving}
+						<span class="loading loading-spinner loading-xs"></span>
+						Menyimpan...
+					{:else}
+						<Icon name="check" />
+						Simpan Pengaturan Asesmen
+					{/if}
+				</button>
+			</div>
 		</div>
 	</form>
 </div>

@@ -63,7 +63,6 @@
 					<h2 class="text-xl font-black text-base-content tracking-tight">
 						Rapor Sisipan Tengah Semester (STS / PTS)
 					</h2>
-					<span class="badge badge-primary badge-sm font-semibold">Khusus SMA</span>
 				</div>
 				<p class="text-xs text-base-content/70 mt-1">
 					Pengisian asesmen formatif (tugas harian) & sumatif (ulangan materi) dinamis per mata
@@ -280,6 +279,7 @@
 				kelasId={kelasAktif.id}
 				mapelId={selectedMapel.id}
 				mapelNama={selectedMapel.nama}
+				isConfigured={isSetupDone}
 				initialKomponenFormatif={setup?.komponenFormatif}
 				initialKomponenSumatif={setup?.komponenSumatif}
 				initialAdaStsTes={setup?.adaStsTes ?? true}

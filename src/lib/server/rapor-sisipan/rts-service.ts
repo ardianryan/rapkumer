@@ -155,6 +155,36 @@ export async function saveRtsSetup(data: {
 }
 
 /**
+ * Hapus / reset konfigurasi komponen asesmen RTS beserta nilai yang tersimpan untuk mapel tersebut
+ */
+export async function deleteRtsSetup(kelasId: number, mataPelajaranId: number, sekolahId?: number) {
+	const setupCondition = sekolahId
+		? and(
+				eq(tableRtsMapelSetup.kelasId, kelasId),
+				eq(tableRtsMapelSetup.mataPelajaranId, mataPelajaranId),
+				eq(tableRtsMapelSetup.sekolahId, sekolahId)
+			)
+		: and(
+				eq(tableRtsMapelSetup.kelasId, kelasId),
+				eq(tableRtsMapelSetup.mataPelajaranId, mataPelajaranId)
+			);
+
+	const nilaiCondition = sekolahId
+		? and(
+				eq(tableRtsNilaiSiswa.kelasId, kelasId),
+				eq(tableRtsNilaiSiswa.mataPelajaranId, mataPelajaranId),
+				eq(tableRtsNilaiSiswa.sekolahId, sekolahId)
+			)
+		: and(
+				eq(tableRtsNilaiSiswa.kelasId, kelasId),
+				eq(tableRtsNilaiSiswa.mataPelajaranId, mataPelajaranId)
+			);
+
+	await db.delete(tableRtsMapelSetup).where(setupCondition);
+	await db.delete(tableRtsNilaiSiswa).where(nilaiCondition);
+}
+
+/**
  * Ambil seluruh nilai siswa RTS untuk rombel & mapel
  */
 export async function getRtsNilaiList(kelasId: number, mataPelajaranId: number) {
