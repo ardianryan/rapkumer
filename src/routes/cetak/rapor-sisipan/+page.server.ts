@@ -63,6 +63,7 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 			: (muridList[0]?.id ?? null);
 
 	let previewHtml: string | null = null;
+	let studentMapelNotes: Array<{ mataPelajaran: string; catatan: string }> = [];
 	if (selectedMuridId) {
 		try {
 			const studentData = await getRaporSisipanDataForStudent({
@@ -71,6 +72,12 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 				muridId: selectedMuridId
 			});
 			previewHtml = renderRaporSisipanHTML(studentData);
+			studentMapelNotes = studentData.mapelList
+				.filter((m) => Boolean(m.catatanGuru && m.catatanGuru.trim().length > 0))
+				.map((m) => ({
+					mataPelajaran: m.mataPelajaran,
+					catatan: m.catatanGuru!
+				}));
 		} catch (err) {
 			console.error('Error generating preview HTML:', err);
 		}
@@ -92,6 +99,7 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 			nisn: m.nisn
 		})),
 		selectedMuridId,
-		previewHtml
+		previewHtml,
+		studentMapelNotes
 	};
 };

@@ -17,7 +17,13 @@ import {
 	formatTanggal,
 	getLogoSrc
 } from '$lib/server/pdf/preview-utils';
+import { isKeluargaAgama, isKeluargaPks, muridAgamaKey } from '$lib/server/mapel-picker';
+import { agamaMapelOptions, agamaParentName, pksMapelOptions, pksParentName } from '$lib/statics';
 import type { RaporSisipanStudentData, RaporSisipanMapelItem } from './templates/rapor-sisipan';
+
+function normalizeText(value: string | null | undefined) {
+	return value?.trim().toLowerCase() ?? '';
+}
 
 export async function getRaporSisipanDataForStudent(params: {
 	sekolahId: number;
@@ -66,12 +72,61 @@ export async function getRaporSisipanDataForStudent(params: {
 	const bgLogoSrc = await getLogoSrc(sekolah.id);
 
 	// Ambil semua mapel di kelas ini
-	const mapelList = await db.query.tableMataPelajaran.findMany({
+	const allClassMapels = await db.query.tableMataPelajaran.findMany({
 		where: eq(tableMataPelajaran.kelasId, kelasId),
-		orderBy: asc(tableMataPelajaran.nama),
+		orderBy: [asc(tableMataPelajaran.urutan), asc(tableMataPelajaran.nama)],
 		with: {
 			pengampu: true
 		}
+	});
+
+	// Smart deteksi Pendidikan Agama & PKS sesuai agama murid
+	const muridKey = muridAgamaKey(murid.agama);
+	const expectedAgamaName =
+		(muridKey ? agamaMapelOptions.find((o: { key: string }) => o.key === muridKey)?.name : null) ??
+		agamaParentName;
+	const expectedAgamaNormalized = normalizeText(expectedAgamaName);
+	const agamaParentNormalized = normalizeText(agamaParentName);
+
+	const expectedPksDbName =
+		(muridKey ? pksMapelOptions.find((o: { key: string }) => o.key === muridKey)?.name : null) ??
+		pksParentName;
+	const expectedPksDbNormalized = normalizeText(expectedPksDbName);
+	const pksParentNormalized = normalizeText(pksParentName);
+	const pksOption = muridKey
+		? pksMapelOptions.find((o: { key: string; label: string }) => o.key === muridKey)
+		: null;
+	const expectedPksDisplayName = pksOption
+		? `Pendalaman Kitab Suci Agama ${pksOption.label}`
+		: pksParentName;
+
+	const hasSpecificAgamaInClass = allClassMapels.some(
+		(m) => normalizeText(m.nama) === expectedAgamaNormalized
+	);
+	const hasSpecificPksInClass = allClassMapels.some(
+		(m) => normalizeText(m.nama) === expectedPksDbNormalized
+	);
+
+	const filteredMapels = allClassMapels.filter((m) => {
+		const normName = normalizeText(m.nama);
+
+		// Filter Pendidikan Agama
+		if (isKeluargaAgama(m.nama)) {
+			if (hasSpecificAgamaInClass) {
+				return normName === expectedAgamaNormalized;
+			}
+			return normName === agamaParentNormalized;
+		}
+
+		// Filter Pendalaman Kitab Suci
+		if (isKeluargaPks(m.nama)) {
+			if (hasSpecificPksInClass) {
+				return normName === expectedPksDbNormalized;
+			}
+			return normName === pksParentNormalized;
+		}
+
+		return true;
 	});
 
 	// Ambil semua setup RTS di kelas ini
@@ -87,7 +142,7 @@ export async function getRaporSisipanDataForStudent(params: {
 	const nilaiMap = new Map(nilaiList.map((n) => [n.mataPelajaranId, n]));
 
 	// Format baris nilai tiap mapel
-	const rtsMapelItems: RaporSisipanMapelItem[] = mapelList.map((m, idx) => {
+	const rtsMapelItems: RaporSisipanMapelItem[] = filteredMapels.map((m, idx) => {
 		const s = setupMap.get(m.id);
 		const n = nilaiMap.get(m.id);
 
@@ -113,10 +168,23 @@ export async function getRaporSisipanDataForStudent(params: {
 			if (parts.length > 0) sumatifDetail = parts.join(', ');
 		}
 
+		let displayName = m.namaLokal?.trim() || m.nama;
+		const normName = normalizeText(m.nama);
+
+		// Jika mapel agama induk, tampilkan varian spesifik agama murid
+		if (isKeluargaAgama(m.nama) && normName === agamaParentNormalized) {
+			displayName = expectedAgamaName;
+		}
+
+		// Jika PKS, sesuaikan display name
+		if (isKeluargaPks(m.nama)) {
+			displayName = expectedPksDisplayName;
+		}
+
 		return {
 			no: idx + 1,
-			mataPelajaran: m.namaLokal?.trim() || m.nama,
-			guruPengampu: m.pengampu?.nama ?? null,
+			mataPelajaran: displayName,
+			guruPengampu: null,
 			formatifDetail,
 			rataFormatif: n?.rataFormatif ?? null,
 			sumatifDetail,

@@ -190,6 +190,7 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 	let setup = null;
 	let daftarMurid: MuridGridItem[] = [];
 	let availableTps: AvailableTpItem[] = [];
+	let availableLingkupMateri: string[] = [];
 
 	if (selectedMapelRecord) {
 		setup = await getRtsSetup(kelas.id, selectedMapelRecord.id);
@@ -199,6 +200,13 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			where: eq(tableTujuanPembelajaran.mataPelajaranId, selectedMapelRecord.id),
 			orderBy: asc(tableTujuanPembelajaran.id)
 		});
+		const lmSet = new Set<string>();
+		for (const t of tpRecords) {
+			const lm = t.lingkupMateri?.trim();
+			if (lm) lmSet.add(lm);
+		}
+		availableLingkupMateri = Array.from(lmSet);
+
 		availableTps = tpRecords.map((t) => ({
 			id: t.id,
 			deskripsi: t.deskripsi,
@@ -301,6 +309,7 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 		setup,
 		daftarMurid,
 		availableTps,
+		availableLingkupMateri,
 		progressList,
 		catatanWaliList,
 		isWaliKelasOrAdmin

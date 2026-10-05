@@ -287,6 +287,7 @@
 				initialBobotSumatif={setup?.bobotSumatifTp ?? 70}
 				initialBobotSts={setup?.bobotSts ?? 30}
 				availableTps={data.availableTps}
+				availableLingkupMateri={data.availableLingkupMateri}
 				onSaved={async () => {
 					setupOpen = false;
 					await reloadData();

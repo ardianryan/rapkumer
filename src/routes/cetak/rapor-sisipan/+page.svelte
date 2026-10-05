@@ -141,6 +141,25 @@
 		<div class="lg:col-span-8">
 			<div class="card bg-base-100 p-3 rounded-xl border border-base-200 shadow-md">
 				{#if data.previewHtml}
+					{#if data.studentMapelNotes && data.studentMapelNotes.length > 0}
+						<div class="mb-3 p-3 bg-base-200/60 rounded-xl border border-base-200">
+							<div class="flex items-center gap-1.5 text-xs font-bold text-base-content mb-2">
+								<Icon name="info" class="w-4 h-4 text-info" />
+								<span
+									>Catatan Guru Mata Pelajaran (Hanya Tampil di Layar Ini, Tidak Dicetak di Rapor):</span
+								>
+							</div>
+							<div class="space-y-1.5">
+								{#each data.studentMapelNotes as note (note.mataPelajaran)}
+									<div class="text-xs bg-base-100 p-2 rounded-lg border border-base-200">
+										<span class="font-semibold text-primary">{note.mataPelajaran}:</span>
+										<span class="text-base-content/80 italic">"{note.catatan}"</span>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
 					<div
 						class="w-full overflow-x-auto bg-slate-200 dark:bg-slate-900 p-3 rounded-lg flex justify-center"
 					>

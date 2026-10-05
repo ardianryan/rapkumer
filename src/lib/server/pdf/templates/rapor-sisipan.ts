@@ -237,19 +237,18 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 <table class="nilai-table">
 	<thead>
 		<tr>
-			<th rowspan="2" style="width: 24px;">No</th>
-			<th rowspan="2" style="width: 140px;">Mata Pelajaran</th>
+			<th rowspan="2" style="width: 28px;">No</th>
+			<th rowspan="2" style="width: 200px;">Mata Pelajaran</th>
 			<th colspan="2">Asesmen Formatif (Tugas)</th>
 			<th colspan="2">Sumatif Lingkup Materi</th>
-			<th rowspan="2" style="width: 32px;">STS</th>
-			<th rowspan="2" style="width: 34px;">NA STS</th>
-			<th rowspan="2">Capaian Kompetensi / Catatan Guru Mapel</th>
+			<th rowspan="2" style="width: 48px;">STS</th>
+			<th rowspan="2" style="width: 54px;">NA STS</th>
 		</tr>
 		<tr>
-			<th style="width: 80px;">Rincian Nilai</th>
-			<th style="width: 32px;">Rata</th>
-			<th style="width: 80px;">Rincian Nilai</th>
-			<th style="width: 32px;">Rata</th>
+			<th style="width: 120px;">Rincian Nilai</th>
+			<th style="width: 42px;">Rata</th>
+			<th style="width: 120px;">Rincian Nilai</th>
+			<th style="width: 42px;">Rata</th>
 		</tr>
 	</thead>
 	<tbody>
@@ -260,17 +259,15 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 			<td class="text-center">${m.no}</td>
 			<td>
 				<div class="font-bold">${escHtml(m.mataPelajaran)}</div>
-				${m.guruPengampu ? `<div style="font-size: 6.5pt; color: #555;">${escHtml(m.guruPengampu)}</div>` : ''}
 			</td>
-			<td class="text-center" style="font-size: 7pt;">${m.formatifDetail || '-'}</td>
+			<td class="text-center" style="font-size: 7.5pt;">${m.formatifDetail || '-'}</td>
 			<td class="text-center font-bold">${m.rataFormatif != null ? m.rataFormatif : '-'}</td>
-			<td class="text-center" style="font-size: 7pt;">${m.sumatifDetail || '-'}</td>
+			<td class="text-center" style="font-size: 7.5pt;">${m.sumatifDetail || '-'}</td>
 			<td class="text-center font-bold">${m.rataSumatif != null ? m.rataSumatif : '-'}</td>
 			<td class="text-center font-bold">${m.sts != null ? m.sts : '-'}</td>
 			<td class="text-center font-bold" style="background-color: #f8fafc; font-size: 8.5pt;">
 				${m.nilaiAkhirRts != null ? m.nilaiAkhirRts : '-'}
 			</td>
-			<td style="font-size: 7pt; line-height: 1.2;">${escHtml(m.catatanGuru || 'Mengikuti kegiatan pembelajaran tengah semester dengan baik.')}</td>
 		</tr>`
 			)
 			.join('')}

@@ -20,6 +20,7 @@
 		initialBobotSumatif?: number;
 		initialBobotSts?: number;
 		availableTps?: TujuanPembelajaranOption[];
+		availableLingkupMateri?: string[];
 		onSaved?: () => void;
 		onClose?: () => void;
 	}
@@ -35,6 +36,7 @@
 		initialBobotSumatif = 70,
 		initialBobotSts = 30,
 		availableTps = [],
+		availableLingkupMateri = [],
 		onSaved,
 		onClose
 	}: Props = $props();
@@ -57,10 +59,25 @@
 					{
 						kode: 'S1',
 						lingkupMateri: 'Lingkup Materi 1',
-						tpDeskripsi: 'Tujuan Pembelajaran 1'
+						tpDeskripsi: 'Lingkup Materi 1'
 					}
 				]
 	);
+
+	// Gabungkan seluruh Lingkup Materi unik yang tersedia dari data guru
+	let allLingkupMateri = $derived.by(() => {
+		const set = new Set<string>();
+		if (availableLingkupMateri) {
+			for (const lm of availableLingkupMateri) {
+				if (lm && lm.trim()) set.add(lm.trim());
+			}
+		}
+		for (const t of availableTps) {
+			const lm = t.lingkupMateri?.trim();
+			if (lm) set.add(lm);
+		}
+		return Array.from(set);
+	});
 
 	// svelte-ignore state_referenced_locally
 	let adaStsTes = $state<boolean>(initialAdaStsTes);
@@ -102,12 +119,13 @@
 		});
 	}
 
-	function addSumatif() {
+	function addSumatif(lmName?: string) {
 		const nextNum = komponenSumatif.length + 1;
+		const name = lmName || `Lingkup Materi ${nextNum}`;
 		komponenSumatif.push({
 			kode: `S${nextNum}`,
-			lingkupMateri: `Lingkup Materi ${nextNum}`,
-			tpDeskripsi: `Tujuan Pembelajaran ${nextNum}`
+			lingkupMateri: name,
+			tpDeskripsi: name
 		});
 	}
 
@@ -122,14 +140,14 @@
 		});
 	}
 
-	function pickTpForSumatif(index: number, tpIdStr: string) {
-		const tpId = Number(tpIdStr);
-		const found = availableTps.find((t) => t.id === tpId);
-		if (found && komponenSumatif[index]) {
-			komponenSumatif[index].tpId = found.id;
-			komponenSumatif[index].lingkupMateri = found.lingkupMateri || '';
-			komponenSumatif[index].tpDeskripsi = found.deskripsi;
-		}
+	function loadAllAvailableLingkupMateri() {
+		if (allLingkupMateri.length === 0) return;
+		komponenSumatif = allLingkupMateri.map((lm, idx) => ({
+			kode: `S${idx + 1}`,
+			lingkupMateri: lm,
+			tpDeskripsi: lm
+		}));
+		toast(`Berhasil memuat ${allLingkupMateri.length} lingkup materi tersimpan.`, 'success');
 	}
 
 	async function handleSubmit(event: SubmitEvent) {
@@ -138,6 +156,11 @@
 			toast('Total bobot Sumatif TP dan STS harus berjumlah 100%.', 'error');
 			return;
 		}
+
+		// Pastikan tpDeskripsi terisi sama dengan lingkup materi
+		komponenSumatif.forEach((s) => {
+			s.tpDeskripsi = s.tpDeskripsi || s.lingkupMateri;
+		});
 
 		isSaving = true;
 		try {
@@ -223,82 +246,101 @@
 
 		<!-- BAGIAN 2: ASESMEN SUMATIF LINGKUP MATERI -->
 		<div class="card bg-base-200/50 p-4 rounded-xl border border-base-200">
-			<div class="flex items-center justify-between mb-3">
+			<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
 				<div>
 					<h4 class="text-sm font-bold flex items-center gap-1.5 text-base-content">
 						<span class="badge badge-primary badge-sm">2</span>
-						Asesmen Sumatif (Ulangan Lingkup Materi / TP)
+						Asesmen Sumatif (Lingkup Materi)
 					</h4>
 					<p class="text-xs text-base-content/60 mt-0.5">
-						Tentukan jumlah ulangan harian per materi/TP sebelum tengah semester.
+						Tentukan lingkup materi yang diujikan sebelum tengah semester.
 					</p>
 				</div>
-				<button type="button" class="btn btn-sm btn-soft btn-primary" onclick={addSumatif}>
-					<Icon name="plus" />
-					Tambah Sumatif TP
-				</button>
+				<div class="flex flex-wrap items-center gap-2">
+					{#if allLingkupMateri.length > 0}
+						<button
+							type="button"
+							class="btn btn-xs btn-outline btn-primary"
+							onclick={loadAllAvailableLingkupMateri}
+							title="Otomatis masukkan semua lingkup materi yang tersimpan di TP mapel ini"
+						>
+							<Icon name="sparkles" />
+							Pakai Semua LM ({allLingkupMateri.length})
+						</button>
+					{/if}
+					<button
+						type="button"
+						class="btn btn-sm btn-soft btn-primary"
+						onclick={() => addSumatif()}
+					>
+						<Icon name="plus" />
+						Tambah Sumatif
+					</button>
+				</div>
 			</div>
 
-			<div class="space-y-3">
+			<div class="space-y-2">
 				{#each komponenSumatif as s, idx (idx)}
-					<div class="bg-base-100 p-3 rounded-lg border border-base-200 space-y-2">
-						<div class="flex items-center justify-between">
-							<span class="badge badge-success text-white font-bold">{s.kode}</span>
-							{#if availableTps.length > 0}
-								<div class="flex items-center gap-1">
-									<span class="text-[11px] text-base-content/60">Pilih dari TP:</span>
-									<select
-										class="select select-xs bg-base-200"
-										onchange={(e) => pickTpForSumatif(idx, (e.target as HTMLSelectElement).value)}
-									>
-										<option value="">-- Pilih TP Tersimpan --</option>
-										{#each availableTps as tp (tp.id)}
-											<option value={tp.id}>
-												{tp.lingkupMateri ? `${tp.lingkupMateri}: ` : ''}{tp.deskripsi.slice(
-													0,
-													45
-												)}...
-											</option>
-										{/each}
-									</select>
-								</div>
-							{/if}
-							<button
-								type="button"
-								class="btn btn-xs btn-ghost btn-square text-error"
-								onclick={() => removeSumatif(idx)}
-								title="Hapus"
-							>
-								<Icon name="del" />
-							</button>
-						</div>
+					<div class="flex items-center gap-2 bg-base-100 p-2.5 rounded-lg border border-base-200">
+						<span class="badge badge-success text-white font-bold shrink-0">{s.kode}</span>
 
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-							<label class="block">
-								<span class="text-[11px] text-base-content/70 font-semibold mb-0.5 block">
-									Lingkup Materi
-								</span>
+						{#if allLingkupMateri.length > 0}
+							<div class="grow flex items-center gap-2">
 								<input
 									type="text"
-									class="input input-sm bg-base-200 dark:bg-base-300 w-full"
-									placeholder="Contoh: Sel Hewan & Tumbuhan"
+									list="lm-list-{idx}"
+									class="input input-sm bg-base-200 dark:bg-base-300 w-full font-medium"
+									placeholder="Pilih atau ketik nama Lingkup Materi..."
 									bind:value={s.lingkupMateri}
+									oninput={() => {
+										s.tpDeskripsi = s.lingkupMateri;
+									}}
 									required
 								/>
-							</label>
-							<label class="block">
-								<span class="text-[11px] text-base-content/70 font-semibold mb-0.5 block">
-									Deskripsi Capaian / TP
-								</span>
-								<input
-									type="text"
-									class="input input-sm bg-base-200 dark:bg-base-300 w-full"
-									placeholder="Contoh: Menganalisis bioproses sel..."
-									bind:value={s.tpDeskripsi}
-									required
-								/>
-							</label>
-						</div>
+								<datalist id="lm-list-{idx}">
+									{#each allLingkupMateri as lm (lm)}
+										<option value={lm}></option>
+									{/each}
+								</datalist>
+
+								<select
+									class="select select-xs bg-base-200 max-w-44 shrink-0"
+									value={allLingkupMateri.includes(s.lingkupMateri) ? s.lingkupMateri : ''}
+									onchange={(e) => {
+										const val = (e.target as HTMLSelectElement).value;
+										if (val) {
+											s.lingkupMateri = val;
+											s.tpDeskripsi = val;
+										}
+									}}
+								>
+									<option value="">-- Pilih dari Daftar --</option>
+									{#each allLingkupMateri as lm (lm)}
+										<option value={lm}>{lm}</option>
+									{/each}
+								</select>
+							</div>
+						{:else}
+							<input
+								type="text"
+								class="input input-sm bg-base-200 dark:bg-base-300 w-full font-medium"
+								placeholder="Nama Lingkup Materi (misal: Struktur Sel, Dinamika Partikel...)"
+								bind:value={s.lingkupMateri}
+								oninput={() => {
+									s.tpDeskripsi = s.lingkupMateri;
+								}}
+								required
+							/>
+						{/if}
+
+						<button
+							type="button"
+							class="btn btn-sm btn-ghost btn-square text-error shrink-0"
+							onclick={() => removeSumatif(idx)}
+							title="Hapus"
+						>
+							<Icon name="del" />
+						</button>
 					</div>
 				{/each}
 			</div>
