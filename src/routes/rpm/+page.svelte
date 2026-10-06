@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/icon.svelte';
 	import { toast } from '$lib/components/toast.svelte';
 	import PdfPreviewModal from '$lib/components/cetak/PdfPreviewModal.svelte';
@@ -643,13 +644,13 @@
 				...(v.matchAll(/^(?:Sintaks|SINTAKS)\s+model\s+pembelajaran\s+\d+\s*[—–-]\s*(.+)$/gim) ??
 					[])
 			];
-			const heads = brackets.map((m, i) => ({
+			const heads = brackets.map((m) => ({
 				name: m[1].trim(),
 				start: m.index,
 				end: m.index + m[0].length
 			}));
 			if (heads.length === 0 && lines.length) {
-				const lh = lines.map((m, i) => ({
+				const lh = lines.map((m) => ({
 					name: m[1].trim(),
 					start: m.index,
 					end: (m as RegExpExecArray).index + (m as RegExpExecArray)[0].length
@@ -787,13 +788,36 @@
 				<span>Memeriksa ketersediaan fitur AI…</span>
 			</div>
 		{:else if aiStatus === 'unconfigured'}
-			<div class="alert alert-warning mb-4" role="alert">
-				<Icon name="warning" />
-				<span>
-					Fitur AI belum aktif. Setel kunci API {isAdminUser ? '' : 'pribadi Anda '}di
-					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- deep link to settings page AI key card -->
-					<a class="link" href="/pengaturan#ai-key">Pengaturan</a>.
-				</span>
+			<div
+				class="alert alert-warning mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+				role="alert"
+			>
+				<div class="flex items-start sm:items-center gap-2">
+					<Icon name="warning" />
+					<div>
+						<span>
+							Fitur AI belum aktif. Setel kunci API {isAdminUser ? '' : 'pribadi Anda '}di
+							<a class="link font-bold" href={resolve('/pengaturan')}>Pengaturan</a>.
+						</span>
+						<p class="text-xs opacity-80 mt-0.5">
+							Dapatkan API Key gratis di Google AI Studio (tanpa kartu kredit).
+						</p>
+					</div>
+				</div>
+				<div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+					<a
+						href="https://aistudio.google.com/api-keys"
+						target="_blank"
+						rel="noreferrer noopener"
+						class="btn btn-xs btn-primary gap-1 shadow-none"
+					>
+						<Icon name="sparkles" />
+						Ambil API Key
+					</a>
+					<a href={resolve('/pengaturan')} class="btn btn-xs btn-outline shadow-none">
+						Ke Pengaturan
+					</a>
+				</div>
 			</div>
 		{/if}
 

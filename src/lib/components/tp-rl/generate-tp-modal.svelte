@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/icon.svelte';
 	import { toast } from '$lib/components/toast.svelte';
 
@@ -193,11 +194,34 @@
 
 <dialog class="modal" open onclose={handleCancel}>
 	{#snippet UnconfiguredMessage()}
-		<span>
-			Fitur AI belum aktif. Setel kunci API {isAdminUser ? '' : 'pribadi Anda '}di halaman
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- deep link to settings page AI key card -->
-			<a class="link" href="/pengaturan#ai-key">Pengaturan</a>.
-		</span>
+		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 w-full">
+			<div>
+				<span class="block">
+					Fitur AI belum aktif. Setel kunci API {isAdminUser ? '' : 'pribadi Anda '}di halaman
+					<a class="link font-bold" href={resolve('/pengaturan')}>Pengaturan</a>.
+				</span>
+				<span class="text-xs opacity-80 block mt-0.5">
+					Belum punya kunci? Dapatkan gratis tanpa kartu kredit di Google AI Studio.
+				</span>
+			</div>
+			<div class="flex items-center gap-2 shrink-0">
+				<a
+					href="https://aistudio.google.com/api-keys"
+					target="_blank"
+					rel="noreferrer noopener"
+					class="btn btn-xs btn-primary gap-1 shadow-none"
+				>
+					<Icon name="sparkles" />
+					Ambil API Key
+				</a>
+				<a
+					href={resolve('/pengaturan')}
+					class="btn btn-xs btn-outline shadow-none"
+				>
+					Ke Pengaturan
+				</a>
+			</div>
+		</div>
 	{/snippet}
 	<div class="modal-box flex max-h-[90vh] flex-col p-4 sm:w-full sm:max-w-3xl">
 		<h3 class="mb-2 text-xl font-bold">

@@ -81,8 +81,48 @@
 				{/if}
 			</header>
 
+			<!-- Bantuan Link Cepat Gemini API Key -->
+			<div
+				class="mb-5 rounded-2xl border border-primary/25 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4 sm:p-5"
+			>
+				<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+					<div class="space-y-1">
+						<div class="flex items-center gap-2 font-bold text-sm text-primary">
+							<Icon name="sparkles" />
+							<span>Panduan Dapatkan Gemini API Key Gratis</span>
+						</div>
+						<p class="text-xs text-base-content/80 leading-relaxed">
+							Google menyediakan kuota Gemini AI gratis tanpa kartu kredit untuk guru dan sekolah.
+							Buka Google AI Studio, klik <strong>Create API Key</strong>, lalu salin kuncinya ke
+							formulir di bawah.
+						</p>
+					</div>
+					<a
+						href="https://aistudio.google.com/api-keys"
+						target="_blank"
+						rel="noreferrer noopener"
+						class="btn btn-sm btn-primary shadow-sm gap-2 shrink-0 self-stretch sm:self-auto"
+					>
+						<Icon name="sparkles" />
+						<span>Buka Google AI Studio</span>
+						<Icon name="right" />
+					</a>
+				</div>
+			</div>
+
 			<fieldset class="fieldset">
-				<legend class="fieldset-legend">Kunci API</legend>
+				<div class="flex items-center justify-between">
+					<legend class="fieldset-legend mb-0">Kunci API</legend>
+					<a
+						href="https://aistudio.google.com/api-keys"
+						target="_blank"
+						rel="noreferrer noopener"
+						class="link link-primary text-xs flex items-center gap-1 font-medium hover:underline"
+					>
+						<span>Dapatkan di aistudio.google.com/api-keys</span>
+						<Icon name="right" />
+					</a>
+				</div>
 				<div class="form-control">
 					<label class="input bg-base-200 dark:bg-base-300 validator w-full dark:border-none">
 						<span class="pl-2"><Icon name="key" /></span>
@@ -105,7 +145,7 @@
 						</button>
 					</label>
 					<p class="text-base-content/70 mt-1 text-xs">
-						Masukkan kunci API baru untuk mengganti kunci yang tersimpan.
+						Kunci API Gemini biasanya diawali dengan <code>AIzaSy...</code>. Masukkan kunci baru untuk menyimpan.
 					</p>
 				</div>
 			</fieldset>
