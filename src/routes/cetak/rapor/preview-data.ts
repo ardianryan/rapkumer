@@ -321,6 +321,12 @@ export async function getRaporPreviewPayload({ locals, url }: RaporContext) {
 
 			const mapel = item.mataPelajaran;
 
+			// Mapel tanpa kode mapel tidak ditampilkan di cetakan rapor (kecuali mapel agama otomatis)
+			const isAgama = isAgamaSubject(mapel.nama) || isPksSubject(mapel.nama);
+			const effectiveKode =
+				mapel.kode?.trim() || (isAgama ? (isPksSubject(mapel.nama) ? 'PKS' : 'PAPB') : null);
+			if (!effectiveKode || mapel.jenis === 'belum_dipetakan') return false;
+
 			// Filter agama subject to only show the one matching murid's agama
 			if (isAgamaSubject(mapel.nama)) {
 				// Only include agama subject that matches murid's expected agama mapel

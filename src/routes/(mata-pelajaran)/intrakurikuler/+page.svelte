@@ -37,6 +37,29 @@
 	} = $props();
 
 	let importMapelOpen = $state(false);
+	let isGeneratingKodeAi = $state(false);
+
+	async function handleGenerateKodeMapelAi() {
+		if (
+			!confirm(
+				'AI akan menganalisis nama mata pelajaran dan otomatis mengisi kode singkat (contoh: MTK, BIND, PAIBP, PJOK) untuk seluruh kelas di sekolah. Lanjutkan?'
+			)
+		) {
+			return;
+		}
+		isGeneratingKodeAi = true;
+		try {
+			const res = await fetch('/api/ai/generate-kode-mapel', { method: 'POST' });
+			const json = await res.json();
+			if (!res.ok) throw new Error(json.error || 'Gagal generate kode mata pelajaran');
+			toast({ message: json.message, type: 'success' });
+			await invalidate('app:mapel');
+		} catch (e) {
+			toast({ message: (e as Error).message, type: 'error' });
+		} finally {
+			isGeneratingKodeAi = false;
+		}
+	}
 
 	const emptyStateMessage = 'Belum ada data mata pelajaran';
 	const agamaMapelNameSet = new Set<string>(agamaMapelNames);
@@ -327,7 +350,23 @@
 			</form>
 		{/if}
 
-		<div class="order-1 max-sm:w-full sm:order-2 sm:ml-auto">
+		<div class="order-1 max-sm:w-full sm:order-2 sm:ml-auto flex items-center gap-2">
+			{#if data.isAdmin}
+				<button
+					type="button"
+					class="btn btn-soft btn-secondary shadow-none max-sm:flex-1"
+					onclick={handleGenerateKodeMapelAi}
+					disabled={isGeneratingKodeAi}
+					title="Otomatis isi kode singkat mata pelajaran se-sekolah dengan AI"
+				>
+					{#if isGeneratingKodeAi}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else}
+						<Icon name="sparkles" />
+					{/if}
+					Generate Kode (AI)
+				</button>
+			{/if}
 			<div class="flex">
 				<a
 					class={`btn btn-soft rounded-r-none shadow-none max-sm:flex-1 ${!canAddImportMapel ? 'pointer-events-none opacity-50' : ''}`}

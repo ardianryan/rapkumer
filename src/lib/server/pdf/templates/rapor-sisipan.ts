@@ -11,6 +11,8 @@ export interface RaporSisipanMapelItem {
 	sts?: number | null;
 	nilaiAkhirRts?: number | null;
 	catatanGuru?: string | null;
+	jenis?: string;
+	kode?: string | null;
 }
 
 export interface RaporSisipanStudentData {
@@ -21,6 +23,7 @@ export interface RaporSisipanStudentData {
 		kabupatenKota?: string | null;
 		provinsi?: string | null;
 		bgLogoSrc?: string | null;
+		jenjangVariant?: string | null;
 	};
 	murid: {
 		nama: string;
@@ -69,6 +72,23 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 
 	const maxF = Math.max(1, data.maxFormatif || 4);
 	const maxS = Math.max(1, data.maxSumatif || 3);
+
+	const kelompokMap: Record<string, RaporSisipanMapelItem[]> = {};
+	for (const m of data.mapelList) {
+		const jenis = m.jenis || 'wajib';
+		if (!kelompokMap[jenis]) kelompokMap[jenis] = [];
+		kelompokMap[jenis].push(m);
+	}
+
+	const isSMK = data.sekolah.jenjangVariant === 'SMK';
+	const jenisLabelText: Record<string, string> = {
+		wajib: isSMK ? 'Mata Pelajaran Umum' : 'Mata Pelajaran Wajib',
+		pilihan: 'Mata Pelajaran Pilihan',
+		kejuruan: 'Mata Pelajaran Kejuruan',
+		mulok: 'Muatan Lokal',
+		pemberdayaan: 'Muatan Pemberdayaan dan Keterampilan'
+	};
+	const jenisOrder = ['wajib', 'pilihan', 'kejuruan', 'pemberdayaan', 'mulok'];
 
 	return `<!DOCTYPE html>
 <html lang="id">
@@ -259,8 +279,8 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 		<tr>
 			<th rowspan="2" style="width: 24px;">No</th>
 			<th rowspan="2" style="width: 175px;">Mata Pelajaran</th>
-			<th colspan="${maxF + 1}">Asesmen Formatif (Tugas)</th>
-			<th colspan="${maxS + 1}">Sumatif Lingkup Materi (UH)</th>
+			<th colspan="${maxF + 1}">Formatif</th>
+			<th colspan="${maxS + 1}">Sumatif</th>
 			<th rowspan="2" style="width: 42px;">STS</th>
 			<th rowspan="2" style="width: 48px;">NA STS</th>
 		</tr>
@@ -272,11 +292,22 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 		</tr>
 	</thead>
 	<tbody>
-		${data.mapelList
-			.map(
-				(m) => `
+		${jenisOrder
+			.filter((j) => kelompokMap[j]?.length)
+			.map((jenis, gIdx) => {
+				const group = kelompokMap[jenis];
+				const letter = String.fromCharCode(65 + gIdx);
+				const groupHeader = `
+		<tr class="group-header">
+			<td colspan="${6 + maxF + maxS}" style="font-weight: bold; background-color: #f1f5f9; text-align: left; padding: 3px 6px; font-size: 8pt; text-transform: uppercase;">
+				${letter}. ${escHtml(jenisLabelText[jenis] || jenis)}
+			</td>
+		</tr>`;
+				const items = group
+					.map(
+						(m, i) => `
 		<tr>
-			<td class="text-center">${m.no}</td>
+			<td class="text-center">${i + 1}</td>
 			<td>
 				<div class="font-bold">${escHtml(m.mataPelajaran)}</div>
 			</td>
@@ -299,7 +330,10 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 				${m.nilaiAkhirRts != null ? m.nilaiAkhirRts : '-'}
 			</td>
 		</tr>`
-			)
+					)
+					.join('');
+				return groupHeader + items;
+			})
 			.join('')}
 	</tbody>
 </table>

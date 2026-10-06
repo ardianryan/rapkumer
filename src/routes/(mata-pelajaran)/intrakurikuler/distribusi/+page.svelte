@@ -63,6 +63,31 @@
 		goto(`/intrakurikuler/distribusi?mapel=${encodeURIComponent(mapel)}`);
 	}
 
+	let isGeneratingKodeAi = $state(false);
+
+	async function handleAiAutoKodeMapel() {
+		if (
+			!confirm(
+				'AI akan menganalisis nama mata pelajaran dan otomatis mengisi kode singkat (contoh: MTK, BIND, PAIBP, PJOK) untuk seluruh kelas di sekolah. Lanjutkan?'
+			)
+		) {
+			return;
+		}
+		isGeneratingKodeAi = true;
+		try {
+			const res = await fetch('/api/ai/generate-kode-mapel', { method: 'POST' });
+			const json = await res.json();
+			if (!res.ok) throw new Error(json.error || 'Gagal generate kode mata pelajaran');
+			toast({ message: json.message, type: 'success' });
+			await invalidate('app:mapel');
+			window.location.reload();
+		} catch (e) {
+			toast({ message: (e as Error).message, type: 'error' });
+		} finally {
+			isGeneratingKodeAi = false;
+		}
+	}
+
 	function applyBulkSettings() {
 		for (const r of displayedRows) {
 			if (bulkKode) r.kode = bulkKode;
@@ -154,12 +179,28 @@
 			>
 				<div class="flex flex-wrap items-center gap-2">
 					<span class="font-bold text-base-content/70">Atur Massal:</span>
-					<input
-						type="text"
-						placeholder="Kode Singkat (cth: MAT)"
-						bind:value={bulkKode}
-						class="input input-xs input-bordered w-36 bg-base-100 uppercase"
-					/>
+					<div class="flex items-center gap-1">
+						<input
+							type="text"
+							placeholder="Kode Singkat (cth: MAT)"
+							bind:value={bulkKode}
+							class="input input-xs input-bordered w-36 bg-base-100 uppercase"
+						/>
+						<button
+							type="button"
+							class="btn btn-xs btn-outline btn-secondary gap-1"
+							onclick={handleAiAutoKodeMapel}
+							disabled={isGeneratingKodeAi}
+							title="Otomatis isi kode singkat mapel se-sekolah dengan AI"
+						>
+							{#if isGeneratingKodeAi}
+								<span class="loading loading-spinner loading-xs"></span>
+							{:else}
+								<Icon name="sparkles" class="h-3 w-3" />
+							{/if}
+							AI Auto-Kode
+						</button>
+					</div>
 					<input
 						type="number"
 						placeholder="KKM (cth: 75)"

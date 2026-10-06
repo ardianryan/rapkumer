@@ -108,6 +108,14 @@ export async function getRaporSisipanDataForStudent(params: {
 	);
 
 	const filteredMapels = allClassMapels.filter((m) => {
+		// Mapel belum dipetakan tidak ditampilkan
+		if (m.jenis === 'belum_dipetakan') return false;
+
+		// Mapel tanpa kode singkat tidak ditampilkan di rapor cetak
+		const isAgama = isKeluargaAgama(m.nama);
+		const effectiveKode = m.kode?.trim() || (isAgama ? 'PAPB' : null);
+		if (!effectiveKode) return false;
+
 		const normName = normalizeText(m.nama);
 
 		// Filter Pendidikan Agama
@@ -127,6 +135,34 @@ export async function getRaporSisipanDataForStudent(params: {
 		}
 
 		return true;
+	});
+
+	// Urutkan mapel berdasarkan urutan manual -> kelompok jenis -> prioritas agama -> alfabetis
+	const mapelJenisOrder: Record<string, number> = {
+		wajib: 1,
+		pilihan: 2,
+		kejuruan: 3,
+		pemberdayaan: 4,
+		mulok: 5,
+		belum_dipetakan: 6
+	};
+
+	filteredMapels.sort((a, b) => {
+		const urutanA = a.urutan ?? Number.POSITIVE_INFINITY;
+		const urutanB = b.urutan ?? Number.POSITIVE_INFINITY;
+		if (urutanA !== urutanB) return urutanA - urutanB;
+
+		const orderA = mapelJenisOrder[a.jenis] ?? Number.POSITIVE_INFINITY;
+		const orderB = mapelJenisOrder[b.jenis] ?? Number.POSITIVE_INFINITY;
+		if (orderA !== orderB) return orderA - orderB;
+
+		if (a.jenis === 'wajib' && b.jenis === 'wajib') {
+			const isAgamaA = isKeluargaAgama(a.nama) ? 0 : 1;
+			const isAgamaB = isKeluargaAgama(b.nama) ? 0 : 1;
+			if (isAgamaA !== isAgamaB) return isAgamaA - isAgamaB;
+		}
+
+		return a.nama.localeCompare(b.nama, 'id');
 	});
 
 	// Ambil semua setup RTS di kelas ini
@@ -202,7 +238,9 @@ export async function getRaporSisipanDataForStudent(params: {
 			rataSumatif: n?.rataSumatifTp ?? null,
 			sts: n?.nilaiSts ?? null,
 			nilaiAkhirRts: n?.nilaiAkhirRts ?? null,
-			catatanGuru: n?.catatanGuru ?? null
+			catatanGuru: n?.catatanGuru ?? null,
+			jenis: m.jenis,
+			kode: m.kode
 		};
 	});
 
@@ -240,6 +278,7 @@ export async function getRaporSisipanDataForStudent(params: {
 			npsn: sekolah.npsn,
 			kabupatenKota: sekolah.alamat?.kabupaten ?? null,
 			provinsi: sekolah.alamat?.provinsi ?? null,
+			jenjangVariant: sekolah.jenjangVariant,
 			bgLogoSrc
 		},
 		murid: {
