@@ -171,15 +171,15 @@ export const actions = {
 			return fail(400, { fail: 'Jenis mata pelajaran tidak valid.' });
 		}
 
-		// For non-agama subjects update kode if provided
+		// For non-agama subjects update kode
 		const updates: Record<string, unknown> = {
 			nama,
 			namaLokal: formMapel.nama_lokal?.toString().trim() || null,
 			jenis: jenisRaw,
 			kkm,
+			kode: kode || null,
 			updatedAt: now
 		};
-		if (kode) updates.kode = kode;
 		if (indukBaru !== undefined) updates.dapodikIndukPembelajaranId = indukBaru;
 		// Nama diganti → sinkronkan kode Dapodik:
 		// - nama baru terdaftar sebagai pembelajaran → rebind ke kode baru;
@@ -221,9 +221,9 @@ export const actions = {
 				const bulkUpdates: Record<string, unknown> = {
 					jenis: jenisRaw,
 					kkm,
+					kode: kode || null,
 					updatedAt: now
 				};
-				if (kode) bulkUpdates.kode = kode;
 
 				await db
 					.update(tableMataPelajaran)

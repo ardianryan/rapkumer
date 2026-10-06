@@ -96,8 +96,9 @@ function createClientBundle(): { client: UnifiedDatabaseClient; dbInstance: unkn
 		const maxConnections = Number(process.env.PG_MAX_CONNECTIONS || 20);
 		const pgClient = postgres(url, {
 			max: maxConnections,
-			idle_timeout: 30,
-			connect_timeout: 10,
+			idle_timeout: 120,
+			connect_timeout: 15,
+			max_lifetime: 60 * 30,
 			onnotice: () => {}
 		});
 

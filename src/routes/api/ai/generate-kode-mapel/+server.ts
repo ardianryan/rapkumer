@@ -31,8 +31,6 @@ const DEFAULT_MAPEL_CODES: Record<string, string> = {
 	'seni rupa': 'SRUP',
 	'seni tari': 'STAR',
 	'seni teater': 'STET',
-	'bimbingan konseling': 'BK',
-	'bimbingan dan konseling': 'BK',
 	'prakarya dan kewirausahaan': 'PKWU',
 	'prakarya': 'PKY',
 	'informatika': 'INF',
@@ -64,7 +62,22 @@ function normalizeName(name: string): string {
 	return name.trim().toLowerCase().replace(/[\s\-_]+/g, ' ');
 }
 
-function generateSmartFallbackCode(name: string): string {
+function isNonRaporSubject(name: string): boolean {
+	const norm = normalizeName(name);
+	return (
+		norm.includes('bimbingan konseling') ||
+		norm.includes('bimbingan dan konseling') ||
+		norm.includes('konseling') ||
+		norm.includes('bimbingan karir') ||
+		norm.startsWith('bk ') ||
+		norm.endsWith(' bk') ||
+		norm === 'bk'
+	);
+}
+
+function generateSmartFallbackCode(name: string): string | null {
+	if (isNonRaporSubject(name)) return null;
+
 	const norm = normalizeName(name);
 	if (DEFAULT_MAPEL_CODES[norm]) return DEFAULT_MAPEL_CODES[norm];
 
@@ -131,18 +144,21 @@ export const POST: RequestHandler = async ({ locals }) => {
 	const uniqueNames = Array.from(new Set(mapelList.map((m) => m.nama.trim()))).filter(Boolean);
 
 	// Coba panggil AI jika API key tersedia
-	const nameToCodeMap = new Map<string, string>();
+	const nameToCodeMap = new Map<string, string | null>();
 	let aiSuccess = false;
 
 	try {
 		const aiSettings = await getAiSettings(user);
 		if (aiSettings?.apiKey) {
 			const prompt = `Anda adalah pakar kurikulum dan sistem administrasi sekolah Indonesia.
-Berikan singkatan atau kode mapel resmi/standar (2 sampai 6 karakter huruf kapital, unik untuk tiap nama) yang umum digunakan pada rapor dan jadwal sekolah di Indonesia untuk daftar mata pelajaran berikut:
+Berikan singkatan atau kode mapel resmi/standar (2 sampai 6 karakter huruf kapital, unik untuk tiap nama) yang umum digunakan pada jadwal/rapor di Indonesia untuk daftar mata pelajaran berikut:
 ${JSON.stringify(uniqueNames)}
 
+PENTING:
+- Untuk mata pelajaran layanan/non-akademik seperti Bimbingan dan Konseling (BK), Bimbingan Konseling, konseling dsb. yang TIDAK dinilai dengan angka rapor intrakurikuler, WAJIB beri null ("kode": null) agar tidak tampil di cetakan rapor.
+
 Format keluaran WAJIB JSON murni tanpa format lain:
-{"codes": [{"nama": "...", "kode": "..."}]}`;
+{"codes": [{"nama": "...", "kode": "..." | null}]}`;
 
 			const base = (aiSettings.baseUrl || 'https://generativelanguage.googleapis.com').replace(/\/+$/, '');
 			const isGemini = base.includes('generativelanguage.googleapis.com');
@@ -195,8 +211,12 @@ Format keluaran WAJIB JSON murni tanpa format lain:
 					const items = parsed.codes || parsed;
 					if (Array.isArray(items)) {
 						for (const it of items) {
-							if (it.nama && it.kode) {
-								nameToCodeMap.set(it.nama.trim(), String(it.kode).trim().toUpperCase());
+							if (it.nama) {
+								if (it.kode && !isNonRaporSubject(it.nama)) {
+									nameToCodeMap.set(it.nama.trim(), String(it.kode).trim().toUpperCase());
+								} else {
+									nameToCodeMap.set(it.nama.trim(), null);
+								}
 							}
 						}
 						aiSuccess = true;
@@ -218,11 +238,14 @@ Format keluaran WAJIB JSON murni tanpa format lain:
 	// Lakukan update massal pada database
 	let updatedCount = 0;
 	for (const [name, kode] of nameToCodeMap.entries()) {
+		const isNonRapor = isNonRaporSubject(name);
+		const effectiveKode = isNonRapor ? null : (kode?.trim() ? kode.trim().toUpperCase() : null);
+
 		// Update seluruh mapel dengan nama ini pada kelas-kelas di sekolah ini
 		await db
 			.update(tableMataPelajaran)
 			.set({
-				kode,
+				kode: effectiveKode,
 				updatedAt: new Date().toISOString()
 			})
 			.where(and(inArray(tableMataPelajaran.kelasId, kelasIds), eq(tableMataPelajaran.nama, name)));

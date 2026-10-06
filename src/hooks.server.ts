@@ -37,6 +37,11 @@ process.on('uncaughtException', (err) => {
 	console.error('[server] Uncaught exception:', err);
 });
 
+// Prevent crash from unhandled promise rejections (e.g. background tasks or db network blips)
+process.on('unhandledRejection', (reason, promise) => {
+	console.error('[server] Unhandled Promise Rejection at:', promise, 'reason:', reason);
+});
+
 // Log combined trusted origins at startup to aid debugging in packaged prod builds.
 (async () => {
 	try {
@@ -424,6 +429,15 @@ function parseAsBytes(value: string | undefined, fallback = '512K') {
 	return Number(numeric) * multiplier;
 }
 
+const urlNormalizerGuard: Handle = async ({ event, resolve }) => {
+	const pathname = event.url.pathname;
+	if (pathname === '//' || (pathname.length > 1 && pathname.includes('//'))) {
+		const cleanPath = pathname.replace(/\/+/g, '/') || '/';
+		throw redirect(301, cleanPath + event.url.search);
+	}
+	return resolve(event);
+};
+
 const startupGuard: Handle = async ({ event, resolve }) => {
 	await runStartupEnsures();
 	return resolve(event);
@@ -432,7 +446,7 @@ const startupGuard: Handle = async ({ event, resolve }) => {
 // Compose the middleware sequence but ensure every internal `resolve` call
 // uses the `bodySizeLimit` derived from `process.env.BODY_SIZE_LIMIT` so
 // parsing limits follow the .env configuration in dev and prod.
-const _composed = sequence(startupGuard, csrfGuard, authGuard, cookieParser);
+const _composed = sequence(urlNormalizerGuard, startupGuard, csrfGuard, authGuard, cookieParser);
 export const handle: Handle = async ({ event, resolve }) => {
 	const bodySizeLimit = parseAsBytes(process.env.BODY_SIZE_LIMIT, '512K');
 	// Expose the parsed limit on `locals` so other server-side code can

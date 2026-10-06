@@ -483,8 +483,10 @@ export async function startBellScheduler() {
 		console.error('[bell] Failed to ensure schema:', e);
 	}
 	console.log('[bell] Scheduler started');
-	intervalId = setInterval(tick, 15_000);
-	tick();
+	intervalId = setInterval(() => {
+		tick().catch((e) => console.error('[bell] tick error:', e));
+	}, 15_000);
+	tick().catch((e) => console.error('[bell] initial tick error:', e));
 }
 
 export function stopBellScheduler() {

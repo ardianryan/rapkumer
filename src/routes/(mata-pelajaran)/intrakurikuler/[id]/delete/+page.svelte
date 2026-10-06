@@ -11,14 +11,22 @@
 		jenisMapel
 	} from '$lib/statics.js';
 
+	import { parseJenjangKelas } from '$lib/utils.js';
+
 	let { data } = $props();
 	let confirmDelete = $state(false);
+	let scopeDelete = $state('kelas');
 	const invalidateTargets = ['app:mapel', 'app:mapel_tp-rl', 'app:asesmen-formatif'];
 	const AGAMA_MAPEL_NAME_SET = new Set<string>(agamaMapelNames);
 	// svelte-ignore state_referenced_locally
 	const isAgamaMapel = AGAMA_MAPEL_NAME_SET.has(data.mapel.nama);
 	// svelte-ignore state_referenced_locally
 	const agamaLabel = agamaMapelLabelByName[data.mapel.nama] ?? '';
+
+	const currentJenjang = $derived.by(() => {
+		const kelasNama = data.mapel.kelas?.nama;
+		return kelasNama ? parseJenjangKelas(kelasNama) : null;
+	});
 
 	// Dapatkan jenjang varian dari sekolah (misalnya 'SMK')
 	const jenjangVariant = $derived.by(() => {
@@ -65,6 +73,46 @@
 						yang saling terhubung dengan data agama siswa. Menghapus mata pelajaran ini dapat merusak
 						logika nilai dan keterkaitan tersebut.
 					</p>
+				</div>
+			</div>
+		{/if}
+
+		{#if data.isAdmin && !isAgamaMapel}
+			<div class="mt-4 p-3 rounded-xl bg-base-200/60 border border-base-300 space-y-2">
+				<span class="text-xs font-bold text-base-content/80 block">Cakupan Penghapusan:</span>
+				<div class="space-y-1.5 text-xs">
+					<label class="flex items-center gap-2 cursor-pointer">
+						<input
+							type="radio"
+							name="scope_delete"
+							value="kelas"
+							bind:group={scopeDelete}
+							class="radio radio-primary radio-xs"
+						/>
+						<span>Hanya di kelas ini ({data.mapel.kelas?.nama || 'Kelas aktif'})</span>
+					</label>
+					{#if currentJenjang}
+						<label class="flex items-center gap-2 cursor-pointer">
+							<input
+								type="radio"
+								name="scope_delete"
+								value="sejenjang"
+								bind:group={scopeDelete}
+								class="radio radio-primary radio-xs"
+							/>
+							<span>Di seluruh rombel se-jenjang ({currentJenjang})</span>
+						</label>
+					{/if}
+					<label class="flex items-center gap-2 cursor-pointer">
+						<input
+							type="radio"
+							name="scope_delete"
+							value="sekolah"
+							bind:group={scopeDelete}
+							class="radio radio-error radio-xs"
+						/>
+						<span class="text-error font-medium">Di seluruh rombel se-sekolah</span>
+					</label>
 				</div>
 			</div>
 		{/if}

@@ -1,24 +1,39 @@
 import db from '$lib/server/db/index.js';
-import { tableMataPelajaran, tableTujuanPembelajaran } from '$lib/server/db/schema.js';
+import { tableKelas, tableMataPelajaran, tableTujuanPembelajaran } from '$lib/server/db/schema.js';
 import { eq, inArray, and, like } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
+import { parseJenjangKelas } from '$lib/utils.js';
+import { isAdminUser } from '../../../../pengguna/permissions.js';
 
-export async function load() {
-	return { meta: { title: 'Hapus Mata Pelajaran' } };
+export async function load({ locals }) {
+	const user = locals.user;
+	return {
+		isAdmin: isAdminUser(user as Parameters<typeof isAdminUser>[0]),
+		meta: { title: 'Hapus Mata Pelajaran' }
+	};
 }
 
 export const actions = {
-	async delete({ params, request }) {
+	async delete({ params, request, locals }) {
 		const form = await request.formData();
 		if (!form.get('confirm')) {
 			return fail(400, { fail: 'Konfirmasi penghapusan diperlukan.' });
 		}
 
 		const id = +params.id;
+		const scopeDelete = form.get('scope_delete')?.toString() || 'kelas'; // 'kelas' | 'sejenjang' | 'sekolah'
+		const user = locals.user;
+		const isAdmin = isAdminUser(user as Parameters<typeof isAdminUser>[0]);
+
 		try {
 			// Get the mapel being deleted
 			const mapel = await db.query.tableMataPelajaran.findFirst({
 				columns: { id: true, nama: true, kelasId: true },
+				with: {
+					kelas: {
+						columns: { id: true, nama: true, semesterId: true, sekolahId: true }
+					}
+				},
 				where: eq(tableMataPelajaran.id, id)
 			});
 
@@ -26,38 +41,76 @@ export const actions = {
 				return fail(404, { fail: 'Mata pelajaran tidak ditemukan.' });
 			}
 
-			// Check if this is parent PKS or parent Agama
+			const sekolahId = locals.sekolah?.id;
+			let targetKelasIds: number[] = [mapel.kelasId];
+
+			if (isAdmin && sekolahId && (scopeDelete === 'sejenjang' || scopeDelete === 'sekolah')) {
+				const allClasses = await db.query.tableKelas.findMany({
+					where: and(
+						eq(tableKelas.sekolahId, sekolahId),
+						mapel.kelas?.semesterId ? eq(tableKelas.semesterId, mapel.kelas.semesterId) : undefined
+					),
+					columns: { id: true, nama: true }
+				});
+
+				if (scopeDelete === 'sejenjang' && mapel.kelas?.nama) {
+					const currentJenjang = parseJenjangKelas(mapel.kelas.nama);
+					targetKelasIds = allClasses
+						.filter((k) => parseJenjangKelas(k.nama) === currentJenjang)
+						.map((k) => k.id);
+				} else if (scopeDelete === 'sekolah') {
+					targetKelasIds = allClasses.map((k) => k.id);
+				}
+			}
+
+			// Ambil semua mapel bernama sama di target kelas
+			const targetMapels = await db.query.tableMataPelajaran.findMany({
+				columns: { id: true, kelasId: true },
+				where: and(
+					inArray(tableMataPelajaran.kelasId, targetKelasIds),
+					eq(tableMataPelajaran.nama, mapel.nama)
+				)
+			});
+
 			const isPksParent = mapel.nama === 'Pendalaman Kitab Suci';
 			const isAgamaParent = mapel.nama === 'Pendidikan Agama dan Budi Pekerti';
 
-			const idsToDelete: number[] = [id];
+			const idsToDelete: number[] = targetMapels.map((m) => m.id);
 
-			// If deleting parent PKS or Agama, also delete all variants in the same kelas
+			// If deleting parent PKS or Agama, also delete all variants in the same classes
 			if (isPksParent || isAgamaParent) {
 				const pattern = isPksParent ? 'Pendalaman Kitab Suci%' : 'Pendidikan Agama%';
 				const variants = await db.query.tableMataPelajaran.findMany({
 					columns: { id: true },
 					where: and(
-						eq(tableMataPelajaran.kelasId, mapel.kelasId),
+						inArray(tableMataPelajaran.kelasId, targetKelasIds),
 						like(tableMataPelajaran.nama, pattern)
 					)
 				});
 				idsToDelete.push(...variants.map((v) => v.id));
 			}
 
-			// Hapus Tujuan Pembelajaran yang terkait dulu agar tidak menabrak constraint
-			await db
-				.delete(tableTujuanPembelajaran)
-				.where(inArray(tableTujuanPembelajaran.mataPelajaranId, idsToDelete));
+			const uniqueIds = Array.from(new Set(idsToDelete));
 
-			// lalu hapus mata pelajaran
-			await db.delete(tableMataPelajaran).where(inArray(tableMataPelajaran.id, idsToDelete));
+			if (uniqueIds.length > 0) {
+				// Hapus Tujuan Pembelajaran yang terkait dulu agar tidak menabrak constraint
+				await db
+					.delete(tableTujuanPembelajaran)
+					.where(inArray(tableTujuanPembelajaran.mataPelajaranId, uniqueIds));
 
-			const deletedCount = idsToDelete.length;
-			const message =
-				deletedCount > 1
-					? `Data mata pelajaran beserta ${deletedCount - 1} varian telah dihapus`
-					: `Data mata pelajaran telah dihapus`;
+				// lalu hapus mata pelajaran
+				await db.delete(tableMataPelajaran).where(inArray(tableMataPelajaran.id, uniqueIds));
+			}
+
+			const deletedMapelCount = targetMapels.length;
+			let message = `Data mata pelajaran telah dihapus.`;
+			if (scopeDelete === 'sejenjang') {
+				message = `Mata pelajaran "${mapel.nama}" berhasil dihapus dari ${deletedMapelCount} kelas se-jenjang.`;
+			} else if (scopeDelete === 'sekolah') {
+				message = `Mata pelajaran "${mapel.nama}" berhasil dihapus dari ${deletedMapelCount} kelas di seluruh sekolah.`;
+			} else if (uniqueIds.length > 1) {
+				message = `Data mata pelajaran beserta ${uniqueIds.length - 1} varian telah dihapus.`;
+			}
 
 			return { message };
 		} catch (error) {
