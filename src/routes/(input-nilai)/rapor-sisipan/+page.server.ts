@@ -5,7 +5,8 @@ import {
 	tableMurid,
 	tableTujuanPembelajaran,
 	tableRtsMapelSetup,
-	tableRtsNilaiSiswa
+	tableRtsNilaiSiswa,
+	tableSekolah
 } from '$lib/server/db/schema';
 import { getAksesMapelUser, needsMapelFilter } from '$lib/server/mapel-access';
 import { and, asc, eq } from 'drizzle-orm';
@@ -66,7 +67,23 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 	const { kelasAktif, user, daftarKelas } = await parent();
 	const meta: PageMeta = { title: 'Rapor Sisipan Tengah Semester (STS)' };
 
+	const typedUser = user as {
+		type?: string;
+		id?: number;
+		kelasId?: number | null;
+		ownKelasIds?: number[] | null;
+	} | null;
+	const isAdmin = typedUser?.type === 'admin';
+
 	const sekolah = locals.sekolah;
+	const currentSekolah = sekolah?.id
+		? await db.query.tableSekolah.findFirst({
+				where: eq(tableSekolah.id, sekolah.id)
+			})
+		: null;
+	const maxFormatif = currentSekolah?.rtsMaxFormatif ?? 4;
+	const maxSumatif = currentSekolah?.rtsMaxSumatif ?? 3;
+
 	if (!sekolah?.id) {
 		return {
 			meta,
@@ -79,7 +96,10 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			availableTps: [],
 			progressList: [],
 			catatanWaliList: [],
-			isWaliKelasOrAdmin: false
+			isWaliKelasOrAdmin: false,
+			maxFormatif,
+			maxSumatif,
+			isAdmin
 		};
 	}
 
@@ -102,7 +122,10 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			availableTps: [],
 			progressList: [],
 			catatanWaliList: [],
-			isWaliKelasOrAdmin: false
+			isWaliKelasOrAdmin: false,
+			maxFormatif,
+			maxSumatif,
+			isAdmin
 		};
 	}
 
@@ -125,22 +148,17 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			availableTps: [],
 			progressList: [],
 			catatanWaliList: [],
-			isWaliKelasOrAdmin: false
+			isWaliKelasOrAdmin: false,
+			maxFormatif,
+			maxSumatif,
+			isAdmin
 		};
 	}
-
-	const typedUser = user as {
-		type?: string;
-		id?: number;
-		kelasId?: number | null;
-		ownKelasIds?: number[] | null;
-	} | null;
 
 	const isWaliKelasOwn =
 		typedUser?.type === 'wali_kelas' &&
 		(typedUser.kelasId === kelas.id || typedUser.ownKelasIds?.includes(kelas.id));
-	const isWaliKelasOrAdmin =
-		typedUser?.type === 'admin' || typedUser?.type === 'kepala_sekolah' || isWaliKelasOwn;
+	const isWaliKelasOrAdmin = isAdmin || typedUser?.type === 'kepala_sekolah' || isWaliKelasOwn;
 
 	// Ambil seluruh mapel di kelas ini
 	const allMapelRecords = await db.query.tableMataPelajaran.findMany({
@@ -312,6 +330,9 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 		availableLingkupMateri,
 		progressList,
 		catatanWaliList,
-		isWaliKelasOrAdmin
+		isWaliKelasOrAdmin,
+		maxFormatif,
+		maxSumatif,
+		isAdmin
 	};
 };

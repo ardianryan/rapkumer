@@ -1,6 +1,22 @@
+import db from './index';
 import { ensureSchema } from './ensure-helper';
 
 export async function ensureRaporSisipanSchema() {
+	try {
+		await db.$client.execute(
+			`ALTER TABLE "sekolah" ADD COLUMN "rts_max_formatif" integer NOT NULL DEFAULT 4`
+		);
+	} catch {
+		// column already exists
+	}
+	try {
+		await db.$client.execute(
+			`ALTER TABLE "sekolah" ADD COLUMN "rts_max_sumatif" integer NOT NULL DEFAULT 3`
+		);
+	} catch {
+		// column already exists
+	}
+
 	await ensureSchema('rts_mapel_setup', [
 		`CREATE TABLE IF NOT EXISTS "rts_mapel_setup" (
 			"id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,

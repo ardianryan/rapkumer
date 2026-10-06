@@ -141,31 +141,42 @@ export async function getRaporSisipanDataForStudent(params: {
 	});
 	const nilaiMap = new Map(nilaiList.map((n) => [n.mataPelajaranId, n]));
 
+	const maxFormatif = sekolah.rtsMaxFormatif ?? 4;
+	const maxSumatif = sekolah.rtsMaxSumatif ?? 3;
+
 	// Format baris nilai tiap mapel
 	const rtsMapelItems: RaporSisipanMapelItem[] = filteredMapels.map((m, idx) => {
 		const s = setupMap.get(m.id);
 		const n = nilaiMap.get(m.id);
 
-		// Format string formatif e.g. "F1: 85, F2: 90"
-		let formatifDetail: string | null = null;
-		if (s?.komponenFormatif && n?.nilaiFormatif) {
-			const rec = n.nilaiFormatif as Record<string, number | null>;
-			const parts: string[] = [];
-			for (const f of s.komponenFormatif) {
-				if (rec[f.kode] != null) parts.push(`${f.kode}: ${rec[f.kode]}`);
+		// Array nilai formatif sejumlah maxFormatif
+		const formatifValues: Array<number | string> = [];
+		const sFormatif = s?.komponenFormatif ?? [];
+		const nFormatif = (n?.nilaiFormatif ?? {}) as Record<string, number | null>;
+		for (let i = 0; i < maxFormatif; i++) {
+			if (i < sFormatif.length) {
+				const f = sFormatif[i];
+				const val = nFormatif[f.kode];
+				formatifValues.push(val != null ? val : '-');
+			} else {
+				// Guru tidak melaksanakan asesmen ini
+				formatifValues.push(sFormatif.length > 0 ? 'X' : '-');
 			}
-			if (parts.length > 0) formatifDetail = parts.join(', ');
 		}
 
-		// Format string sumatif e.g. "S1: 88, S2: 82"
-		let sumatifDetail: string | null = null;
-		if (s?.komponenSumatif && n?.nilaiSumatif) {
-			const rec = n.nilaiSumatif as Record<string, number | null>;
-			const parts: string[] = [];
-			for (const sum of s.komponenSumatif) {
-				if (rec[sum.kode] != null) parts.push(`${sum.kode}: ${rec[sum.kode]}`);
+		// Array nilai sumatif sejumlah maxSumatif
+		const sumatifValues: Array<number | string> = [];
+		const sSumatif = s?.komponenSumatif ?? [];
+		const nSumatif = (n?.nilaiSumatif ?? {}) as Record<string, number | null>;
+		for (let i = 0; i < maxSumatif; i++) {
+			if (i < sSumatif.length) {
+				const sum = sSumatif[i];
+				const val = nSumatif[sum.kode];
+				sumatifValues.push(val != null ? val : '-');
+			} else {
+				// Guru tidak melaksanakan asesmen ini
+				sumatifValues.push(sSumatif.length > 0 ? 'X' : '-');
 			}
-			if (parts.length > 0) sumatifDetail = parts.join(', ');
 		}
 
 		let displayName = m.namaLokal?.trim() || m.nama;
@@ -185,9 +196,9 @@ export async function getRaporSisipanDataForStudent(params: {
 			no: idx + 1,
 			mataPelajaran: displayName,
 			guruPengampu: null,
-			formatifDetail,
+			formatifValues,
 			rataFormatif: n?.rataFormatif ?? null,
-			sumatifDetail,
+			sumatifValues,
 			rataSumatif: n?.rataSumatifTp ?? null,
 			sts: n?.nilaiSts ?? null,
 			nilaiAkhirRts: n?.nilaiAkhirRts ?? null,
@@ -253,6 +264,8 @@ export async function getRaporSisipanDataForStudent(params: {
 			nip: sekolah.kepalaSekolah?.nip || null,
 			statusKepalaSekolah: sekolah.statusKepalaSekolah
 		},
+		maxFormatif,
+		maxSumatif,
 		tanggalCetak,
 		mapelList: rtsMapelItems,
 		ketidakhadiran: {

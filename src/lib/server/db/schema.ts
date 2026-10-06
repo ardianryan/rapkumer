@@ -186,6 +186,9 @@ export const tableSekolah = sqliteTable('sekolah', {
 	statusKepalaSekolah: text({ enum: ['definitif', 'plt'] })
 		.default('definitif')
 		.notNull(),
+	// Batas maksimal kolom asesmen formatif & sumatif pada rapor sisipan tengah semester (STS)
+	rtsMaxFormatif: int().default(4).notNull(),
+	rtsMaxSumatif: int().default(3).notNull(),
 	// Daftar path menu yang disembunyikan untuk guru/non-admin
 	hiddenMenuPaths: text({ mode: 'json' }).$type<string[]>().default([]).notNull(),
 	...audit

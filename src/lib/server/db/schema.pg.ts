@@ -204,6 +204,9 @@ export const tableSekolah = pgTable('sekolah', {
 	statusKepalaSekolah: text({ enum: ['definitif', 'plt'] })
 		.default('definitif')
 		.notNull(),
+	// Batas maksimal kolom asesmen formatif & sumatif pada rapor sisipan tengah semester (STS)
+	rtsMaxFormatif: integer().default(4).notNull(),
+	rtsMaxSumatif: integer().default(3).notNull(),
 	// Daftar path menu yang disembunyikan untuk guru/non-admin
 	hiddenMenuPaths: jsonb().$type<string[]>().default([]).notNull(),
 	...audit

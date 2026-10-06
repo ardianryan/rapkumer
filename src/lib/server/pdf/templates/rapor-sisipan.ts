@@ -4,9 +4,9 @@ export interface RaporSisipanMapelItem {
 	no: number;
 	mataPelajaran: string;
 	guruPengampu?: string | null;
-	formatifDetail?: string | null;
+	formatifValues: Array<number | string>;
 	rataFormatif?: number | null;
-	sumatifDetail?: string | null;
+	sumatifValues: Array<number | string>;
 	rataSumatif?: number | null;
 	sts?: number | null;
 	nilaiAkhirRts?: number | null;
@@ -44,6 +44,8 @@ export interface RaporSisipanStudentData {
 		nip?: string | null;
 		statusKepalaSekolah?: string | null;
 	};
+	maxFormatif: number;
+	maxSumatif: number;
 	tanggalCetak: string;
 	mapelList: RaporSisipanMapelItem[];
 	ketidakhadiran: {
@@ -64,6 +66,9 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 
 	const kepalaStatus =
 		data.kepalaSekolah.statusKepalaSekolah === 'plt' ? 'Plt. Kepala Sekolah' : 'Kepala Sekolah';
+
+	const maxF = Math.max(1, data.maxFormatif || 4);
+	const maxS = Math.max(1, data.maxSumatif || 3);
 
 	return `<!DOCTYPE html>
 <html lang="id">
@@ -163,6 +168,11 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 	.text-left { text-align: left; }
 	.text-right { text-align: right; }
 	.font-bold { font-weight: bold; }
+	.cell-x {
+		color: #94a3b8;
+		font-weight: bold;
+		background-color: #f8fafc;
+	}
 	.bottom-section {
 		display: flex;
 		gap: 10px;
@@ -247,18 +257,18 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 <table class="nilai-table">
 	<thead>
 		<tr>
-			<th rowspan="2" style="width: 28px;">No</th>
-			<th rowspan="2" style="width: 200px;">Mata Pelajaran</th>
-			<th colspan="2">Asesmen Formatif (Tugas)</th>
-			<th colspan="2">Sumatif Lingkup Materi</th>
-			<th rowspan="2" style="width: 48px;">STS</th>
-			<th rowspan="2" style="width: 54px;">NA STS</th>
+			<th rowspan="2" style="width: 24px;">No</th>
+			<th rowspan="2" style="width: 175px;">Mata Pelajaran</th>
+			<th colspan="${maxF + 1}">Asesmen Formatif (Tugas)</th>
+			<th colspan="${maxS + 1}">Sumatif Lingkup Materi (UH)</th>
+			<th rowspan="2" style="width: 42px;">STS</th>
+			<th rowspan="2" style="width: 48px;">NA STS</th>
 		</tr>
 		<tr>
-			<th style="width: 120px;">Rincian Nilai</th>
-			<th style="width: 42px;">Rata</th>
-			<th style="width: 120px;">Rincian Nilai</th>
-			<th style="width: 42px;">Rata</th>
+			${Array.from({ length: maxF }, (_, i) => `<th style="width: 28px;">F${i + 1}</th>`).join('')}
+			<th style="width: 36px;">Rata</th>
+			${Array.from({ length: maxS }, (_, i) => `<th style="width: 28px;">S${i + 1}</th>`).join('')}
+			<th style="width: 36px;">Rata</th>
 		</tr>
 	</thead>
 	<tbody>
@@ -270,9 +280,19 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 			<td>
 				<div class="font-bold">${escHtml(m.mataPelajaran)}</div>
 			</td>
-			<td class="text-center" style="font-size: 7.5pt;">${m.formatifDetail || '-'}</td>
+			${m.formatifValues
+				.map(
+					(v) =>
+						`<td class="text-center ${v === 'X' ? 'cell-x' : ''}">${v != null && v !== '' ? v : '-'}</td>`
+				)
+				.join('')}
 			<td class="text-center font-bold">${m.rataFormatif != null ? m.rataFormatif : '-'}</td>
-			<td class="text-center" style="font-size: 7.5pt;">${m.sumatifDetail || '-'}</td>
+			${m.sumatifValues
+				.map(
+					(v) =>
+						`<td class="text-center ${v === 'X' ? 'cell-x' : ''}">${v != null && v !== '' ? v : '-'}</td>`
+				)
+				.join('')}
 			<td class="text-center font-bold">${m.rataSumatif != null ? m.rataSumatif : '-'}</td>
 			<td class="text-center font-bold">${m.sts != null ? m.sts : '-'}</td>
 			<td class="text-center font-bold" style="background-color: #f8fafc; font-size: 8.5pt;">
@@ -283,6 +303,9 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 			.join('')}
 	</tbody>
 </table>
+<div style="font-size: 7pt; color: #475569; margin-top: 1px; margin-bottom: 8px;">
+	* Keterangan: Kolom bertanda <strong>X</strong> menunjukkan asesmen tidak dilaksanakan oleh guru mata pelajaran.
+</div>
 
 <!-- REKAPITULASI PRESENSI & CATATAN WALI KELAS -->
 <div class="bottom-section">

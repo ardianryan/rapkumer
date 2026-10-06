@@ -22,6 +22,8 @@
 		initialBobotSts?: number;
 		availableTps?: TujuanPembelajaranOption[];
 		availableLingkupMateri?: string[];
+		maxFormatif?: number;
+		maxSumatif?: number;
 		onSaved?: () => void;
 		onClose?: () => void;
 	}
@@ -39,6 +41,8 @@
 		initialBobotSts = 30,
 		availableTps = [],
 		availableLingkupMateri = [],
+		maxFormatif = 4,
+		maxSumatif = 3,
 		onSaved,
 		onClose
 	}: Props = $props();
@@ -102,6 +106,10 @@
 	}
 
 	function addFormatif() {
+		if (komponenFormatif.length >= maxFormatif) {
+			toast(`Maksimal ${maxFormatif} asesmen formatif yang diperbolehkan.`, 'warning');
+			return;
+		}
 		const nextNum = komponenFormatif.length + 1;
 		komponenFormatif.push({
 			kode: `F${nextNum}`,
@@ -122,6 +130,13 @@
 	}
 
 	function addSumatif(lmName?: string) {
+		if (komponenSumatif.length >= maxSumatif) {
+			toast(
+				`Maksimal ${maxSumatif} asesmen sumatif lingkup materi (UH) yang diperbolehkan.`,
+				'warning'
+			);
+			return;
+		}
 		const nextNum = komponenSumatif.length + 1;
 		const name = lmName || `Lingkup Materi ${nextNum}`;
 		komponenSumatif.push({
@@ -144,12 +159,20 @@
 
 	function loadAllAvailableLingkupMateri() {
 		if (allLingkupMateri.length === 0) return;
-		komponenSumatif = allLingkupMateri.map((lm, idx) => ({
+		const targetLms = allLingkupMateri.slice(0, maxSumatif);
+		komponenSumatif = targetLms.map((lm, idx) => ({
 			kode: `S${idx + 1}`,
 			lingkupMateri: lm,
 			tpDeskripsi: lm
 		}));
-		toast(`Berhasil memuat ${allLingkupMateri.length} lingkup materi tersimpan.`, 'success');
+		if (allLingkupMateri.length > maxSumatif) {
+			toast(
+				`Dimuat ${maxSumatif} lingkup materi pertama (batas maksimal sekolah adalah ${maxSumatif} sumatif).`,
+				'info'
+			);
+		} else {
+			toast(`Berhasil memuat ${allLingkupMateri.length} lingkup materi tersimpan.`, 'success');
+		}
 	}
 
 	async function handleSubmit(event: SubmitEvent) {
@@ -247,9 +270,14 @@
 						Tentukan berapa kali penugasan/praktik formatif yang dilakukan.
 					</p>
 				</div>
-				<button type="button" class="btn btn-sm btn-soft btn-primary" onclick={addFormatif}>
+				<button
+					type="button"
+					class="btn btn-sm btn-soft btn-primary"
+					onclick={addFormatif}
+					disabled={komponenFormatif.length >= maxFormatif}
+				>
 					<Icon name="plus" />
-					Tambah Formatif
+					Tambah Formatif ({komponenFormatif.length}/{maxFormatif})
 				</button>
 			</div>
 
@@ -305,9 +333,10 @@
 						type="button"
 						class="btn btn-sm btn-soft btn-primary"
 						onclick={() => addSumatif()}
+						disabled={komponenSumatif.length >= maxSumatif}
 					>
 						<Icon name="plus" />
-						Tambah Sumatif
+						Tambah Sumatif ({komponenSumatif.length}/{maxSumatif})
 					</button>
 				</div>
 			</div>
