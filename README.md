@@ -188,26 +188,39 @@ pnpm package:win             # Menyiapkan artefak installer sistem operasi Windo
 
 ---
 
-## 📄 Lisensi, Pengakuan & Basis Proyek
+## 🤝 Atribusi Hulu (Upstream), Komunitas & Donasi
 
-Aplikasi ini didistribusikan di bawah lisensi khusus non-komersial (_Custom Non-Commercial License_). Anda bebas menggunakan, menelaah, serta memodifikasi perangkat lunak ini untuk kebutuhan institusi pendidikan secara mandiri tanpa tujuan komersialisasi. Ketentuan lengkap dapat dibaca pada berkas [LICENSE](LICENSE).
+Sebagai bentuk integritas etika open-source dan apresiasi mendalam, platform ini berakar dan dikembangkan lebih lanjut dari proyek utama **[Rapkumer](https://github.com/apoxicam/rapkumer)** yang diprakarsai oleh tim pengembang aslinya. Repositori ini memperluas kapabilitas inti tersebut dengan dukungan server skala institusi, integrasi multi-database, dan fitur spesifik sekolah.
 
-<details>
-<summary><strong>Informasi Basis Kode & Atribusi (Rapkumer Engine)</strong></summary>
+### 🌐 Tautan Hulu (Upstream) & Diskusi Komunitas
+
+- **Repositori Resmi Hulu**: [github.com/apoxicam/rapkumer](https://github.com/apoxicam/rapkumer)
+- **Grup Telegram Komunitas Pendidik**: [t.me/rapkumer](https://t.me/rapkumer) — ruang komunikasi, tanya jawab, dan diskusi pemanfaatan teknologi pendidikan antar-guru se-Indonesia.
+
+### ☕ Apresiasi & Donasi untuk Pengembang Hulu
+
+Apabila sistem ini bermanfaat bagi operasional sekolah Anda dan Anda ingin mendukung keberlanjutan dedikasi tim pengembang hulu aslinya, Anda dipersilakan menyalurkan apresiasi langsung melalui tautan donasi resmi:
 
 <br />
 
-Aplikasi ini dikembangkan dan disempurnakan dengan fondasi utama dari proyek sumber terbuka [Rapkumer](https://github.com/apoxicam/rapkumer) oleh tim pengembang aslinya. Pengembangan lanjutan pada repositori ini berfokus pada:
+<div align="left">
+	<a href="https://pay.apoxi.cam" target="_blank" rel="noreferrer">
+		<img alt="Dukungan Pengembang Hulu via QRIS" src="https://img.shields.io/badge/Apresiasi_Pengembang_Hulu-QRIS_Apoxicam-E11D48?style=for-the-badge&logo=heart&logoColor=white" />
+	</a>
+	&nbsp;
+	<a href="https://t.me/rapkumer" target="_blank" rel="noreferrer">
+		<img alt="Komunitas Telegram Rapkumer" src="https://img.shields.io/badge/Komunitas-Telegram_Rapkumer-0088CC?style=for-the-badge&logo=telegram&logoColor=white" />
+	</a>
+</div>
 
-- Penambahan kapabilitas server multi-koneksi PostgreSQL untuk deployment institusi skala besar.
-- Peningkatan sistem konfigurasi asesmen dinamis dan pemisahan sub-komponen penilaian tengah semester.
-- Pembaruan arsitektur modern Svelte 5 Runes, Tailwind CSS 4, serta tata kelola dokumentasi terpusat.
+---
 
-Seluruh hak cipta modul dasar tetap menjadi milik kontributor dan pengembang asli Rapkumer.
-</details>
+## 📄 Ketentuan Lisensi
+
+Perangkat lunak ini didistribusikan di bawah lisensi khusus non-komersial (_Custom Non-Commercial License_). Anda bebas menggunakan, memodifikasi, dan membagikan aplikasi ini untuk keperluan internal institusi pendidikan secara mandiri. Tidak diperkenankan memonetisasi atau memperjualbelikan perangkat lunak ini maupun turunannya dalam bentuk apa pun. Ketentuan selengkapnya tercantum pada berkas [LICENSE](LICENSE) dan [docs/ICON-CREDITS.md](docs/ICON-CREDITS.md).
 
 ---
 
 <div align="center">
-  <sub>Dikembangkan dengan dedikasi untuk kemajuan efisiensi administrasi pendidikan Indonesia.</sub>
+	<sub>Didedikasikan untuk memajukan transformasi digital administrasi pendidikan Indonesia.</sub>
 </div>
