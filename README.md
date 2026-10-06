@@ -1,198 +1,213 @@
-# Rapkumer
+<div align="center">
 
-> **Dikembangkan ulang untuk SMA Negeri 1 Gedeg**  
-> _Versi modifikasi dari repositori resmi [Rapkumer](https://github.com/apoxicam/rapkumer) dengan penambahan fitur dukungan database PostgreSQL untuk server sekolah terpusat._  
-> 📖 [Panduan Database PostgreSQL](POSTGRES.md) | 🎨 [Panduan Perombakan Frontend](FRONTEND_GUIDE.md)
+# Sistem Informasi Manajemen & Administrasi Sekolah Terpadu
 
-![screenshot](static/image.png)
+### Comprehensive School Management, Academic Assessment & Institutional Operations Platform
 
-<a href='https://nodejs.org/en' target="_blank"><img alt='node.js' src='https://img.shields.io/badge/Node.JS-100000?style=for-the-badge&logo=node.js&logoColor=35C354&labelColor=000000&color=35C354'/></a> <a href='https://svelte.dev/' target="_blank"><img alt='Svelte' src='https://img.shields.io/badge/Svelte-100000?style=for-the-badge&logo=Svelte&logoColor=F45A20&labelColor=000000&color=F45A20'/></a> <a href='https://orm.drizzle.team/' target="_blank"><img alt='Drizzle' src='https://img.shields.io/badge/Drizzle_ORM-100000?style=for-the-badge&logo=Drizzle&logoColor=FAF61D&labelColor=000000&color=FAF61D'/></a> <a href='https://sqlite.org/' target="_blank"><img alt='Sqlite' src='https://img.shields.io/badge/SQLite3-100000?style=for-the-badge&logo=Sqlite&logoColor=5EA765&labelColor=000000&color=5EA765'/></a> <a href='https://www.postgresql.org/' target="_blank"><img alt='PostgreSQL' src='https://img.shields.io/badge/PostgreSQL-100000?style=for-the-badge&logo=postgresql&logoColor=4169E1&labelColor=000000&color=4169E1'/></a> <a href='https://tailwindcss.com/' target="_blank"><img alt='tailwindcss' src='https://img.shields.io/badge/Tailwind_CSS-100000?style=for-the-badge&logo=tailwindcss&logoColor=36DBFF&labelColor=000000&color=36DBFF'/></a> <a href='https://daisyui.com/' target="_blank"><img alt='DaisyUI' src='https://img.shields.io/badge/Daisy_UI-100000?style=for-the-badge&logo=DaisyUI&logoColor=FFEC25&labelColor=000000&color=FFEC25'/></a>
+[![SvelteKit](https://img.shields.io/badge/SvelteKit_2-FF3E00?style=for-the-badge&logo=svelte&logoColor=white)](https://svelte.dev/)
+[![Svelte 5 Runes](https://img.shields.io/badge/Svelte_5-Runes-F45A20?style=for-the-badge&logo=svelte&logoColor=white)](https://svelte.dev/)
+[![TailwindCSS 4](https://img.shields.io/badge/Tailwind_CSS_4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-C5F74F?style=for-the-badge&logo=drizzle&logoColor=black)](https://orm.drizzle.team/)
+[![SQLite](https://img.shields.io/badge/SQLite_3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Node.js](https://img.shields.io/badge/Node.js_20_LTS-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 
-> Rapkumer awalnya dibuat sebagai alternatif E-Rapor Kurikulum Merdeka.
+<br />
 
-Seiring perkembangannya, Rapkumer kini menjadi aplikasi terpadu yang membantu berbagai kebutuhan administrasi guru dan sekolah.
+<p align="center">
+  Solusi digital terintegrasi untuk pengelolaan akademik kurikulum nasional, asesmen sumatif & formatif dinamis, pelaporan tengah semester (STS) & akhir semester, presensi otomatis, jadwal dan bel sekolah digital, administrasi kepegawaian, hingga sinkronisasi data Dapodik.
+</p>
 
-> **Mengapa masih menggunakan Rapkumer jika pemerintah sudah menyediakan E-Rapor resmi?**
+</div>
 
-Karena E-Rapor resmi berfokus pada input nilai akhir serta penentuan Tujuan Pembelajaran (TP) yang tercapai atau belum tercapai secara manual. Rapkumer hadir sebagai pelengkap proses tersebut dengan menyediakan pencatatan penilaian harian, pengolahan nilai, hingga rekapitulasi secara otomatis sehingga pekerjaan guru menjadi lebih praktis.
+---
 
-Dokumentasi lengkap aplikasi ini disusun dalam bahasa Indonesia. File README ini memberikan gambaran singkat untuk pengguna dan pengembang, sedangkan pembahasan teknis serta panduan kontribusi tersedia di folder `docs/`.
+## 📌 Ikhtisar Platform
 
-## Daftar Fitur
+Platform ini dirancang untuk menjawab kebutuhan administrasi sekolah modern dalam satu ekosistem yang terpadu, cepat, dan aman. Berbeda dengan aplikasi rapor konvensional yang kaku dan hanya berfokus pada hasil akhir, sistem ini mendampingi guru dan tenaga kependidikan sepanjang siklus pembelajaran:
 
-- AI Generator untuk membuat Lingkup Materi berserta Tujuan Pembelajarannya secara otomatis berdasarkan Capaian Pembelajaran dari BSKAP
-- Mengelola data sekolah, kelas, dan murid.
-- Input nilai intrakurikuler berdasarkan Tujuan Pembelajaran (TP), meliputi penilaian harian, STS, SAS, dan formatif.
-- Jadwal pembelajaran beserta bell sekolah yang berjalan secara otomatis.
-- Presensi murid dengan cara input langsung secara massal oleh guru mata pelajaran maupun wali kelas.
-- Jurnal harian guru.
-- Nilai dan rapor keasramaan khusus Sekolah Rakyat.
-- Pembuatan rapor, piagam, dan berbagai dokumen pendukung yang siap dicetak.
-- Mendukung penggunaan campuran huruf latin dan arab pada Capaian Pembelajaran (CP) di rapor.
-- Ekspor nilai dan Tujuan Pembelajaran (TP) ke file Excel yang dapat diimpor ke E-Rapor Kemdikdas.
-- Presensi guru beserta laporannya
-- Buku tamu digital yang dapat diakses melalui halaman `ipAddress:3000/tamu`
-- Jadwal pelajaran yang dapat diakses melalui halaman `ipAddress:3000/jadwal-pelajaran`
-- Dinas luar dan SPPD otomatis
-- Tarik data dari Dapodik (sinkronisasi sekolah, guru, kelas, murid, dan jadwal pembelajaran secara otomatis dari aplikasi Dapodik Desktop)
-- Kirim nilai akhir dan mata evaluasi (matev) langsung ke Dapodik
+1. **Fleksibilitas Kurikulum & Asesmen**: Mendukung Kurikulum Merdeka secara penuh, mulai dari pemetaan Capaian Pembelajaran (CP), penyusunan Tujuan Pembelajaran (TP) berbantuan AI, penilaian formatif harian, hingga penilaian sumatif lingkup materi dan STS/SAS.
+2. **Otomatisasi Operasional Sekolah**: Bell otomatis berbasis audio, penjadwalan guru dan mata pelajaran, buku tamu digital dengan penandatanganan paraf elektronik, serta modul dinas luar/SPPD terbit otomatis.
+3. **Multi-Deployment Ready**: Dapat beroperasi secara mandiri (_standalone desktop_) berbasis SQLite untuk komputer lokal, maupun mode jaringan terpusat berbasis server jaringan institusi (PostgreSQL/LAN/Cloud).
 
-## Siapa yang Cocok Menggunakan Rapkumer?
+---
 
-- Sekolah yang tidak dapat menggunakan E-Rapor Kemdikdas karena alasan tertentu.
-- Sekolah yang sudah menggunakan E-Rapor tetapi ingin seluruh proses penilaian harian tercatat secara elektronik sehingga rekapitulasi nilai tidak lagi dilakukan secara manual di Excel. Nilai akhir cukup diimpor ke E-Rapor.
-- Sekolah swasta, khususnya sekolah Islam, yang membutuhkan dukungan penulisan Capaian Pembelajaran (CP) dengan kombinasi huruf latin dan arab.
+## ✨ Fitur Unggulan
 
-## Quickstart
+### 1. Penilaian Akademik & Rapor Komprehensif
 
-### Versi Pengguna (Windows Installer)
+- **Penilaian Intrakurikuler**: Pengolahan nilai formatif dan sumatif secara fleksibel, dilengkapi fitur kalkulasi rata-rata otomatis dan pembobotan proporsional.
+- **Rapor Sisipan Tengah Semester (STS/PTS)**: Format rapor sisipan dinamis dengan batas sub-kolom tugas formatif ($F_1..F_n$) dan ulangan materi ($S_1..S_n$) yang dapat dikonfigurasi mandiri oleh administrator sekolah. Asesmen yang tidak dilaksanakan oleh guru mata pelajaran secara otomatis ditandai silang ($X$) demi transparansi penilaian.
+- **Cetak Rapor & Dokumen Resmi**: Menghasilkan dokumen cetak berstandar percetakan (PDF resolusi tinggi via PagedJS dan Chromium Engine), meliputi Rapor Tengah Semester, Rapor Akhir Semester, Cover Rapor, Biodata Peserta Didik, Leger Nilai, hingga Piagam Penghargaan.
+- **Dukungan Tipografi Khusus**: Render tipografi bilingual yang mulus untuk teks Latin dan Arab pada mata pelajaran Pendidikan Agama Islam dan Bahasa Arab.
 
-1. Kunjungi halaman rilis:
-   https://github.com/sira313/rapkumer/releases
-2. Unduh file `RapkumerSetup.exe`.
-3. Jalankan installer dan ikuti proses instalasi.
-4. Setelah selesai, buka aplikasi melalui shortcut yang tersedia.
+### 2. Integrasi Data & Dapodik Desktop
 
-### Versi Linux dan Sistem Operasi Lain (Menggunakan Node.js)
+- **Sinkronisasi Dapodik**: Tarik dan sinkronkan data identitas sekolah, rombongan belajar, guru PTK, data murid, hingga penugasan mengajar secara langsung.
+- **Ekspor & Impor E-Rapor**: Format ekspor spreadsheet Excel yang kompatibel langsung untuk pengunggahan ke server pusat E-Rapor Kemendikdasmen.
 
-#### Persyaratan
+### 3. Presensi & Kehadiran Terpadu
 
-- Node.js 20 LTS (direkomendasikan)
-- pnpm
-- Google Chrome atau Chromium (digunakan untuk proses rendering PDF melalui PagedJS + Puppeteer)
+- **Presensi Fleksibel**: Mendukung skema presensi per-hari (masuk & pulang) maupun presensi per-mata pelajaran untuk verifikasi jam belajar efektif.
+- **Sinkronisasi AKAS**: Integrasi penarikan log kehadiran digital secara instan.
+- **Rekapitulasi Otomatis**: Kalkulasi persentase kehadiran harian, bulanan, dan akumulasi paruh semester yang terhubung langsung ke lembar rapor siswa.
 
-#### Instalasi
+### 4. Administrasi Guru & Tata Usaha
 
-1. Clone repository menggunakan perintah di bawah atau download [file zip](https://github.com/sira313/rapkumer/archive/refs/heads/main.zip) dari project ini.
+- **Jurnal Mengajar Harian**: Pencatatan aktivitas materi ajar, kehadiran siswa dalam kelas, serta kendala proses belajar mengajar.
+- **Buku Tamu Digital**: Pencatatan tamu sekolah lengkap dengan foto identitas dan tanda tangan langsung melalui canvas layar sentuh.
+- **Dinas Luar & SPPD**: Pengajuan surat tugas, bukti perjalanan dinas, dan pencetakan lembar SPPD formal.
+- **Bel Sekolah Digital Terjadwal**: Otomatisasi pengingat jam masuk, istirahat, pergantian jam pelajaran, dan kepulangan dengan playlist audio kustom.
 
-   ```bash
-   git clone https://github.com/sira313/rapkumer && cd rapkumer
-   ```
+### 5. Asisten AI Capaian Pembelajaran
 
-2. Install seluruh dependency.
+- Generator otomatis lingkup materi dan Tujuan Pembelajaran (TP) berbasis AI terintegrasi untuk membantu meringankan beban administratif perencanaan guru.
 
-   ```bash
-   pnpm install
-   ```
+---
 
-3. Build aplikasi dan jalankan.
+## 🛠️ Arsitektur Teknologi
 
-   ```bash
-   pnpm build && node build
-   ```
+| Komponen            | Teknologi                    | Deskripsi                                                                     |
+| :------------------ | :--------------------------- | :---------------------------------------------------------------------------- |
+| **Framework Utama** | SvelteKit 2 + Svelte 5       | Arsitektur modern berbasis Svelte 5 Runes (`$state`, `$derived`, `$props`)    |
+| **User Interface**  | Tailwind CSS 4 + DaisyUI 5   | Komponen responsif, ramah aksesibilitas, dengan dukungan Dark Mode persisten  |
+| **Database Engine** | SQLite (LibSQL) & PostgreSQL | Fleksibilitas SQLite untuk desktop dan PostgreSQL untuk skala jaringan/server |
+| **ORM & Migrasi**   | Drizzle ORM                  | Schema type-safe dan migrasi terorkestrasi                                    |
+| **PDF Rendering**   | PagedJS + Puppeteer Core     | Mesin cetak PDF standar percetakan berbasis HTML/CSS Print Media              |
+| **Autentikasi**     | Session-based & Zitadel SSO  | Manajemen sesi terenkripsi dengan kontrol hak akses berbasis peran (RBAC)     |
 
-Untuk panduan instalasi manual serta proses pengembangan yang lebih lengkap, silakan baca:
+---
 
-`docs/DEVELOPMENT.md`
+## 🚀 Panduan Memulai (Quickstart)
 
-## Menjalankan Versi Pengembangan (Untuk Pengembang)
+### Prasyarat Sistem
 
-### Persyaratan
+- **Node.js**: Versi 20 LTS (direkomendasikan)
+- **Package Manager**: `pnpm` (wajib, `engine-strict=true`)
+- **Browser Engine**: Google Chrome atau Chromium terpasang di sistem untuk rendering cetak PDF.
 
-- Node.js 20 LTS (direkomendasikan)
-- pnpm
-- Google Chrome atau Chromium (digunakan untuk rendering PDF melalui PagedJS + Puppeteer)
-
-### Langkah Singkat
+### 1. Instalasi Dependensi
 
 ```bash
+git clone https://github.com/ardianryan/rapkumer.git
+cd rapkumer
 pnpm install
+```
+
+### 2. Konfigurasi Lingkungan (.env)
+
+Salin berkas konfigurasi sampel atau buat berkas `.env` pada direktori root:
+
+```env
+# Default database (SQLite lokal)
+DB_URL="file:./data/database.sqlite3"
+
+# Opsional: Jika menggunakan PostgreSQL terpusat
+# DB_URL="postgresql://user:password@localhost:5432/school_db"
+
+# Batas ukuran payload
+BODY_SIZE_LIMIT="512K"
+
+# Jalur executable Chrome/Chromium untuk cetak PDF (sesuaikan jika di Linux/server)
+# PUPPETEER_EXECUTABLE_PATH="/usr/bin/chromium-browser"
+```
+
+### 3. Inisialisasi Database
+
+Jalankan migrasi schema awal:
+
+```bash
+pnpm db:push
+```
+
+### 4. Menjalankan Mode Pengembangan
+
+```bash
 pnpm dev -- --port 5173
 ```
 
-Selanjutnya buka:
+Aplikasi dapat diakses melalui peramban di: `http://localhost:5173`
 
-```
-http://localhost:5173
-```
+> **Kredensial Default Administrator**: `Admin` / `Admin123` _(sangat disarankan segera diganti setelah instalasi)_.
 
-Jika port `5173` sedang digunakan, jalankan dengan port lain, misalnya:
+### 5. Kompilasi & Menjalankan Mode Produksi
 
-```
---port 5174
-```
-
-### Beberapa Skrip Penting
-
-(Lihat juga `package.json`)
-
-- `pnpm dev` — Menjalankan server pengembangan (`node scripts/dev.js`) sekaligus generator ikon.
-- `pnpm build` — Membuat build produksi.
-- `pnpm db:push` — Menjalankan migrasi database menggunakan Drizzle.
-- `pnpm db:studio` — Membuka Drizzle Studio untuk melihat dan mengelola database.
-- `pnpm lint` dan `pnpm check` — Melakukan pengecekan format, lint, dan tipe Svelte.
-
-Lokasi database lokal:
-
-```
-data/database.sqlite3
+```bash
+pnpm build
+pnpm start
 ```
 
-### Skills untuk AI Coding Agent (opencode)
+---
 
-Skills (instruksi untuk agent coding) disimpan di folder `.agents/skills/` dan dibaca otomatis oleh opencode. Terdapat dua kelompok:
+## 📂 Panduan Dokumentasi Teknis (`docs/`)
 
-- **Strix (security testing):** 9 skill untuk menjalankan AI pentest, memperbaiki temuan keamanan, dan menyiapkan CI scanning. Cara install/pembaruan:
+Dokumentasi arsitektur, panduan konfigurasi, dan alur kontribusi tersimpan rapi dalam direktori [`docs/`](docs/):
 
-  ```sh
-  npx skills add usestrix/strix
-  ```
+| Dokumen                                                                                   | Topik Pembahasan                                                          |
+| :---------------------------------------------------------------------------------------- | :------------------------------------------------------------------------ |
+| [**DEVELOPMENT.md**](docs/DEVELOPMENT.md)                                                 | Panduan standar koding, struktur proyek, dan alur kerja pengembangan      |
+| [**POSTGRES.md**](docs/POSTGRES.md)                                                       | Panduan konfigurasi dan migrasi ke database terpusat PostgreSQL           |
+| [**FRONTEND_GUIDE.md**](docs/FRONTEND_GUIDE.md)                                           | Pedoman desain antarmuka, sistem token warna, dan standar DaisyUI         |
+| [**DAPODIK.md**](docs/DAPODIK.md)                                                         | Mekanisme sinkronisasi API dan penarikan data Dapodik Desktop             |
+| [**ERAPOR.md**](docs/ERAPOR.md)                                                           | Struktur data integrasi dan spesifikasi berkas impor/ekspor E-Rapor       |
+| [**PENGATURAN_IZIN_PENGGUNA.md**](docs/PENGATURAN_IZIN_PENGGUNA.md)                       | Matriks hak akses pengguna (Admin, Wali Kelas, Guru Mapel, Wali Asuh)     |
+| [**INSTALLER_WORKFLOW.md**](docs/INSTALLER_WORKFLOW.md)                                   | Alur kompilasi paket instalasi mandiri Windows (InnoSetup)                |
+| [**CODE_SIGNING.md**](docs/CODE_SIGNING.md)                                               | Konfigurasi tanda tangan digital dan sertifikat biner Windows             |
+| [**REVERSE_PROXY.md**](docs/REVERSE_PROXY.md)                                             | Rekomendasi konfigurasi Nginx/Caddy untuk deployment jaringan sekolah     |
+| [**R2_STORAGE.md**](docs/R2_STORAGE.md)                                                   | Panduan penyimpanan berkas eksternal berbasis Cloudflare S3/R2            |
+| [**AUDIT.md**](docs/AUDIT.md) & [**SKILLS.md**](docs/SKILLS.md)                           | Panduan audit keamanan berkala dan pengujian penetrasi mandiri (Strix AI) |
+| [**BOOTLENECK.md**](docs/BOOTLENECK.md) & [**BOOTLENECK_FIX.md**](docs/BOOTLENECK_FIX.md) | Analisis profiling performa dan solusi mitigasi beban komputasi tinggi    |
+| [**UPDATE_PLAN_FOR_RAPKUMER.md**](docs/UPDATE_PLAN_FOR_RAPKUMER.md)                       | Catatan peta jalan (_roadmap_) pengembangan modul lanjutan                |
 
-  Panduan instalasi Strix CLI, konfigurasi LLM, dan perintah scan tersedia di `docs/SKILLS.md`.
+---
 
-- **Bahasa Indonesia:** skill `bahasa-inti` (aturan inti penulisan bahasa Indonesia) dan `bahasa-website` (penulisan UX/microcopy) — sudah termasuk di repository.
+## 📋 Daftar Perintah CLI (Cheatsheet)
 
-Restart ulang session opencode setelah menambah atau memperbarui skills agar dikenali.
+```bash
+pnpm dev -- --port 5173      # Menjalankan Vite dev server + generator ikon otomatis
+pnpm build                   # Mengompilasi aplikasi untuk adapter node (build/index.js)
+pnpm preview                 # Menjalankan preview hasil kompilasi aplikasi
+pnpm start                   # Menjalankan aplikasi produksi dengan launcher terpadu
+pnpm db:push                 # Menerapkan perubahan skema basis data
+pnpm db:studio               # Membuka antarmuka Drizzle Studio GUI
+pnpm db:cleanup              # Membersihkan data orphan pada relasi database
+pnpm db:purge                # Menghapus berkas database lokal (reset total)
+pnpm check                   # Validasi tipe statis (SvelteKit sync + svelte-check)
+pnpm lint                    # Memeriksa format kode (Prettier & ESLint)
+pnpm format                  # Memformat seluruh berkas kode sesuai standar repositori
+pnpm package:win             # Menyiapkan artefak installer sistem operasi Windows
+```
 
-## Struktur Proyek (Singkat)
+---
 
-- `src/` — Kode sumber aplikasi SvelteKit (komponen, route, dan server).
-- `static/` — Aset statis yang disajikan apa adanya.
-- `scripts/` — Berisi skrip utilitas seperti migrasi, seed, dan generator ikon.
-- `data/` — Menyimpan database lokal serta file upload.
-- `drizzle/` — File migrasi SQL yang digunakan oleh Drizzle ORM.
+## 🔒 Keamanan & Kebijakan Data
 
-Penjelasan lebih lengkap mengenai pola implementasi (Svelte 5 Runes, DaisyUI, Tailwind CSS v4, dan Drizzle ORM) tersedia pada:
+- **Enkripsi Sesi**: Otentikasi sesi menggunakan token aman berbasis _HTTP-Only_ cookies dan perlindungan CSRF kustom.
+- **Penyimpanan Tanda Tangan**: Paraf dan tanda tangan disimpan secara terpisah dalam berkas gambar transparan terisolasi (bukan raw base64 dalam tabel) dengan perlindungan akses valid.
+- **Isolasi Data**: Seluruh kueri basis data diisolasi per entitas sekolah (`sekolahId`) untuk memastikan integritas data multi-tenant tetap terjaga.
 
-`docs/DEVELOPMENT.md`
+---
 
-## Lisensi & Pengecualian
+## 📄 Lisensi, Pengakuan & Basis Proyek
 
-Perangkat lunak ini menggunakan lisensi khusus (custom license).
+Aplikasi ini didistribusikan di bawah lisensi khusus non-komersial (_Custom Non-Commercial License_). Anda bebas menggunakan, menelaah, serta memodifikasi perangkat lunak ini untuk kebutuhan institusi pendidikan secara mandiri tanpa tujuan komersialisasi. Ketentuan lengkap dapat dibaca pada berkas [LICENSE](LICENSE).
 
-Anda bebas menggunakan, memodifikasi, dan membagikan aplikasi ini untuk keperluan nonkomersial dengan tetap mencantumkan atribusi kepada pembuatnya.
+<details>
+<summary><strong>Informasi Basis Kode & Atribusi (Rapkumer Engine)</strong></summary>
 
-Tidak diperbolehkan menjual atau memonetisasi perangkat lunak ini maupun hasil modifikasinya dalam bentuk apa pun.
+<br />
 
-Silakan lihat file `LICENSE` di root proyek untuk mengetahui ketentuan lengkap beserta daftar aset yang termasuk di dalamnya.
+Aplikasi ini dikembangkan dan disempurnakan dengan fondasi utama dari proyek sumber terbuka [Rapkumer](https://github.com/apoxicam/rapkumer) oleh tim pengembang aslinya. Pengembangan lanjutan pada repositori ini berfokus pada:
 
-Ikon yang berada pada folder `src/lib/icons` berasal dari Feather dan dirilis di bawah lisensi MIT.
+- Penambahan kapabilitas server multi-koneksi PostgreSQL untuk deployment institusi skala besar.
+- Peningkatan sistem konfigurasi asesmen dinamis dan pemisahan sub-komponen penilaian tengah semester.
+- Pembaruan arsitektur modern Svelte 5 Runes, Tailwind CSS 4, serta tata kelola dokumentasi terpusat.
 
-Informasi lisensi dan kredit selengkapnya tersedia di:
+Seluruh hak cipta modul dasar tetap menjadi milik kontributor dan pengembang asli Rapkumer.
+</details>
 
-`docs/ICON-CREDITS.md`
+---
 
-## Kontribusi dan Donasi
-
-Terima kasih atas minat Anda untuk berkontribusi pada Rapkumer.
-
-Sebelum mengirim Pull Request, mohon perhatikan beberapa hal berikut:
-
-- Ikuti panduan penulisan kode yang berlaku.
-- Jalankan `pnpm lint` dan `pnpm check` untuk memastikan tidak ada masalah pada kode.
-- Gunakan bahasa Indonesia untuk seluruh teks yang ditampilkan kepada pengguna (user-facing copy dan dokumentasi pengguna).
-- Jika mengubah fitur penting, tambahkan pengujian sederhana atau sertakan langkah verifikasi secara manual.
-
-Panduan lengkap alur pengembangan tersedia pada:
-
-`docs/DEVELOPMENT.md`
-
-Bila ingin berdonasi untuk project ini silahkan scan QRIS gambar di bawah:
-
-<a href='https://pay.apoxi.cam' target="_blank"><img alt='Scan QRIS' src='https://img.shields.io/badge/Apoxicam-QRIS-red?style=for-the-badge'/></a>
-
-## Bantuan
-
-Apabila menemukan bug, mengalami kendala, atau memiliki pertanyaan, silakan buat Issue pada repository GitHub atau join ke grup telegram Rapkumer melalui tombol di bawah:
-
-<a href='https://t.me/rapkumer' target="_blank"><img alt='telegram' src='https://img.shields.io/badge/telegram-100000?style=for-the-badge&logo=telegram&logoColor=0088CC&labelColor=000000&color=0088CC'/></a>
+<div align="center">
+  <sub>Dikembangkan dengan dedikasi untuk kemajuan efisiensi administrasi pendidikan Indonesia.</sub>
+</div>
