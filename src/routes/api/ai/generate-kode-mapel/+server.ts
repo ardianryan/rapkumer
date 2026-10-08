@@ -74,7 +74,16 @@ function isNonRaporSubject(name: string): boolean {
 		norm.includes('bimbingan karir') ||
 		norm.startsWith('bk ') ||
 		norm.endsWith(' bk') ||
-		norm === 'bk'
+		norm === 'bk' ||
+		norm.includes('pembelajaran berbasis project') ||
+		norm.includes('pembelajaran berbasis proyek') ||
+		norm.includes('project based learning') ||
+		norm.includes('proyek based learning') ||
+		norm.includes('berbasis project') ||
+		norm.includes('berbasis proyek') ||
+		norm.includes('pembelajaran berbasis riset') ||
+		norm === 'pjbl' ||
+		norm === 'pbl'
 	);
 }
 
@@ -162,6 +171,7 @@ ${JSON.stringify(uniqueNames)}
 
 PENTING:
 - Untuk mata pelajaran layanan/non-akademik seperti Bimbingan dan Konseling (BK), Bimbingan Konseling, konseling dsb. yang TIDAK dinilai dengan angka rapor intrakurikuler, WAJIB beri null ("kode": null) agar tidak tampil di cetakan rapor.
+- Untuk mata pelajaran "Pembelajaran Berbasis Project" / "Pembelajaran Berbasis Proyek" (PjBL) atau pembelajaran proyek sejenis, WAJIB beri null ("kode": null) agar tidak tampil di cetakan rapor.
 
 Format keluaran WAJIB JSON murni tanpa format lain:
 {"codes": [{"nama": "...", "kode": "..." | null}]}`;

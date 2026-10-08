@@ -28,6 +28,7 @@
 		bobotSumatif: number;
 		bobotSts: number;
 		muridList: MuridItem[];
+		allowSts?: boolean;
 		canEdit?: boolean;
 		onSaved?: () => void;
 		onOpenSetup?: () => void;
@@ -44,10 +45,16 @@
 		bobotSumatif,
 		bobotSts,
 		muridList,
+		allowSts = true,
 		canEdit = true,
 		onSaved,
 		onOpenSetup
 	}: Props = $props();
+
+	const effectiveAdaStsTes = $derived(allowSts && adaStsTes);
+	const effectiveAdaStsNonTes = $derived(allowSts && adaStsNonTes);
+	const effectiveBobotSumatif = $derived(allowSts ? bobotSumatif : 100);
+	const effectiveBobotSts = $derived(allowSts ? bobotSts : 0);
 
 	// svelte-ignore state_referenced_locally
 	let rows = $state(
@@ -88,8 +95,9 @@
 
 	// Hitung nilai STS per baris
 	function getNilaiSts(tes: number | null, nonTes: number | null): number | null {
-		const validTes = adaStsTes && tes != null && !Number.isNaN(tes);
-		const validNonTes = adaStsNonTes && nonTes != null && !Number.isNaN(nonTes);
+		if (!allowSts) return null;
+		const validTes = effectiveAdaStsTes && tes != null && !Number.isNaN(tes);
+		const validNonTes = effectiveAdaStsNonTes && nonTes != null && !Number.isNaN(nonTes);
 
 		if (validTes && validNonTes) return Math.round(((tes! + nonTes!) / 2) * 100) / 100;
 		if (validTes) return tes;
@@ -104,25 +112,29 @@
 		bSumatif: number,
 		bSts: number
 	): number | null {
+		const effBSts = allowSts ? bSts : 0;
+		const effBSumatif = allowSts ? bSumatif : 100;
+		if (!allowSts || effBSts <= 0) return rataSumatif;
+
 		if (rataSumatif == null && sts == null) return null;
 		if (rataSumatif != null && sts == null) return rataSumatif;
 		if (rataSumatif == null && sts != null) return sts;
 
-		const totalB = bSumatif + bSts;
+		const totalB = effBSumatif + effBSts;
 		if (totalB <= 0) return rataSumatif;
-		return Math.round(((rataSumatif! * bSumatif + sts! * bSts) / totalB) * 100) / 100;
+		return Math.round(((rataSumatif! * effBSumatif + sts! * effBSts) / totalB) * 100) / 100;
 	}
 
 	// Keyboard navigation: Arrow Up, Down, Left, Right, Enter
 	function handleKeyDown(e: KeyboardEvent, rowIndex: number, colIndex: number) {
 		const totalRows = rows.length;
 		// Jumlah total input column per baris:
-		// F columns + S columns + (adaStsTes ? 1 : 0) + (adaStsNonTes ? 1 : 0)
+		// F columns + S columns + (effectiveAdaStsTes ? 1 : 0) + (effectiveAdaStsNonTes ? 1 : 0)
 		const totalCols =
 			komponenFormatif.length +
 			komponenSumatif.length +
-			(adaStsTes ? 1 : 0) +
-			(adaStsNonTes ? 1 : 0);
+			(effectiveAdaStsTes ? 1 : 0) +
+			(effectiveAdaStsNonTes ? 1 : 0);
 
 		if (e.key === 'Enter' || e.key === 'ArrowDown') {
 			e.preventDefault();
@@ -423,7 +435,7 @@
 				<select class="select select-xs bg-base-100" bind:value={quickFillColumn}>
 					<option value="all_formatif">Semua Tugas Kosong</option>
 					<option value="all_sumatif">Semua Formatif Materi Kosong</option>
-					{#if adaStsTes}
+					{#if effectiveAdaStsTes}
 						<option value="sts_tes">STS Tes</option>
 					{/if}
 					{#each komponenFormatif as f (f.kode)}
@@ -466,11 +478,13 @@
 				<span class="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span> Tugas
 			</span>
 			<span class="inline-flex items-center gap-1">
-				<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Formatif ({bobotSumatif}%)
+				<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Formatif ({effectiveBobotSumatif}%)
 			</span>
-			<span class="inline-flex items-center gap-1">
-				<span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> STS ({bobotSts}%)
-			</span>
+			{#if allowSts && (adaStsTes || adaStsNonTes)}
+				<span class="inline-flex items-center gap-1">
+					<span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> STS ({effectiveBobotSts}%)
+				</span>
+			{/if}
 		</div>
 	</div>
 
@@ -501,16 +515,16 @@
 						colspan={komponenSumatif.length + 1}
 						class="text-center bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-r border-base-300 py-1.5"
 					>
-						ASESMEN FORMATIF LINGKUP MATERI ({bobotSumatif}%)
+						ASESMEN FORMATIF LINGKUP MATERI ({effectiveBobotSumatif}%)
 					</th>
 
 					<!-- KELOMPOK STS -->
-					{#if adaStsTes || adaStsNonTes}
+					{#if effectiveAdaStsTes || effectiveAdaStsNonTes}
 						<th
-							colspan={(adaStsTes && adaStsNonTes ? 2 : 1) + 1}
+							colspan={(effectiveAdaStsTes && effectiveAdaStsNonTes ? 2 : 1) + 1}
 							class="text-center bg-amber-500/10 text-amber-700 dark:text-amber-400 border-r border-base-300 py-1.5"
 						>
-							SUMATIF TENGAH SEMESTER ({bobotSts}%)
+							SUMATIF TENGAH SEMESTER ({effectiveBobotSts}%)
 						</th>
 					{/if}
 
@@ -558,13 +572,13 @@
 					</th>
 
 					<!-- STS Sub-cols -->
-					{#if adaStsTes}
+					{#if effectiveAdaStsTes}
 						<th class="text-center min-w-14 border-r border-base-200 py-1.5">Tes</th>
 					{/if}
-					{#if adaStsNonTes}
+					{#if effectiveAdaStsNonTes}
 						<th class="text-center min-w-14 border-r border-base-200 py-1.5">Non-Tes</th>
 					{/if}
-					{#if adaStsTes || adaStsNonTes}
+					{#if effectiveAdaStsTes || effectiveAdaStsNonTes}
 						<th
 							class="text-center min-w-14 bg-amber-500/5 text-amber-700 dark:text-amber-400 font-bold border-r border-base-300"
 						>
@@ -579,7 +593,7 @@
 					{@const rataF = getRataFormatif(row.nilaiFormatif)}
 					{@const rataS = getRataSumatif(row.nilaiSumatif)}
 					{@const valSts = getNilaiSts(row.stsTes, row.stsNonTes)}
-					{@const naRts = getNilaiAkhirRts(rataS, valSts, bobotSumatif, bobotSts)}
+					{@const naRts = getNilaiAkhirRts(rataS, valSts, effectiveBobotSumatif, effectiveBobotSts)}
 
 					<tr class="hover:bg-base-200/40 border-b border-base-200 transition-colors">
 						<!-- No -->
@@ -654,7 +668,7 @@
 						</td>
 
 						<!-- INPUT STS TES -->
-						{#if adaStsTes}
+						{#if effectiveAdaStsTes}
 							{@const colIdx = komponenFormatif.length + komponenSumatif.length}
 							<td class="p-1 border-r border-base-200 text-center">
 								<input
@@ -673,9 +687,9 @@
 						{/if}
 
 						<!-- INPUT STS NON-TES -->
-						{#if adaStsNonTes}
+						{#if effectiveAdaStsNonTes}
 							{@const colIdx =
-								komponenFormatif.length + komponenSumatif.length + (adaStsTes ? 1 : 0)}
+								komponenFormatif.length + komponenSumatif.length + (effectiveAdaStsTes ? 1 : 0)}
 							<td class="p-1 border-r border-base-200 text-center">
 								<input
 									id="cell-{rIdx}-{colIdx}"
@@ -693,7 +707,7 @@
 						{/if}
 
 						<!-- RATA STS (BADGE AUTO) -->
-						{#if adaStsTes || adaStsNonTes}
+						{#if effectiveAdaStsTes || effectiveAdaStsNonTes}
 							<td
 								class="text-center font-bold text-xs bg-amber-500/5 text-amber-700 dark:text-amber-400 border-r border-base-300"
 							>

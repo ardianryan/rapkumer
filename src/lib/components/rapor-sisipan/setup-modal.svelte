@@ -24,6 +24,7 @@
 		availableLingkupMateri?: string[];
 		maxFormatif?: number;
 		maxSumatif?: number;
+		allowSts?: boolean;
 		onSaved?: () => void;
 		onClose?: () => void;
 	}
@@ -43,6 +44,7 @@
 		availableLingkupMateri = [],
 		maxFormatif = 4,
 		maxSumatif = 3,
+		allowSts = true,
 		onSaved,
 		onClose
 	}: Props = $props();
@@ -86,13 +88,13 @@
 	});
 
 	// svelte-ignore state_referenced_locally
-	let adaStsTes = $state<boolean>(initialAdaStsTes);
+	let adaStsTes = $state<boolean>(allowSts ? initialAdaStsTes : false);
 	// svelte-ignore state_referenced_locally
-	let adaStsNonTes = $state<boolean>(initialAdaStsNonTes);
+	let adaStsNonTes = $state<boolean>(allowSts ? initialAdaStsNonTes : false);
 	// svelte-ignore state_referenced_locally
-	let bobotSumatif = $state<number>(initialBobotSumatif);
+	let bobotSumatif = $state<number>(allowSts ? initialBobotSumatif : 100);
 	// svelte-ignore state_referenced_locally
-	let bobotSts = $state<number>(initialBobotSts);
+	let bobotSts = $state<number>(allowSts ? initialBobotSts : 0);
 	let isSaving = $state<boolean>(false);
 
 	function handleStsToggle() {
@@ -197,10 +199,10 @@
 					mataPelajaranId: mapelId,
 					komponenFormatif,
 					komponenSumatif,
-					adaStsTes,
-					adaStsNonTes,
-					bobotSumatifTp: bobotSumatif,
-					bobotSts
+					adaStsTes: allowSts ? adaStsTes : false,
+					adaStsNonTes: allowSts ? adaStsNonTes : false,
+					bobotSumatifTp: allowSts ? bobotSumatif : 100,
+					bobotSts: allowSts ? bobotSts : 0
 				})
 			});
 
@@ -415,110 +417,135 @@
 					<span class="badge badge-primary badge-sm">3</span>
 					Pengaturan Sumatif Tengah Semester (STS) & Bobot
 				</h4>
-				<p class="text-xs text-base-content/60 mt-0.5">
-					Centang bentuk asesmen STS yang dilaksanakan. Kolom pengisian nilai per siswa akan
-					otomatis aktif di tabel nilai.
-				</p>
+				{#if !allowSts}
+					<p class="text-xs text-base-content/60 mt-0.5">
+						Kebijakan penilaian tengah semester diatur terpusat oleh sekolah.
+					</p>
+				{:else}
+					<p class="text-xs text-base-content/60 mt-0.5">
+						Centang bentuk asesmen STS yang dilaksanakan. Kolom pengisian nilai per siswa akan
+						otomatis aktif di tabel nilai.
+					</p>
+				{/if}
 			</div>
 
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-				<div class="space-y-2">
-					<label
-						class="label cursor-pointer justify-start items-start gap-3 bg-base-100 p-2.5 rounded-lg border border-base-200 hover:border-primary/40 transition-colors"
-					>
-						<input
-							type="checkbox"
-							class="checkbox checkbox-primary checkbox-sm mt-0.5"
-							bind:checked={adaStsTes}
-							onchange={handleStsToggle}
-						/>
-						<div>
-							<span class="text-xs font-semibold block text-base-content"
-								>Ada STS Tertulis / Tes</span
-							>
-							<span class="text-[11px] text-base-content/60 block">
-								Memunculkan kolom input nilai tes tertulis per siswa di tabel nilai
-							</span>
-						</div>
-					</label>
-					<label
-						class="label cursor-pointer justify-start items-start gap-3 bg-base-100 p-2.5 rounded-lg border border-base-200 hover:border-primary/40 transition-colors"
-					>
-						<input
-							type="checkbox"
-							class="checkbox checkbox-primary checkbox-sm mt-0.5"
-							bind:checked={adaStsNonTes}
-							onchange={handleStsToggle}
-						/>
-						<div>
-							<span class="text-xs font-semibold block text-base-content"
-								>Ada STS Non-Tes (Praktik / Proyek)</span
-							>
-							<span class="text-[11px] text-base-content/60 block">
-								Memunculkan kolom input nilai praktik/proyek per siswa di tabel nilai
-							</span>
-						</div>
-					</label>
+			{#if !allowSts}
+				<div class="alert alert-warning text-xs py-3 px-3.5 rounded-lg flex items-start gap-2.5">
+					<Icon name="info" class="w-4 h-4 shrink-0 mt-0.5 text-warning" />
+					<div>
+						<span class="font-bold text-base-content"
+							>Asesmen STS Dinonaktifkan oleh Kebijakan Sekolah</span
+						>
+						<p class="mt-0.5 text-base-content/80 leading-relaxed">
+							Administrator sekolah telah menetapkan bahwa sekolah tidak melaksanakan tes STS.
+							Sesuai kebijakan ini, tidak ada kolom pengisian nilai STS dan pembobotan nilai akhir
+							otomatis terkunci <strong>100% menggunakan nilai formatif materi</strong>.
+						</p>
+					</div>
 				</div>
-
-				<div class="bg-base-100 p-3 rounded-lg border border-base-200 space-y-2.5">
-					<div class="flex items-center justify-between text-xs">
-						<span class="font-semibold text-base-content">Bobot Rata-rata Formatif (Materi):</span>
-						<div class="flex items-center gap-1">
+			{:else}
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<label
+							class="label cursor-pointer justify-start items-start gap-3 bg-base-100 p-2.5 rounded-lg border border-base-200 hover:border-primary/40 transition-colors"
+						>
 							<input
-								type="number"
-								min="0"
-								max="100"
-								class="input input-xs bg-base-200 dark:bg-base-300 w-16 text-center font-bold"
-								bind:value={bobotSumatif}
-								disabled={!adaStsTes && !adaStsNonTes}
+								type="checkbox"
+								class="checkbox checkbox-primary checkbox-sm mt-0.5"
+								bind:checked={adaStsTes}
+								onchange={handleStsToggle}
 							/>
-							<span>%</span>
-						</div>
-					</div>
-					<div class="flex items-center justify-between text-xs">
-						<span class="font-semibold text-base-content">Bobot Nilai Ujian STS:</span>
-						<div class="flex items-center gap-1">
+							<div>
+								<span class="text-xs font-semibold block text-base-content"
+									>Ada STS Tertulis / Tes</span
+								>
+								<span class="text-[11px] text-base-content/60 block">
+									Memunculkan kolom input nilai tes tertulis per siswa di tabel nilai
+								</span>
+							</div>
+						</label>
+						<label
+							class="label cursor-pointer justify-start items-start gap-3 bg-base-100 p-2.5 rounded-lg border border-base-200 hover:border-primary/40 transition-colors"
+						>
 							<input
-								type="number"
-								min="0"
-								max="100"
-								class="input input-xs bg-base-200 dark:bg-base-300 w-16 text-center font-bold"
-								bind:value={bobotSts}
-								disabled={!adaStsTes && !adaStsNonTes}
+								type="checkbox"
+								class="checkbox checkbox-primary checkbox-sm mt-0.5"
+								bind:checked={adaStsNonTes}
+								onchange={handleStsToggle}
 							/>
-							<span>%</span>
-						</div>
+							<div>
+								<span class="text-xs font-semibold block text-base-content"
+									>Ada STS Non-Tes (Praktik / Proyek)</span
+								>
+								<span class="text-[11px] text-base-content/60 block">
+									Memunculkan kolom input nilai praktik/proyek per siswa di tabel nilai
+								</span>
+							</div>
+						</label>
 					</div>
 
-					{#if !adaStsTes && !adaStsNonTes}
+					<div class="bg-base-100 p-3 rounded-lg border border-base-200 space-y-2.5">
+						<div class="flex items-center justify-between text-xs">
+							<span class="font-semibold text-base-content">Bobot Rata-rata Formatif (Materi):</span
+							>
+							<div class="flex items-center gap-1">
+								<input
+									type="number"
+									min="0"
+									max="100"
+									class="input input-xs bg-base-200 dark:bg-base-300 w-16 text-center font-bold"
+									bind:value={bobotSumatif}
+									disabled={!adaStsTes && !adaStsNonTes}
+								/>
+								<span>%</span>
+							</div>
+						</div>
+						<div class="flex items-center justify-between text-xs">
+							<span class="font-semibold text-base-content">Bobot Nilai Ujian STS:</span>
+							<div class="flex items-center gap-1">
+								<input
+									type="number"
+									min="0"
+									max="100"
+									class="input input-xs bg-base-200 dark:bg-base-300 w-16 text-center font-bold"
+									bind:value={bobotSts}
+									disabled={!adaStsTes && !adaStsNonTes}
+								/>
+								<span>%</span>
+							</div>
+						</div>
+
+						{#if !adaStsTes && !adaStsNonTes}
+							<div
+								class="bg-info/10 text-info text-[11px] p-2 rounded border border-info/20 leading-tight"
+							>
+								Tanpa tes STS: Nilai akhir rapor sisipan dihitung 100% murni dari rata-rata Formatif
+								materi.
+							</div>
+						{:else}
+							<div class="text-[11px] text-base-content/60 leading-tight">
+								Nilai ujian diisi di kolom STS pada tabel. NA STS dihitung: <span
+									class="font-medium text-base-content"
+									>({bobotSumatif}% × Rata Formatif) + ({bobotSts}% × Nilai STS)</span
+								>.
+							</div>
+						{/if}
+
 						<div
-							class="bg-info/10 text-info text-[11px] p-2 rounded border border-info/20 leading-tight"
+							class="pt-2 border-t border-base-200 flex justify-between items-center text-[11px]"
 						>
-							Tanpa tes STS: Nilai akhir rapor sisipan dihitung 100% murni dari rata-rata Sumatif
-							TP.
+							<span class="text-base-content/70">Total Bobot:</span>
+							<span
+								class="font-bold {bobotSumatif + bobotSts === 100
+									? 'text-success'
+									: 'text-error font-extrabold'}"
+							>
+								{bobotSumatif + bobotSts}% {bobotSumatif + bobotSts !== 100 ? '(Harus 100%)' : '✓'}
+							</span>
 						</div>
-					{:else}
-						<div class="text-[11px] text-base-content/60 leading-tight">
-							Nilai ujian diisi di kolom STS pada tabel. NA STS dihitung: <span
-								class="font-medium text-base-content"
-								>({bobotSumatif}% × Rata TP) + ({bobotSts}% × Nilai STS)</span
-							>.
-						</div>
-					{/if}
-
-					<div class="pt-2 border-t border-base-200 flex justify-between items-center text-[11px]">
-						<span class="text-base-content/70">Total Bobot:</span>
-						<span
-							class="font-bold {bobotSumatif + bobotSts === 100
-								? 'text-success'
-								: 'text-error font-extrabold'}"
-						>
-							{bobotSumatif + bobotSts}% {bobotSumatif + bobotSts !== 100 ? '(Harus 100%)' : '✓'}
-						</span>
 					</div>
 				</div>
-			</div>
+			{/if}
 		</div>
 
 		<!-- TOMBOL AKSI -->

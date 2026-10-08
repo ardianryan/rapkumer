@@ -307,6 +307,7 @@
 						bobotSumatif={setup.bobotSumatifTp}
 						bobotSts={setup.bobotSts}
 						muridList={data.daftarMurid}
+						allowSts={data.showSts}
 						canEdit={true}
 						onSaved={reloadData}
 						onOpenSetup={() => (setupOpen = true)}
@@ -356,6 +357,7 @@
 				availableLingkupMateri={data.availableLingkupMateri}
 				maxFormatif={data.maxFormatif}
 				maxSumatif={data.maxSumatif}
+				allowSts={data.showSts}
 				onSaved={async () => {
 					setupOpen = false;
 					await reloadData();

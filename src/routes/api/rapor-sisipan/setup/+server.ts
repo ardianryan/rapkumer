@@ -1,5 +1,8 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { saveRtsSetup, deleteRtsSetup } from '$lib/server/rapor-sisipan/rts-service';
+import db from '$lib/server/db';
+import { tableSekolah } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	const user = locals.user;
@@ -30,18 +33,27 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		if (!Array.isArray(komponenFormatif) || komponenFormatif.length === 0) {
-			return json(
-				{ error: 'Minimal harus ada 1 komponen Asesmen Formatif (Tugas Harian).' },
-				{ status: 400 }
-			);
+			return json({ error: 'Minimal harus ada 1 komponen Tugas.' }, { status: 400 });
 		}
 
 		if (!Array.isArray(komponenSumatif) || komponenSumatif.length === 0) {
 			return json(
-				{ error: 'Minimal harus ada 1 komponen Asesmen Sumatif (Ulangan TP).' },
+				{ error: 'Minimal harus ada 1 komponen Asesmen Formatif Lingkup Materi.' },
 				{ status: 400 }
 			);
 		}
+
+		// Cek apakah kebijakan sekolah mengizinkan STS
+		const currentSekolah = await db.query.tableSekolah.findFirst({
+			where: eq(tableSekolah.id, sekolah.id),
+			columns: { rtsShowSts: true }
+		});
+		const isStsAllowed = (currentSekolah?.rtsShowSts ?? 1) === 1;
+
+		const finalAdaStsTes = isStsAllowed ? Boolean(adaStsTes) : false;
+		const finalAdaStsNonTes = isStsAllowed ? Boolean(adaStsNonTes) : false;
+		const finalBobotSumatifTp = isStsAllowed ? Number(bobotSumatifTp) || 70 : 100;
+		const finalBobotSts = isStsAllowed ? Number(bobotSts) || 30 : 0;
 
 		await saveRtsSetup({
 			sekolahId: sekolah.id,
@@ -49,10 +61,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			mataPelajaranId: Number(mataPelajaranId),
 			komponenFormatif,
 			komponenSumatif,
-			adaStsTes: Boolean(adaStsTes),
-			adaStsNonTes: Boolean(adaStsNonTes),
-			bobotSumatifTp: Number(bobotSumatifTp) || 70,
-			bobotSts: Number(bobotSts) || 30
+			adaStsTes: finalAdaStsTes,
+			adaStsNonTes: finalAdaStsNonTes,
+			bobotSumatifTp: finalBobotSumatifTp,
+			bobotSts: finalBobotSts
 		});
 
 		return json({ success: true, message: 'Pengaturan asesmen berhasil disimpan.' });
