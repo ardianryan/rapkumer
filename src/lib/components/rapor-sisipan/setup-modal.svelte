@@ -52,8 +52,8 @@
 		initialKomponenFormatif.length > 0
 			? JSON.parse(JSON.stringify(initialKomponenFormatif))
 			: [
-					{ kode: 'F1', nama: 'Tugas Harian 1' },
-					{ kode: 'F2', nama: 'Tugas Harian 2' }
+					{ kode: 'T1', nama: 'Tugas 1' },
+					{ kode: 'T2', nama: 'Tugas 2' }
 				]
 	);
 
@@ -63,7 +63,7 @@
 			? JSON.parse(JSON.stringify(initialKomponenSumatif))
 			: [
 					{
-						kode: 'S1',
+						kode: 'F1',
 						lingkupMateri: 'Lingkup Materi 1',
 						tpDeskripsi: 'Lingkup Materi 1'
 					}
@@ -107,32 +107,32 @@
 
 	function addFormatif() {
 		if (komponenFormatif.length >= maxFormatif) {
-			toast(`Maksimal ${maxFormatif} asesmen formatif yang diperbolehkan.`, 'warning');
+			toast(`Maksimal ${maxFormatif} tugas yang diperbolehkan.`, 'warning');
 			return;
 		}
 		const nextNum = komponenFormatif.length + 1;
 		komponenFormatif.push({
-			kode: `F${nextNum}`,
-			nama: `Tugas Harian ${nextNum}`
+			kode: `T${nextNum}`,
+			nama: `Tugas ${nextNum}`
 		});
 	}
 
 	function removeFormatif(index: number) {
 		if (komponenFormatif.length <= 1) {
-			toast('Minimal harus ada 1 asesmen formatif.', 'error');
+			toast('Minimal harus ada 1 tugas.', 'error');
 			return;
 		}
 		komponenFormatif.splice(index, 1);
-		// Re-index kodenya agar urut F1, F2...
+		// Re-index kodenya agar urut T1, T2...
 		komponenFormatif.forEach((item, idx) => {
-			item.kode = `F${idx + 1}`;
+			item.kode = `T${idx + 1}`;
 		});
 	}
 
 	function addSumatif(lmName?: string) {
 		if (komponenSumatif.length >= maxSumatif) {
 			toast(
-				`Maksimal ${maxSumatif} asesmen sumatif lingkup materi (UH) yang diperbolehkan.`,
+				`Maksimal ${maxSumatif} asesmen formatif lingkup materi yang diperbolehkan.`,
 				'warning'
 			);
 			return;
@@ -140,7 +140,7 @@
 		const nextNum = komponenSumatif.length + 1;
 		const name = lmName || `Lingkup Materi ${nextNum}`;
 		komponenSumatif.push({
-			kode: `S${nextNum}`,
+			kode: `F${nextNum}`,
 			lingkupMateri: name,
 			tpDeskripsi: name
 		});
@@ -148,12 +148,12 @@
 
 	function removeSumatif(index: number) {
 		if (komponenSumatif.length <= 1) {
-			toast('Minimal harus ada 1 asesmen sumatif lingkup materi.', 'error');
+			toast('Minimal harus ada 1 asesmen formatif lingkup materi.', 'error');
 			return;
 		}
 		komponenSumatif.splice(index, 1);
 		komponenSumatif.forEach((item, idx) => {
-			item.kode = `S${idx + 1}`;
+			item.kode = `F${idx + 1}`;
 		});
 	}
 
@@ -161,13 +161,13 @@
 		if (allLingkupMateri.length === 0) return;
 		const targetLms = allLingkupMateri.slice(0, maxSumatif);
 		komponenSumatif = targetLms.map((lm, idx) => ({
-			kode: `S${idx + 1}`,
+			kode: `F${idx + 1}`,
 			lingkupMateri: lm,
 			tpDeskripsi: lm
 		}));
 		if (allLingkupMateri.length > maxSumatif) {
 			toast(
-				`Dimuat ${maxSumatif} lingkup materi pertama (batas maksimal sekolah adalah ${maxSumatif} sumatif).`,
+				`Dimuat ${maxSumatif} lingkup materi pertama (batas maksimal sekolah adalah ${maxSumatif} formatif).`,
 				'info'
 			);
 		} else {
@@ -258,16 +258,16 @@
 	</div>
 
 	<form onsubmit={handleSubmit} class="space-y-6">
-		<!-- BAGIAN 1: ASESMEN FORMATIF -->
+		<!-- BAGIAN 1: TUGAS -->
 		<div class="card bg-base-200/50 p-4 rounded-xl border border-base-200">
 			<div class="flex items-center justify-between mb-3">
 				<div>
 					<h4 class="text-sm font-bold flex items-center gap-1.5 text-base-content">
 						<span class="badge badge-primary badge-sm">1</span>
-						Asesmen Formatif (Tugas Harian)
+						Tugas (T1, T2, ...)
 					</h4>
 					<p class="text-xs text-base-content/60 mt-0.5">
-						Tentukan berapa kali penugasan/praktik formatif yang dilakukan.
+						Tentukan berapa kali penugasan/tagihan harian yang dilakukan.
 					</p>
 				</div>
 				<button
@@ -277,7 +277,7 @@
 					disabled={komponenFormatif.length >= maxFormatif}
 				>
 					<Icon name="plus" />
-					Tambah Formatif ({komponenFormatif.length}/{maxFormatif})
+					Tambah Tugas ({komponenFormatif.length}/{maxFormatif})
 				</button>
 			</div>
 
@@ -288,7 +288,7 @@
 						<input
 							type="text"
 							class="input input-sm bg-base-200 dark:bg-base-300 w-full"
-							placeholder="Nama tugas (misal: Resume Struktur Sel, Kuis Bab 1...)"
+							placeholder="Nama tugas (misal: Resume Struktur Sel, Latihan Soal Bab 1...)"
 							bind:value={f.nama}
 							required
 						/>
@@ -305,16 +305,16 @@
 			</div>
 		</div>
 
-		<!-- BAGIAN 2: ASESMEN SUMATIF LINGKUP MATERI -->
+		<!-- BAGIAN 2: ASESMEN FORMATIF LINGKUP MATERI -->
 		<div class="card bg-base-200/50 p-4 rounded-xl border border-base-200">
 			<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
 				<div>
 					<h4 class="text-sm font-bold flex items-center gap-1.5 text-base-content">
 						<span class="badge badge-primary badge-sm">2</span>
-						Asesmen Sumatif (Lingkup Materi)
+						Asesmen Formatif (Lingkup Materi)
 					</h4>
 					<p class="text-xs text-base-content/60 mt-0.5">
-						Tentukan lingkup materi yang diujikan sebelum tengah semester.
+						Tentukan lingkup materi asesmen formatif yang dinilai sebelum tengah semester.
 					</p>
 				</div>
 				<div class="flex flex-wrap items-center gap-2">
@@ -336,7 +336,7 @@
 						disabled={komponenSumatif.length >= maxSumatif}
 					>
 						<Icon name="plus" />
-						Tambah Sumatif ({komponenSumatif.length}/{maxSumatif})
+						Tambah Formatif ({komponenSumatif.length}/{maxSumatif})
 					</button>
 				</div>
 			</div>
@@ -463,7 +463,7 @@
 
 				<div class="bg-base-100 p-3 rounded-lg border border-base-200 space-y-2.5">
 					<div class="flex items-center justify-between text-xs">
-						<span class="font-semibold text-base-content">Bobot Rata-rata Sumatif TP:</span>
+						<span class="font-semibold text-base-content">Bobot Rata-rata Formatif (Materi):</span>
 						<div class="flex items-center gap-1">
 							<input
 								type="number"

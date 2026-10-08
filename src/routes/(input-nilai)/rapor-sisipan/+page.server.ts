@@ -83,6 +83,10 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 		: null;
 	const maxFormatif = currentSekolah?.rtsMaxFormatif ?? 4;
 	const maxSumatif = currentSekolah?.rtsMaxSumatif ?? 3;
+	const showRataTugas = (currentSekolah?.rtsShowRataTugas ?? 1) === 1;
+	const showRataFormatif = (currentSekolah?.rtsShowRataFormatif ?? 1) === 1;
+	const showSts = (currentSekolah?.rtsShowSts ?? 1) === 1;
+	const showNaSts = (currentSekolah?.rtsShowNaSts ?? 1) === 1;
 
 	if (!sekolah?.id) {
 		return {
@@ -99,6 +103,11 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			isWaliKelasOrAdmin: false,
 			maxFormatif,
 			maxSumatif,
+			maxTugas: maxFormatif,
+			showRataTugas,
+			showRataFormatif,
+			showSts,
+			showNaSts,
 			isAdmin
 		};
 	}
@@ -125,6 +134,11 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			isWaliKelasOrAdmin: false,
 			maxFormatif,
 			maxSumatif,
+			maxTugas: maxFormatif,
+			showRataTugas,
+			showRataFormatif,
+			showSts,
+			showNaSts,
 			isAdmin
 		};
 	}
@@ -333,6 +347,11 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 		isWaliKelasOrAdmin,
 		maxFormatif,
 		maxSumatif,
+		maxTugas: maxFormatif,
+		showRataTugas,
+		showRataFormatif,
+		showSts,
+		showNaSts,
 		isAdmin
 	};
 };

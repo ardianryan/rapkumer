@@ -4,9 +4,14 @@ export interface RaporSisipanMapelItem {
 	no: number;
 	mataPelajaran: string;
 	guruPengampu?: string | null;
+	// Istilah Baru: Tugas (T1..Tn) & Rata-rata Tugas
+	tugasValues?: Array<number | string>;
+	rataTugas?: number | null;
+	// Istilah Baru: Formatif (F1..Fn) & Rata-rata Formatif
 	formatifValues: Array<number | string>;
 	rataFormatif?: number | null;
-	sumatifValues: Array<number | string>;
+	// Kompatibilitas field lama (Sumatif)
+	sumatifValues?: Array<number | string>;
 	rataSumatif?: number | null;
 	sts?: number | null;
 	nilaiAkhirRts?: number | null;
@@ -49,6 +54,12 @@ export interface RaporSisipanStudentData {
 	};
 	maxFormatif: number;
 	maxSumatif: number;
+	maxTugas?: number;
+	// Kebijakan visibilitas kolom cetak sekolah (Admin)
+	showRataTugas?: boolean;
+	showRataFormatif?: boolean;
+	showSts?: boolean;
+	showNaSts?: boolean;
 	tanggalCetak: string;
 	mapelList: RaporSisipanMapelItem[];
 	ketidakhadiran: {
@@ -70,8 +81,20 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 	const kepalaStatus =
 		data.kepalaSekolah.statusKepalaSekolah === 'plt' ? 'Plt. Kepala Sekolah' : 'Kepala Sekolah';
 
-	const maxF = Math.max(1, data.maxFormatif || 4);
-	const maxS = Math.max(1, data.maxSumatif || 3);
+	// Nomenklatur baru:
+	// - Tugas = maxTugas / maxFormatif lama (default 4)
+	// - Formatif = maxSumatif lama (default 3)
+	const maxT = Math.max(1, data.maxTugas ?? data.maxFormatif ?? 4);
+	const maxF = Math.max(1, data.maxSumatif ?? 3);
+
+	const showRataTugas = data.showRataTugas !== false;
+	const showRataFormatif = data.showRataFormatif !== false;
+	const showSts = data.showSts !== false;
+	const showNaSts = data.showNaSts !== false;
+
+	const colTugas = maxT + (showRataTugas ? 1 : 0);
+	const colFormatif = maxF + (showRataFormatif ? 1 : 0);
+	const totalTableCols = 2 + colTugas + colFormatif + (showSts ? 1 : 0) + (showNaSts ? 1 : 0);
 
 	const kelompokMap: Record<string, RaporSisipanMapelItem[]> = {};
 	for (const m of data.mapelList) {
@@ -279,16 +302,16 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 		<tr>
 			<th rowspan="2" style="width: 24px;">No</th>
 			<th rowspan="2" style="width: 175px;">Mata Pelajaran</th>
-			<th colspan="${maxF + 1}">Formatif</th>
-			<th colspan="${maxS + 1}">Sumatif</th>
-			<th rowspan="2" style="width: 42px;">STS</th>
-			<th rowspan="2" style="width: 48px;">NA STS</th>
+			<th colspan="${colTugas}">Tugas</th>
+			<th colspan="${colFormatif}">Formatif</th>
+			${showSts ? `<th rowspan="2" style="width: 42px;">STS</th>` : ''}
+			${showNaSts ? `<th rowspan="2" style="width: 48px;">NA STS</th>` : ''}
 		</tr>
 		<tr>
+			${Array.from({ length: maxT }, (_, i) => `<th style="width: 28px;">T${i + 1}</th>`).join('')}
+			${showRataTugas ? `<th style="width: 36px;">Rata</th>` : ''}
 			${Array.from({ length: maxF }, (_, i) => `<th style="width: 28px;">F${i + 1}</th>`).join('')}
-			<th style="width: 36px;">Rata</th>
-			${Array.from({ length: maxS }, (_, i) => `<th style="width: 28px;">S${i + 1}</th>`).join('')}
-			<th style="width: 36px;">Rata</th>
+			${showRataFormatif ? `<th style="width: 36px;">Rata</th>` : ''}
 		</tr>
 	</thead>
 	<tbody>
@@ -299,38 +322,41 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 				const letter = String.fromCharCode(65 + gIdx);
 				const groupHeader = `
 		<tr class="group-header">
-			<td colspan="${6 + maxF + maxS}" style="font-weight: bold; background-color: #f1f5f9; text-align: left; padding: 3px 6px; font-size: 8pt; text-transform: uppercase;">
+			<td colspan="${totalTableCols}" style="font-weight: bold; background-color: #f1f5f9; text-align: left; padding: 3px 6px; font-size: 8pt; text-transform: uppercase;">
 				${letter}. ${escHtml(jenisLabelText[jenis] || jenis)}
 			</td>
 		</tr>`;
 				const items = group
-					.map(
-						(m, i) => `
+					.map((m, i) => {
+						const tugasList = m.tugasValues ?? m.formatifValues ?? [];
+						const formatifList = m.sumatifValues ?? [];
+						const rataTugasVal = m.rataTugas ?? m.rataFormatif;
+						const rataFormatifVal = m.rataSumatif;
+
+						return `
 		<tr>
 			<td class="text-center">${i + 1}</td>
 			<td>
 				<div class="font-bold">${escHtml(m.mataPelajaran)}</div>
 			</td>
-			${m.formatifValues
+			${tugasList
 				.map(
 					(v) =>
 						`<td class="text-center ${v === 'X' ? 'cell-x' : ''}">${v != null && v !== '' ? v : '-'}</td>`
 				)
 				.join('')}
-			<td class="text-center font-bold">${m.rataFormatif != null ? m.rataFormatif : '-'}</td>
-			${m.sumatifValues
+			${showRataTugas ? `<td class="text-center font-bold">${rataTugasVal != null ? rataTugasVal : '-'}</td>` : ''}
+			${formatifList
 				.map(
 					(v) =>
 						`<td class="text-center ${v === 'X' ? 'cell-x' : ''}">${v != null && v !== '' ? v : '-'}</td>`
 				)
 				.join('')}
-			<td class="text-center font-bold">${m.rataSumatif != null ? m.rataSumatif : '-'}</td>
-			<td class="text-center font-bold">${m.sts != null ? m.sts : '-'}</td>
-			<td class="text-center font-bold" style="background-color: #f8fafc; font-size: 8.5pt;">
-				${m.nilaiAkhirRts != null ? m.nilaiAkhirRts : '-'}
-			</td>
-		</tr>`
-					)
+			${showRataFormatif ? `<td class="text-center font-bold">${rataFormatifVal != null ? rataFormatifVal : '-'}</td>` : ''}
+			${showSts ? `<td class="text-center font-bold">${m.sts != null ? m.sts : '-'}</td>` : ''}
+			${showNaSts ? `<td class="text-center font-bold" style="background-color: #f8fafc; font-size: 8.5pt;">${m.nilaiAkhirRts != null ? m.nilaiAkhirRts : '-'}</td>` : ''}
+		</tr>`;
+					})
 					.join('');
 				return groupHeader + items;
 			})

@@ -421,16 +421,16 @@
 			</div>
 			<div class="flex items-center gap-2">
 				<select class="select select-xs bg-base-100" bind:value={quickFillColumn}>
-					<option value="all_formatif">Semua Tugas Formatif Kosong</option>
-					<option value="all_sumatif">Semua Ulangan Sumatif Kosong</option>
+					<option value="all_formatif">Semua Tugas Kosong</option>
+					<option value="all_sumatif">Semua Formatif Materi Kosong</option>
 					{#if adaStsTes}
 						<option value="sts_tes">STS Tes</option>
 					{/if}
 					{#each komponenFormatif as f (f.kode)}
-						<option value="F_{f.kode}">Formatif: [{f.kode}] {f.nama}</option>
+						<option value="F_{f.kode}">Tugas: [{f.kode}] {f.nama}</option>
 					{/each}
 					{#each komponenSumatif as s (s.kode)}
-						<option value="S_{s.kode}">Sumatif: [{s.kode}] {s.lingkupMateri}</option>
+						<option value="S_{s.kode}">Formatif: [{s.kode}] {s.lingkupMateri}</option>
 					{/each}
 				</select>
 				<input
@@ -463,10 +463,10 @@
 		</div>
 		<div class="flex items-center gap-3">
 			<span class="inline-flex items-center gap-1">
-				<span class="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span> Formatif
+				<span class="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span> Tugas
 			</span>
 			<span class="inline-flex items-center gap-1">
-				<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Sumatif TP ({bobotSumatif}%)
+				<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Formatif ({bobotSumatif}%)
 			</span>
 			<span class="inline-flex items-center gap-1">
 				<span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> STS ({bobotSts}%)
@@ -488,20 +488,20 @@
 						Nama Peserta Didik
 					</th>
 
-					<!-- KELOMPOK FORMATIF -->
+					<!-- KELOMPOK TUGAS -->
 					<th
 						colspan={komponenFormatif.length + 1}
 						class="text-center bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-r border-base-300 py-1.5"
 					>
-						ASESMEN FORMATIF (TUGAS HARIAN)
+						TUGAS
 					</th>
 
-					<!-- KELOMPOK SUMATIF TP -->
+					<!-- KELOMPOK FORMATIF TP -->
 					<th
 						colspan={komponenSumatif.length + 1}
 						class="text-center bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-r border-base-300 py-1.5"
 					>
-						ASESMEN SUMATIF LINGKUP MATERI ({bobotSumatif}%)
+						ASESMEN FORMATIF LINGKUP MATERI ({bobotSumatif}%)
 					</th>
 
 					<!-- KELOMPOK STS -->
@@ -530,7 +530,7 @@
 				<tr
 					class="bg-base-200 text-base-content/80 text-[11px] font-semibold border-b border-base-300"
 				>
-					<!-- Formatif Sub-cols -->
+					<!-- Tugas Sub-cols -->
 					{#each komponenFormatif as f (f.kode)}
 						<th class="text-center min-w-14 border-r border-base-200 py-1.5" title={f.nama}>
 							{f.kode}
@@ -539,10 +539,10 @@
 					<th
 						class="text-center min-w-14 bg-indigo-500/5 text-indigo-700 dark:text-indigo-400 font-bold border-r border-base-300"
 					>
-						Rata F
+						Rata T
 					</th>
 
-					<!-- Sumatif Sub-cols -->
+					<!-- Formatif Sub-cols -->
 					{#each komponenSumatif as s (s.kode)}
 						<th
 							class="text-center min-w-14 border-r border-base-200 py-1.5"
@@ -554,7 +554,7 @@
 					<th
 						class="text-center min-w-14 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400 font-bold border-r border-base-300"
 					>
-						Rata S
+						Rata F
 					</th>
 
 					<!-- STS Sub-cols -->

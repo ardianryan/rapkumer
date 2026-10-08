@@ -189,6 +189,11 @@ export const tableSekolah = sqliteTable('sekolah', {
 	// Batas maksimal kolom asesmen formatif & sumatif pada rapor sisipan tengah semester (STS)
 	rtsMaxFormatif: int().default(4).notNull(),
 	rtsMaxSumatif: int().default(3).notNull(),
+	// Pengaturan visibilitas kolom cetak rapor sisipan (kebijakan sekolah, hanya admin)
+	rtsShowRataTugas: int().default(1).notNull(),
+	rtsShowRataFormatif: int().default(1).notNull(),
+	rtsShowSts: int().default(1).notNull(),
+	rtsShowNaSts: int().default(1).notNull(),
 	// Daftar path menu yang disembunyikan untuk guru/non-admin
 	hiddenMenuPaths: text({ mode: 'json' }).$type<string[]>().default([]).notNull(),
 	...audit

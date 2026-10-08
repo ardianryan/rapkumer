@@ -214,10 +214,7 @@
 					<Icon name="sparkles" />
 					Ambil API Key
 				</a>
-				<a
-					href={resolve('/pengaturan')}
-					class="btn btn-xs btn-outline shadow-none"
-				>
+				<a href={resolve('/pengaturan')} class="btn btn-xs btn-outline shadow-none">
 					Ke Pengaturan
 				</a>
 			</div>

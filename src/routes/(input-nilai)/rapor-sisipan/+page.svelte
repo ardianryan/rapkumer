@@ -16,11 +16,19 @@
 	let adminConfigOpen = $state(false);
 	let adminMaxFormatif = $state(4);
 	let adminMaxSumatif = $state(3);
+	let adminShowRataTugas = $state(true);
+	let adminShowRataFormatif = $state(true);
+	let adminShowSts = $state(true);
+	let adminShowNaSts = $state(true);
 	let isSavingAdminConfig = $state(false);
 
 	$effect(() => {
 		if (data.maxFormatif) adminMaxFormatif = data.maxFormatif;
 		if (data.maxSumatif) adminMaxSumatif = data.maxSumatif;
+		if (data.showRataTugas !== undefined) adminShowRataTugas = data.showRataTugas;
+		if (data.showRataFormatif !== undefined) adminShowRataFormatif = data.showRataFormatif;
+		if (data.showSts !== undefined) adminShowSts = data.showSts;
+		if (data.showNaSts !== undefined) adminShowNaSts = data.showNaSts;
 	});
 
 	const kelasAktif = $derived(data.kelasAktif);
@@ -72,12 +80,17 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					maxFormatif: adminMaxFormatif,
-					maxSumatif: adminMaxSumatif
+					maxSumatif: adminMaxSumatif,
+					maxTugas: adminMaxFormatif,
+					showRataTugas: adminShowRataTugas,
+					showRataFormatif: adminShowRataFormatif,
+					showSts: adminShowSts,
+					showNaSts: adminShowNaSts
 				})
 			});
 			const json = await res.json();
 			if (!res.ok) throw new Error(json.error || 'Gagal menyimpan konfigurasi');
-			toast('Aturan batas asesmen berhasil diperbarui', 'success');
+			toast('Aturan asesmen dan format cetak rapor berhasil diperbarui', 'success');
 			adminConfigOpen = false;
 			await reloadData();
 		} catch (err) {
@@ -99,8 +112,8 @@
 					</h2>
 				</div>
 				<p class="text-xs text-base-content/70 mt-1">
-					Pengisian asesmen formatif (tugas harian) & sumatif (ulangan materi) dinamis per mata
-					pelajaran, matriks kelas terpadu, dan cetak laporan paruh semester.
+					Pengisian asesmen tugas harian & formatif lingkup materi dinamis per mata pelajaran,
+					matriks kelas terpadu, dan cetak laporan paruh semester.
 				</p>
 			</div>
 
@@ -113,12 +126,16 @@
 						onclick={() => {
 							adminMaxFormatif = data.maxFormatif ?? 4;
 							adminMaxSumatif = data.maxSumatif ?? 3;
+							adminShowRataTugas = data.showRataTugas ?? true;
+							adminShowRataFormatif = data.showRataFormatif ?? true;
+							adminShowSts = data.showSts ?? true;
+							adminShowNaSts = data.showNaSts ?? true;
 							adminConfigOpen = true;
 						}}
-						title="Atur batas maksimal asesmen formatif & sumatif untuk sekolah"
+						title="Atur batas maksimal asesmen & kebijakan tampilan cetak rapor sisipan untuk sekolah"
 					>
 						<Icon name="gear" />
-						Batas Asesmen (Admin)
+						Aturan Asesmen & Cetak (Admin)
 					</button>
 				{/if}
 				{#if kelasAktif && data.isWaliKelasOrAdmin}
@@ -378,47 +395,134 @@
 			</div>
 
 			<form onsubmit={handleSaveAdminConfig} class="space-y-4">
-				<div>
-					<label class="label text-xs font-semibold text-base-content" for="input-max-formatif">
-						Maksimal Formatif / Tugas Harian (F1 - Fn)
-					</label>
-					<input
-						id="input-max-formatif"
-						type="number"
-						min="1"
-						max="10"
-						class="input input-sm bg-base-200 dark:bg-base-300 w-full font-bold"
-						bind:value={adminMaxFormatif}
-						required
-					/>
-					<span class="text-[11px] text-base-content/60 mt-1 block">
-						Jumlah kolom formatif pada format cetak rapor sisipan (default: 4).
-					</span>
+				<div class="space-y-3">
+					<div
+						class="text-xs font-bold uppercase tracking-wider text-primary border-b border-base-200 pb-1"
+					>
+						1. Batas Maksimal Kolom Asesmen
+					</div>
+					<div>
+						<label class="label text-xs font-semibold text-base-content" for="input-max-formatif">
+							Maksimal Kolom Tugas (T1 - Tn)
+						</label>
+						<input
+							id="input-max-formatif"
+							type="number"
+							min="1"
+							max="10"
+							class="input input-sm bg-base-200 dark:bg-base-300 w-full font-bold"
+							bind:value={adminMaxFormatif}
+							required
+						/>
+						<span class="text-[11px] text-base-content/60 mt-1 block">
+							Jumlah kolom tugas harian pada format cetak rapor sisipan (default: 4).
+						</span>
+					</div>
+
+					<div>
+						<label class="label text-xs font-semibold text-base-content" for="input-max-sumatif">
+							Maksimal Kolom Formatif (F1 - Fn)
+						</label>
+						<input
+							id="input-max-sumatif"
+							type="number"
+							min="1"
+							max="10"
+							class="input input-sm bg-base-200 dark:bg-base-300 w-full font-bold"
+							bind:value={adminMaxSumatif}
+							required
+						/>
+						<span class="text-[11px] text-base-content/60 mt-1 block">
+							Jumlah kolom asesmen formatif materi sebelum STS pada cetak rapor (default: 3).
+						</span>
+					</div>
 				</div>
 
-				<div>
-					<label class="label text-xs font-semibold text-base-content" for="input-max-sumatif">
-						Maksimal Sumatif Lingkup Materi / UH (S1 - Sn)
-					</label>
-					<input
-						id="input-max-sumatif"
-						type="number"
-						min="1"
-						max="10"
-						class="input input-sm bg-base-200 dark:bg-base-300 w-full font-bold"
-						bind:value={adminMaxSumatif}
-						required
-					/>
-					<span class="text-[11px] text-base-content/60 mt-1 block">
-						Jumlah kolom ulangan materi sebelum STS pada cetak rapor (default: 3).
-					</span>
+				<div class="space-y-3 pt-2">
+					<div
+						class="text-xs font-bold uppercase tracking-wider text-primary border-b border-base-200 pb-1"
+					>
+						2. Kebijakan Tampilan Cetak Rapor Sisipan
+					</div>
+					<div class="space-y-2 text-xs">
+						<label
+							class="label cursor-pointer justify-start gap-3 p-1 rounded-lg hover:bg-base-200/50"
+						>
+							<input
+								type="checkbox"
+								class="checkbox checkbox-sm checkbox-primary"
+								bind:checked={adminShowRataTugas}
+							/>
+							<div>
+								<span class="font-semibold text-base-content"
+									>Tampilkan Kolom Rata-rata Tugas (Rata T)</span
+								>
+								<p class="text-[11px] text-base-content/60">
+									Sertakan kolom rata-rata tugas harian di lembar rapor.
+								</p>
+							</div>
+						</label>
+
+						<label
+							class="label cursor-pointer justify-start gap-3 p-1 rounded-lg hover:bg-base-200/50"
+						>
+							<input
+								type="checkbox"
+								class="checkbox checkbox-sm checkbox-primary"
+								bind:checked={adminShowRataFormatif}
+							/>
+							<div>
+								<span class="font-semibold text-base-content"
+									>Tampilkan Kolom Rata-rata Formatif (Rata F)</span
+								>
+								<p class="text-[11px] text-base-content/60">
+									Sertakan kolom rata-rata nilai formatif materi di lembar rapor.
+								</p>
+							</div>
+						</label>
+
+						<label
+							class="label cursor-pointer justify-start gap-3 p-1 rounded-lg hover:bg-base-200/50"
+						>
+							<input
+								type="checkbox"
+								class="checkbox checkbox-sm checkbox-primary"
+								bind:checked={adminShowSts}
+							/>
+							<div>
+								<span class="font-semibold text-base-content">Tampilkan Kolom Nilai STS</span>
+								<p class="text-[11px] text-base-content/60">
+									Matikan jika sekolah memiliki kebijakan tidak melaksanakan tes STS.
+								</p>
+							</div>
+						</label>
+
+						<label
+							class="label cursor-pointer justify-start gap-3 p-1 rounded-lg hover:bg-base-200/50"
+						>
+							<input
+								type="checkbox"
+								class="checkbox checkbox-sm checkbox-primary"
+								bind:checked={adminShowNaSts}
+							/>
+							<div>
+								<span class="font-semibold text-base-content"
+									>Tampilkan Kolom NA STS (Nilai Akhir)</span
+								>
+								<p class="text-[11px] text-base-content/60">
+									Matikan jika sekolah hanya menghendaki nilai capaian murni tanpa nilai akhir.
+								</p>
+							</div>
+						</label>
+					</div>
 				</div>
 
 				<div class="alert alert-info text-xs py-2 px-3 rounded-lg flex items-start gap-2">
 					<Icon name="info" />
 					<span>
-						Jika guru melaksanakan kurang dari batas ini, kolom yang tidak dilaksanakan akan
-						otomatis disilang (<strong>X</strong>) pada lembar rapor.
+						Kebijakan ini dikunci oleh Administrator dan berlaku untuk seluruh kelas saat mencetak
+						rapor sisipan. Jika guru melaksanakan asesmen kurang dari batas maksimal, kolom kosong
+						akan otomatis bertanda (<strong>X</strong>).
 					</span>
 				</div>
 

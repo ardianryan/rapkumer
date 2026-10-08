@@ -145,7 +145,8 @@
 						</button>
 					</label>
 					<p class="text-base-content/70 mt-1 text-xs">
-						Kunci API Gemini biasanya diawali dengan <code>AIzaSy...</code>. Masukkan kunci baru untuk menyimpan.
+						Kunci API Gemini biasanya diawali dengan <code>AIzaSy...</code>. Masukkan kunci baru
+						untuk menyimpan.
 					</p>
 				</div>
 			</fieldset>

@@ -17,13 +17,13 @@ const DEFAULT_MAPEL_CODES: Record<string, string> = {
 	'pendidikan pancasila': 'PP',
 	'pendidikan pancasila dan kewarganegaraan': 'PPKN',
 	'bahasa indonesia': 'BIND',
-	'matematika': 'MTK',
+	matematika: 'MTK',
 	'matematika tingkat lanjut': 'MTK-TL',
 	'bahasa inggris': 'BING',
 	'bahasa inggris tingkat lanjut': 'BING-TL',
 	'pendidikan jasmani, olahraga, dan kesehatan': 'PJOK',
 	'pendidikan jasmani olahraga dan kesehatan': 'PJOK',
-	'sejarah': 'SEJ',
+	sejarah: 'SEJ',
 	'sejarah tingkat lanjut': 'SEJ-TL',
 	'sejarah indonesia': 'SEJIN',
 	'seni budaya': 'SBD',
@@ -32,17 +32,17 @@ const DEFAULT_MAPEL_CODES: Record<string, string> = {
 	'seni tari': 'STAR',
 	'seni teater': 'STET',
 	'prakarya dan kewirausahaan': 'PKWU',
-	'prakarya': 'PKY',
-	'informatika': 'INF',
+	prakarya: 'PKY',
+	informatika: 'INF',
 	'ilmu pengetahuan alam': 'IPA',
 	'ilmu pengetahuan sosial': 'IPS',
-	'biologi': 'BIO',
-	'fisika': 'FIS',
-	'kimia': 'KIM',
-	'sosiologi': 'SOS',
-	'ekonomi': 'EKO',
-	'geografi': 'GEO',
-	'antropologi': 'ANT',
+	biologi: 'BIO',
+	fisika: 'FIS',
+	kimia: 'KIM',
+	sosiologi: 'SOS',
+	ekonomi: 'EKO',
+	geografi: 'GEO',
+	antropologi: 'ANT',
 	'bahasa daerah': 'BD',
 	'bahasa jawa': 'BJAW',
 	'bahasa sunda': 'BSUN',
@@ -59,7 +59,10 @@ const DEFAULT_MAPEL_CODES: Record<string, string> = {
 };
 
 function normalizeName(name: string): string {
-	return name.trim().toLowerCase().replace(/[\s\-_]+/g, ' ');
+	return name
+		.trim()
+		.toLowerCase()
+		.replace(/[\s\-_]+/g, ' ');
 }
 
 function isNonRaporSubject(name: string): boolean {
@@ -111,7 +114,10 @@ export const POST: RequestHandler = async ({ locals }) => {
 	// Hanya admin, kepala sekolah, atau pengguna berwenang yang dapat menjalankan
 	const allowedRoles = ['admin', 'kepala_sekolah'];
 	if (!allowedRoles.includes(user.type)) {
-		return json({ error: 'Hanya administrator yang dapat men-generate kode mata pelajaran se-sekolah.' }, { status: 403 });
+		return json(
+			{ error: 'Hanya administrator yang dapat men-generate kode mata pelajaran se-sekolah.' },
+			{ status: 403 }
+		);
 	}
 
 	const sekolah = locals.sekolah;
@@ -160,7 +166,10 @@ PENTING:
 Format keluaran WAJIB JSON murni tanpa format lain:
 {"codes": [{"nama": "...", "kode": "..." | null}]}`;
 
-			const base = (aiSettings.baseUrl || 'https://generativelanguage.googleapis.com').replace(/\/+$/, '');
+			const base = (aiSettings.baseUrl || 'https://generativelanguage.googleapis.com').replace(
+				/\/+$/,
+				''
+			);
 			const isGemini = base.includes('generativelanguage.googleapis.com');
 			const endpoint = isGemini
 				? `${base}/v1beta/models/${aiSettings.model}:generateContent`
@@ -206,7 +215,11 @@ Format keluaran WAJIB JSON murni tanpa format lain:
 					? body?.candidates?.[0]?.content?.parts?.[0]?.text
 					: body?.choices?.[0]?.message?.content;
 				if (text) {
-					const cleaned = text.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+					const cleaned = text
+						.trim()
+						.replace(/^```(?:json)?/i, '')
+						.replace(/```$/, '')
+						.trim();
 					const parsed = JSON.parse(cleaned);
 					const items = parsed.codes || parsed;
 					if (Array.isArray(items)) {
@@ -239,7 +252,7 @@ Format keluaran WAJIB JSON murni tanpa format lain:
 	let updatedCount = 0;
 	for (const [name, kode] of nameToCodeMap.entries()) {
 		const isNonRapor = isNonRaporSubject(name);
-		const effectiveKode = isNonRapor ? null : (kode?.trim() ? kode.trim().toUpperCase() : null);
+		const effectiveKode = isNonRapor ? null : kode?.trim() ? kode.trim().toUpperCase() : null;
 
 		// Update seluruh mapel dengan nama ini pada kelas-kelas di sekolah ini
 		await db

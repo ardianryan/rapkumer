@@ -207,6 +207,11 @@ export const tableSekolah = pgTable('sekolah', {
 	// Batas maksimal kolom asesmen formatif & sumatif pada rapor sisipan tengah semester (STS)
 	rtsMaxFormatif: integer().default(4).notNull(),
 	rtsMaxSumatif: integer().default(3).notNull(),
+	// Pengaturan visibilitas kolom cetak rapor sisipan (kebijakan sekolah, hanya admin)
+	rtsShowRataTugas: integer().default(1).notNull(),
+	rtsShowRataFormatif: integer().default(1).notNull(),
+	rtsShowSts: integer().default(1).notNull(),
+	rtsShowNaSts: integer().default(1).notNull(),
 	// Daftar path menu yang disembunyikan untuk guru/non-admin
 	hiddenMenuPaths: jsonb().$type<string[]>().default([]).notNull(),
 	...audit
