@@ -3,6 +3,7 @@ import { tableKelas, tableMurid } from '$lib/server/db/schema';
 import { and, asc, eq } from 'drizzle-orm';
 import { getRaporSisipanDataForStudent } from '$lib/server/pdf/rapor-sisipan-preview';
 import { renderRaporSisipanHTML } from '$lib/server/pdf/templates/rapor-sisipan';
+import { isWaliOfKelas } from '$lib/server/kelas-akses';
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
@@ -11,10 +12,12 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 		throw redirect(303, '/login');
 	}
 
-	const user = locals.user;
+	const { kelasAktif, daftarKelas, user: parentUser } = await parent();
+	const user = parentUser ?? locals.user;
 	const typedUser = user as {
 		type?: string;
 		id?: number;
+		pegawaiId?: number | null;
 		kelasId?: number | null;
 		ownKelasIds?: number[] | null;
 	};
@@ -28,7 +31,6 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 		throw redirect(303, '/forbidden?required=wali_kelas');
 	}
 
-	const { kelasAktif, daftarKelas } = await parent();
 	const sekolah = locals.sekolah;
 	const meta: PageMeta = { title: 'Cetak Rapor Sisipan (STS)' };
 
@@ -49,7 +51,10 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 		typedUser.type === 'admin' || typedUser.type === 'kepala_sekolah'
 			? (daftarKelas ?? [])
 			: (daftarKelas ?? []).filter(
-					(k) => k.id === typedUser.kelasId || typedUser.ownKelasIds?.includes(k.id)
+					(k) =>
+						k.id === typedUser.kelasId ||
+						typedUser.ownKelasIds?.includes(k.id) ||
+						(typedUser.pegawaiId && k.waliKelas?.id === typedUser.pegawaiId)
 				);
 
 	const requestedKelasId = Number(url.searchParams.get('kelas_id'));
@@ -93,7 +98,8 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 		typedUser.type === 'wali_kelas' &&
 		(typedUser.kelasId === kelas.id ||
 			typedUser.ownKelasIds?.includes(kelas.id) ||
-			kelas.waliKelasId === typedUser.id);
+			kelas.waliKelasId === typedUser.pegawaiId ||
+			(await isWaliOfKelas(typedUser, kelas.id)));
 	const isAllowed =
 		typedUser.type === 'admin' || typedUser.type === 'kepala_sekolah' || isWaliKelasOwn;
 

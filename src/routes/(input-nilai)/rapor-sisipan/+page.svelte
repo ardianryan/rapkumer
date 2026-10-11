@@ -229,10 +229,21 @@
 		{:else if !hasMapel}
 			<div class="alert alert-soft alert-info">
 				<Icon name="info" />
-				<span>
-					Belum ada mata pelajaran yang diampu atau ditugaskan untuk kelas ini. Hubungi admin
-					kurikulum jika Anda belum diplot sebagai guru pengampu mapel.
-				</span>
+				<div>
+					<h4 class="font-bold text-sm">Tidak Ada Mata Pelajaran yang Diampu di Kelas Ini</h4>
+					<p class="text-xs text-base-content/70 mt-0.5">
+						{#if data.isWaliKelasOrAdmin}
+							Sebagai Wali Kelas, Anda tidak tercatat mengajar mata pelajaran di kelas ini, namun
+							Anda dapat memantau progres pengisian nilai guru lain melalui tab <strong
+								>Monitoring Capaian</strong
+							>
+							atau mengisi kehadiran di tab <strong>Catatan Wali & Presensi</strong>.
+						{:else}
+							Anda belum tercatat sebagai guru pengampu mata pelajaran di kelas ini. Hubungi
+							administrator jika penugasan belum sesuai.
+						{/if}
+					</p>
+				</div>
 			</div>
 		{:else}
 			<div class="space-y-4">
@@ -255,14 +266,20 @@
 
 					{#if selectedMapel}
 						<div class="flex items-center gap-2">
-							<button
-								type="button"
-								class="btn btn-sm btn-soft btn-secondary"
-								onclick={() => (setupOpen = true)}
-							>
-								<Icon name="gear" />
-								Atur Komponen Asesmen
-							</button>
+							{#if data.canEditSelectedMapel}
+								<button
+									type="button"
+									class="btn btn-sm btn-soft btn-secondary font-semibold"
+									onclick={() => (setupOpen = true)}
+								>
+									<Icon name="gear" />
+									Atur Komponen Asesmen
+								</button>
+							{:else}
+								<span class="badge badge-sm badge-ghost text-base-content/70 font-medium">
+									Mode Pantau (Pengampu: {selectedMapel.guruNama || 'Belum ada pengampu'})
+								</span>
+							{/if}
 						</div>
 					{/if}
 				</div>
@@ -288,13 +305,34 @@
 							</p>
 						</div>
 						<div>
-							<button type="button" class="btn btn-primary" onclick={() => (setupOpen = true)}>
-								<Icon name="gear" />
-								Mulai Atur Komponen Asesmen
-							</button>
+							{#if data.canEditSelectedMapel}
+								<button type="button" class="btn btn-primary" onclick={() => (setupOpen = true)}>
+									<Icon name="gear" />
+									Mulai Atur Komponen Asesmen
+								</button>
+							{:else}
+								<span class="badge badge-neutral text-xs">
+									Menunggu guru pengampu ({selectedMapel.guruNama || 'Guru'}) mengatur asesmen
+								</span>
+							{/if}
 						</div>
 					</div>
 				{:else if selectedMapel && setup}
+					{#if !data.canEditSelectedMapel}
+						<div
+							class="alert alert-soft alert-info text-xs py-2 px-3 rounded-lg flex items-center justify-between"
+						>
+							<div class="flex items-center gap-2">
+								<Icon name="info" class="h-4 w-4 shrink-0 text-info" />
+								<span>
+									<strong>Mode Pantau:</strong> Anda melihat rekap nilai mata pelajaran ini.
+									Penginputan dan perubahan nilai hanya dapat dilakukan oleh guru pengampu ({selectedMapel.guruNama ||
+										'Pengampu'}).
+								</span>
+							</div>
+						</div>
+					{/if}
+
 					<!-- GRID MATRIKS SPREADSHEET PENUH -->
 					<GridMatriks
 						kelasId={kelasAktif.id}
@@ -308,7 +346,7 @@
 						bobotSts={setup.bobotSts}
 						muridList={data.daftarMurid}
 						allowSts={data.showSts}
-						canEdit={true}
+						canEdit={data.canEditSelectedMapel}
 						onSaved={reloadData}
 						onOpenSetup={() => (setupOpen = true)}
 					/>

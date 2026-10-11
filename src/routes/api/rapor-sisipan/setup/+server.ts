@@ -3,6 +3,7 @@ import { saveRtsSetup, deleteRtsSetup } from '$lib/server/rapor-sisipan/rts-serv
 import db from '$lib/server/db';
 import { tableSekolah } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
+import { canUserEditMapel } from '$lib/server/mapel-access';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	const user = locals.user;
@@ -30,6 +31,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		if (!kelasId || !mataPelajaranId) {
 			return json({ error: 'Kelas dan Mata Pelajaran harus dipilih.' }, { status: 400 });
+		}
+
+		const isAllowed = await canUserEditMapel(user, Number(kelasId), Number(mataPelajaranId));
+		if (!isAllowed) {
+			return json(
+				{ error: 'Akses ditolak. Anda bukan guru pengampu mata pelajaran ini.' },
+				{ status: 403 }
+			);
 		}
 
 		if (!Array.isArray(komponenFormatif) || komponenFormatif.length === 0) {
@@ -91,6 +100,14 @@ export const DELETE: RequestHandler = async ({ request, locals }) => {
 
 		if (!kelasId || !mataPelajaranId) {
 			return json({ error: 'Kelas dan Mata Pelajaran harus dipilih.' }, { status: 400 });
+		}
+
+		const isAllowed = await canUserEditMapel(user, Number(kelasId), Number(mataPelajaranId));
+		if (!isAllowed) {
+			return json(
+				{ error: 'Akses ditolak. Anda bukan guru pengampu mata pelajaran ini.' },
+				{ status: 403 }
+			);
 		}
 
 		await deleteRtsSetup(Number(kelasId), Number(mataPelajaranId), sekolah.id);

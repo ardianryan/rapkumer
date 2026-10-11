@@ -230,3 +230,18 @@ export async function bolehAksesMapel(
 	const akses = await getAksesMapelUser(user, mapel.kelasId);
 	return akses.ids.has(mapel.id) || akses.names.has(norm(mapel.nama));
 }
+
+/**
+ * Validasi otorisasi apakah user berhak mengedit / menginput nilai pada mapel tertentu di suatu kelas.
+ * Hanya Admin, Kepala Sekolah, atau guru pengampu yang diizinkan.
+ */
+export async function canUserEditMapel(
+	user: { id?: number; type?: string; pegawaiId?: number | null } | null | undefined,
+	kelasId: number,
+	mataPelajaranId: number
+): Promise<boolean> {
+	if (!user?.id) return false;
+	if (user.type === 'admin' || user.type === 'kepala_sekolah') return true;
+	const akses = await getAksesMapelUser({ id: user.id, pegawaiId: user.pegawaiId }, kelasId);
+	return akses.ids.has(mataPelajaranId);
+}

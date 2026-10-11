@@ -8,7 +8,8 @@ import {
 	tableRtsNilaiSiswa,
 	tableSekolah
 } from '$lib/server/db/schema';
-import { getAksesMapelUser, needsMapelFilter } from '$lib/server/mapel-access';
+import { getAksesMapelUser } from '$lib/server/mapel-access';
+import { isWaliOfKelas } from '$lib/server/kelas-akses';
 import { and, asc, eq } from 'drizzle-orm';
 import {
 	getRtsSetup,
@@ -70,6 +71,7 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 	const typedUser = user as {
 		type?: string;
 		id?: number;
+		pegawaiId?: number | null;
 		kelasId?: number | null;
 		ownKelasIds?: number[] | null;
 	} | null;
@@ -171,8 +173,73 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 
 	const isWaliKelasOwn =
 		typedUser?.type === 'wali_kelas' &&
-		(typedUser.kelasId === kelas.id || typedUser.ownKelasIds?.includes(kelas.id));
+		(typedUser.kelasId === kelas.id ||
+			typedUser.ownKelasIds?.includes(kelas.id) ||
+			kelas.waliKelasId === typedUser.pegawaiId ||
+			(await isWaliOfKelas(typedUser, kelas.id)));
 	const isWaliKelasOrAdmin = isAdmin || typedUser?.type === 'kepala_sekolah' || isWaliKelasOwn;
+
+	// Ambil daftar murid di kelas ini terlebih dahulu untuk deteksi agama murid
+	const muridRecords = await db.query.tableMurid.findMany({
+		where: eq(tableMurid.kelasId, kelas.id),
+		orderBy: asc(tableMurid.nama)
+	});
+
+	function muridAgamaKey(agama: string | null | undefined): string | null {
+		const a = (agama ?? '').trim().toLowerCase();
+		if (a.includes('islam')) return 'islam';
+		if (a.includes('kristen') || a.includes('protestan')) return 'kristen';
+		if (a.includes('katolik')) return 'katolik';
+		if (a.includes('hindu')) return 'hindu';
+		if (a.includes('buddha') || a.includes('budha')) return 'buddha';
+		if (a.includes('konghuchu') || a.includes('khonghucu')) return 'konghuchu';
+		if (a.includes('kepercayaan')) return 'kepercayaan';
+		return null;
+	}
+
+	function isNonRaporSubject(name: string): boolean {
+		const norm = (name ?? '').trim().toLowerCase();
+		return (
+			norm.includes('bimbingan konseling') ||
+			norm.includes('bimbingan dan konseling') ||
+			norm.includes('konseling') ||
+			norm.includes('bimbingan karir') ||
+			norm.startsWith('bk ') ||
+			norm.endsWith(' bk') ||
+			norm === 'bk' ||
+			norm.includes('pembelajaran berbasis project') ||
+			norm.includes('pembelajaran berbasis proyek') ||
+			norm.includes('project based learning') ||
+			norm.includes('proyek based learning') ||
+			norm.includes('berbasis project') ||
+			norm.includes('berbasis proyek') ||
+			norm.includes('pembelajaran berbasis riset') ||
+			norm === 'pjbl' ||
+			norm === 'pbl'
+		);
+	}
+
+	function mapelAgamaKey(nama: string | null | undefined): string | null {
+		const n = (nama ?? '').trim().toLowerCase();
+		if (n.includes('islam')) return 'islam';
+		if (n.includes('kristen') || n.includes('protestan')) return 'kristen';
+		if (n.includes('katolik')) return 'katolik';
+		if (n.includes('hindu')) return 'hindu';
+		if (n.includes('buddha') || n.includes('budha')) return 'buddha';
+		if (n.includes('konghuchu') || n.includes('khonghucu')) return 'konghuchu';
+		if (n.includes('kepercayaan')) return 'kepercayaan';
+		if (n === 'pendidikan agama dan budi pekerti' || n === 'pendidikan agama') return 'umum';
+		return null;
+	}
+
+	function isKeluargaAgama(nama: string | null | undefined): boolean {
+		const n = (nama ?? '').trim().toLowerCase();
+		return n.startsWith('pendidikan agama') || n.startsWith('pendidikan kepercayaan');
+	}
+
+	const classAgamaKeys = new Set(
+		muridRecords.map((m) => muridAgamaKey(m.agama)).filter((k): k is string => Boolean(k))
+	);
 
 	// Ambil seluruh mapel di kelas ini
 	const allMapelRecords = await db.query.tableMataPelajaran.findMany({
@@ -183,19 +250,61 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 		}
 	});
 
-	// Filter mapel sesuai hak akses guru jika tipe akun "user" (guru mapel)
-	let accessibleMapels = allMapelRecords;
-	if (needsMapelFilter(user, kelas.id) && user?.id) {
-		const userAkses = await getAksesMapelUser(user as { id: number }, kelas.id);
-		accessibleMapels = allMapelRecords.filter(
-			(m) =>
-				userAkses.ids.has(m.id) ||
-				userAkses.names.has(m.nama.trim().toLowerCase()) ||
-				(m.namaLokal && userAkses.names.has(m.namaLokal.trim().toLowerCase()))
+	// Ambil seluruh data nilai & setup untuk cek apakah mapel pernah memiliki data
+	const allNilaiInKelas = await db.query.tableRtsNilaiSiswa.findMany({
+		where: eq(tableRtsNilaiSiswa.kelasId, kelas.id)
+	});
+	const mapelWithNilaiSet = new Set(allNilaiInKelas.map((n) => n.mataPelajaranId));
+	const allSetupsInKelas = await db.query.tableRtsMapelSetup.findMany({
+		where: eq(tableRtsMapelSetup.kelasId, kelas.id)
+	});
+	const setupSet = new Set(allSetupsInKelas.map((s) => s.mataPelajaranId));
+
+	// Filter mapel yang aktif dan relevan di kelas ini (hilangkan mapel non-rapor & varian agama tanpa murid)
+	const activeClassMapels = allMapelRecords.filter((m) => {
+		if (isNonRaporSubject(m.nama)) return false;
+
+		if (isKeluargaAgama(m.nama)) {
+			const agKey = mapelAgamaKey(m.nama);
+			const hasDataOrPengampu = Boolean(
+				m.pengampuId || setupSet.has(m.id) || mapelWithNilaiSet.has(m.id)
+			);
+			if (agKey && agKey !== 'umum') {
+				if (!classAgamaKeys.has(agKey) && !hasDataOrPengampu) {
+					return false;
+				}
+			} else if (agKey === 'umum' && !hasDataOrPengampu) {
+				return false;
+			}
+		}
+
+		return true;
+	});
+
+	// Ambil hak akses mapel pengguna
+	let assignedMapelIds = new Set<number>();
+	if (user?.id) {
+		const userAkses = await getAksesMapelUser(
+			{
+				id: user.id,
+				mataPelajaranId: (user as { mataPelajaranId?: number | null }).mataPelajaranId,
+				pegawaiId: (user as { pegawaiId?: number | null }).pegawaiId
+			},
+			kelas.id
 		);
+		assignedMapelIds = userAkses.ids;
 	}
 
-	const mapelOptions = accessibleMapels.map((m) => ({
+	const isFullAdmin = isAdmin || typedUser?.type === 'kepala_sekolah';
+
+	// Untuk dropdown di tab "Input Nilai Mapel":
+	// - Jika Admin / Kepala Sekolah: bisa memilih semua activeClassMapels
+	// - Jika Guru / Wali Kelas: HANYA mapel yang dia ampu di kelas ini!
+	const inputMapelOptions = isFullAdmin
+		? activeClassMapels
+		: activeClassMapels.filter((m) => assignedMapelIds.has(m.id));
+
+	const mapelOptions = inputMapelOptions.map((m) => ({
 		id: m.id,
 		nama: m.namaLokal?.trim() || m.nama,
 		guruNama: m.pengampu?.nama ?? null
@@ -203,20 +312,17 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 
 	// Tentukan mapel yang sedang dipilih
 	const requestedMapelId = Number(url.searchParams.get('mapel_id'));
-	let selectedMapelRecord = requestedMapelId
-		? accessibleMapels.find((m) => m.id === requestedMapelId)
-		: (accessibleMapels[0] ?? null);
-
-	// Jika requested mapel tidak ditemukan di accessible, gunakan fallback pertama
-	if (!selectedMapelRecord && accessibleMapels.length > 0) {
-		selectedMapelRecord = accessibleMapels[0];
+	let selectedMapelRecord: (typeof activeClassMapels)[number] | null = null;
+	if (requestedMapelId) {
+		selectedMapelRecord = activeClassMapels.find((m) => m.id === requestedMapelId) ?? null;
+	}
+	if (!selectedMapelRecord) {
+		selectedMapelRecord = inputMapelOptions[0] ?? activeClassMapels[0] ?? null;
 	}
 
-	// Ambil daftar murid di kelas ini
-	const muridRecords = await db.query.tableMurid.findMany({
-		where: eq(tableMurid.kelasId, kelas.id),
-		orderBy: asc(tableMurid.nama)
-	});
+	// Cek apakah user berhak mengedit mapel terpilih ini
+	const canEditSelectedMapel =
+		isFullAdmin || (Boolean(selectedMapelRecord) && assignedMapelIds.has(selectedMapelRecord!.id));
 
 	// Ambil data untuk mapel terpilih
 	let setup = null;
@@ -293,16 +399,8 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			};
 		});
 
-		// Progress pengisian per mapel
-		const allNilaiInKelas = await db.query.tableRtsNilaiSiswa.findMany({
-			where: eq(tableRtsNilaiSiswa.kelasId, kelas.id)
-		});
-		const allSetupsInKelas = await db.query.tableRtsMapelSetup.findMany({
-			where: eq(tableRtsMapelSetup.kelasId, kelas.id)
-		});
-		const setupSet = new Set(allSetupsInKelas.map((s) => s.mataPelajaranId));
-
-		progressList = allMapelRecords.map((m) => {
+		// Progress pengisian per mapel (menggunakan activeClassMapels yang sudah disaring)
+		progressList = activeClassMapels.map((m) => {
 			const gradedCount = allNilaiInKelas.filter(
 				(n) => n.mataPelajaranId === m.id && n.nilaiAkhirRts != null
 			).length;
@@ -316,7 +414,8 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 				isSetup: setupSet.has(m.id),
 				totalMurid,
 				muridDinilai: gradedCount,
-				persentase
+				persentase,
+				canEdit: isFullAdmin || assignedMapelIds.has(m.id)
 			};
 		});
 	}
@@ -345,6 +444,8 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 		progressList,
 		catatanWaliList,
 		isWaliKelasOrAdmin,
+		canEditSelectedMapel,
+		isUserPengampuAny: isFullAdmin || assignedMapelIds.size > 0,
 		maxFormatif,
 		maxSumatif,
 		maxTugas: maxFormatif,

@@ -9,6 +9,7 @@
 		totalMurid: number;
 		muridDinilai: number;
 		persentase: number;
+		canEdit?: boolean;
 	}
 
 	interface Props {
@@ -108,11 +109,13 @@
 				<div class="pt-2 border-t border-base-200 flex justify-end">
 					<button
 						type="button"
-						class="btn btn-xs btn-soft btn-primary w-full"
+						class="btn btn-xs btn-soft {mapel.canEdit
+							? 'btn-primary'
+							: 'btn-secondary'} w-full font-semibold"
 						onclick={() => onSelectMapel(mapel.id)}
 					>
-						<Icon name="pen" />
-						Buka / Isi Nilai Mapel
+						<Icon name={mapel.canEdit ? 'pen' : 'book'} />
+						{mapel.canEdit ? 'Buka / Isi Nilai Mapel' : 'Lihat Rekap Nilai'}
 					</button>
 				</div>
 			</div>

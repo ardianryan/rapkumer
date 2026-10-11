@@ -4,6 +4,7 @@ import { tableKelas, tableMurid } from '$lib/server/db/schema';
 import { and, asc, eq } from 'drizzle-orm';
 import { getRaporSisipanDataForStudent } from '$lib/server/pdf/rapor-sisipan-preview';
 import { generatePDF, generateBulkPDF } from '$lib/server/pdf/generate';
+import { isWaliOfKelas } from '$lib/server/kelas-akses';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	if (!locals.user) throw redirect(303, '/login');
@@ -23,6 +24,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	const typedUser = user as {
 		type?: string;
 		id?: number;
+		pegawaiId?: number | null;
 		kelasId?: number | null;
 		ownKelasIds?: number[] | null;
 	};
@@ -31,7 +33,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		typedUser.type === 'wali_kelas' &&
 		(typedUser.kelasId === kelas.id ||
 			typedUser.ownKelasIds?.includes(kelas.id) ||
-			kelas.waliKelasId === typedUser.id);
+			kelas.waliKelasId === typedUser.pegawaiId ||
+			(await isWaliOfKelas(typedUser, kelas.id)));
 	const isAllowed =
 		typedUser.type === 'admin' || typedUser.type === 'kepala_sekolah' || isWaliKelasOwn;
 
