@@ -12,7 +12,8 @@ import {
 	getAkasConfig,
 	fetchAkasStudents,
 	fetchAkasAttendanceRecap,
-	fetchAkasAttendanceDaily
+	fetchAkasAttendanceDaily,
+	fetchAkasViolations
 } from './client';
 
 export interface SyncAkasParams {
@@ -373,4 +374,178 @@ async function upsertKetidakhadiran(muridId: number, tanggal: string, keterangan
 				isNull(tableAbsensi.mataPelajaranId)
 			)
 		);
+}
+
+export interface SyncAkasViolationsResult {
+	success: boolean;
+	message: string;
+	kelasNama: string;
+	totalMurid: number;
+	totalViolations: number;
+	totalPoints: number;
+	matchedStudents: number;
+}
+
+/**
+ * Sinkronisasi data pelanggaran dan poin kedisiplinan dari AKAS ke Rapkumer untuk satu rombel/kelas.
+ * Menggunakan pencocokan berjenjang: NISN -> NIS -> Nama Lengkap Siswa.
+ */
+export async function syncViolationsFromAkas(params: {
+	sekolahId: number;
+	kelasId: number;
+	tahunAjaranId?: number;
+}): Promise<SyncAkasViolationsResult> {
+	const config = await getAkasConfig(params.sekolahId, params.tahunAjaranId);
+	if (!config.apiKey) {
+		throw new Error(
+			'API Key AKAS belum disetel. Buka Pengaturan -> Integrasi AKAS untuk menyetel API Key.'
+		);
+	}
+
+	const kelas = await db.query.tableKelas.findFirst({
+		where: and(eq(tableKelas.id, params.kelasId), eq(tableKelas.sekolahId, params.sekolahId))
+	});
+	if (!kelas) {
+		throw new Error(`Kelas dengan ID ${params.kelasId} tidak ditemukan.`);
+	}
+
+	const muridList = await db.query.tableMurid.findMany({
+		where: eq(tableMurid.kelasId, kelas.id)
+	});
+
+	// Buat Map NISN -> Murid, NIS -> Murid, dan Nama -> Murid (normalized lowercase)
+	const nisnToMurid = new Map<string, (typeof muridList)[0]>();
+	const nisToMurid = new Map<string, (typeof muridList)[0]>();
+	const namaToMurid = new Map<string, (typeof muridList)[0]>();
+
+	for (const m of muridList) {
+		if (m.nisn && m.nisn.trim()) nisnToMurid.set(m.nisn.trim(), m);
+		if (m.nis && m.nis.trim()) nisToMurid.set(m.nis.trim(), m);
+		if (m.nama && m.nama.trim()) namaToMurid.set(m.nama.trim().toLowerCase(), m);
+	}
+
+	const akasKelasName = normalizeClassName(kelas.nama);
+
+	// 1. Tarik daftar siswa AKAS untuk kelas ini (untuk mapping user_id -> { nisn, nis, nama })
+	let akasStudents: Awaited<ReturnType<typeof fetchAkasStudents>> = [];
+	try {
+		akasStudents = await fetchAkasStudents(config.baseUrl, config.apiKey, akasKelasName);
+	} catch (err) {
+		console.warn(`[AKAS Violations] Gagal tarik siswa untuk kelas ${akasKelasName}:`, err);
+	}
+
+	const akasUserIdToStudent = new Map<
+		string,
+		{ nisn?: string | null; nis?: string | null; nama?: string | null }
+	>();
+	for (const s of akasStudents) {
+		akasUserIdToStudent.set(s.id, {
+			nisn: s.nisn?.trim() || null,
+			nis: s.nis?.trim() || null,
+			nama: s.nama?.trim() || null
+		});
+	}
+
+	// 2. Tarik seluruh catatan pelanggaran AKAS untuk kelas ini
+	let akasViolations: Awaited<ReturnType<typeof fetchAkasViolations>>;
+	try {
+		akasViolations = await fetchAkasViolations(config.baseUrl, config.apiKey, {
+			kelas: akasKelasName
+		});
+	} catch (err) {
+		console.warn(`[AKAS Violations] Gagal tarik pelanggaran kelas ${akasKelasName}:`, err);
+		akasViolations = [];
+	}
+
+	// Agregasi pelanggaran per muridId Rapkumer
+	const studentStats = new Map<number, { count: number; points: number }>();
+	for (const m of muridList) {
+		studentStats.set(m.id, { count: 0, points: 0 });
+	}
+
+	let totalViolations = 0;
+	let totalPoints = 0;
+
+	for (const v of akasViolations) {
+		const sInfo = v.student || akasUserIdToStudent.get(v.user_id);
+		const nisn = (sInfo?.nisn || '').trim();
+		const nis = (sInfo?.nis || '').trim();
+		const namaNorm = (sInfo?.nama || '').trim().toLowerCase();
+
+		// Hirarki pencocokan: NISN -> NIS -> Nama Lengkap
+		let matchedMurid = nisn ? nisnToMurid.get(nisn) : undefined;
+		if (!matchedMurid && nis) {
+			matchedMurid = nisToMurid.get(nis);
+		}
+		if (!matchedMurid && namaNorm) {
+			matchedMurid = namaToMurid.get(namaNorm);
+		}
+
+		if (matchedMurid) {
+			const stat = studentStats.get(matchedMurid.id) || { count: 0, points: 0 };
+			const pts = Number(v.type?.points || 0);
+			stat.count += 1;
+			stat.points += pts;
+			studentStats.set(matchedMurid.id, stat);
+
+			totalViolations += 1;
+			totalPoints += pts;
+		}
+	}
+
+	const nowIso = new Date().toISOString();
+
+	// 3. Simpan rekapitulasi ke tableRtsCatatanWali
+	let matchedStudents = 0;
+	for (const m of muridList) {
+		const stat = studentStats.get(m.id) || { count: 0, points: 0 };
+		if (stat.count > 0 || stat.points > 0) {
+			matchedStudents++;
+		}
+
+		const existing = await db.query.tableRtsCatatanWali.findFirst({
+			where: and(
+				eq(tableRtsCatatanWali.sekolahId, params.sekolahId),
+				eq(tableRtsCatatanWali.kelasId, kelas.id),
+				eq(tableRtsCatatanWali.muridId, m.id)
+			)
+		});
+
+		if (existing) {
+			await db
+				.update(tableRtsCatatanWali)
+				.set({
+					jumlahPelanggaran: stat.count,
+					poinPelanggaran: stat.points,
+					akasViolationsSyncedAt: nowIso,
+					updatedAt: nowIso
+				})
+				.where(eq(tableRtsCatatanWali.id, existing.id));
+		} else {
+			await db.insert(tableRtsCatatanWali).values({
+				sekolahId: params.sekolahId,
+				kelasId: kelas.id,
+				muridId: m.id,
+				catatanWali: '',
+				sakit: 0,
+				izin: 0,
+				alfa: 0,
+				jumlahPelanggaran: stat.count,
+				poinPelanggaran: stat.points,
+				akasViolationsSyncedAt: nowIso,
+				createdAt: nowIso,
+				updatedAt: nowIso
+			});
+		}
+	}
+
+	return {
+		success: true,
+		message: `Berhasil menyinkronkan data pelanggaran AKAS untuk kelas ${kelas.nama} (${totalViolations} pelanggaran, total ${totalPoints} poin).`,
+		kelasNama: kelas.nama,
+		totalMurid: muridList.length,
+		totalViolations,
+		totalPoints,
+		matchedStudents
+	};
 }

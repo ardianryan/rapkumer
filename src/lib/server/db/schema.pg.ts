@@ -1985,6 +1985,9 @@ export const tableRtsCatatanWali = pgTable(
 		sakit: integer(),
 		izin: integer(),
 		alfa: integer(),
+		jumlahPelanggaran: integer().default(0),
+		poinPelanggaran: integer().default(0),
+		akasViolationsSyncedAt: text(),
 		...audit
 	},
 	(table) => [

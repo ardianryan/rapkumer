@@ -1,4 +1,5 @@
 <script lang="ts">
+	/* eslint-disable svelte/no-navigation-without-resolve */
 	import Icon from '$lib/components/icon.svelte';
 	import { toast } from '$lib/components/toast.svelte';
 
@@ -11,17 +12,28 @@
 		sakit: number;
 		izin: number;
 		alfa: number;
+		jumlahPelanggaran?: number;
+		poinPelanggaran?: number;
+		akasViolationsSyncedAt?: string | null;
 	}
 
 	interface Props {
 		kelasId: number;
 		kelasNama: string;
 		items: CatatanWaliRow[];
+		akasBaseUrl?: string;
 		canEdit?: boolean;
 		onSaved?: () => void;
 	}
 
-	let { kelasId, kelasNama, items, canEdit = true, onSaved }: Props = $props();
+	let {
+		kelasId,
+		kelasNama,
+		items,
+		akasBaseUrl = 'https://akas.smage.my.id',
+		canEdit = true,
+		onSaved
+	}: Props = $props();
 
 	// svelte-ignore state_referenced_locally
 	let rows = $state(
@@ -33,12 +45,16 @@
 			catatanWali: it.catatanWali || '',
 			sakit: it.sakit || 0,
 			izin: it.izin || 0,
-			alfa: it.alfa || 0
+			alfa: it.alfa || 0,
+			jumlahPelanggaran: it.jumlahPelanggaran || 0,
+			poinPelanggaran: it.poinPelanggaran || 0,
+			akasViolationsSyncedAt: it.akasViolationsSyncedAt || null
 		}))
 	);
 
 	let isSaving = $state(false);
 	let isSyncing = $state(false);
+	let isSyncingAkas = $state(false);
 
 	async function handleSyncPresensi() {
 		if (!canEdit) return;
@@ -58,6 +74,27 @@
 			toast((err as Error).message, 'error');
 		} finally {
 			isSyncing = false;
+		}
+	}
+
+	async function handleSyncPelanggaranAkas() {
+		if (!canEdit) return;
+		isSyncingAkas = true;
+		try {
+			const res = await fetch('/api/rapor-sisipan/sinkron-pelanggaran-akas', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ kelasId })
+			});
+			const data = await res.json();
+			if (!res.ok) throw new Error(data.error || 'Gagal menyinkronkan data pelanggaran AKAS.');
+
+			toast(data.message || 'Data pelanggaran AKAS berhasil diperbarui!', 'success');
+			onSaved?.();
+		} catch (err) {
+			toast((err as Error).message, 'error');
+		} finally {
+			isSyncingAkas = false;
 		}
 	}
 
@@ -106,7 +143,23 @@
 			</p>
 		</div>
 
-		<div class="flex items-center gap-2">
+		<div class="flex flex-wrap items-center gap-2">
+			<button
+				type="button"
+				class="btn btn-sm btn-soft btn-warning"
+				onclick={handleSyncPelanggaranAkas}
+				disabled={!canEdit || isSyncingAkas}
+				title="Tarik rekapitulasi jumlah & poin pelanggaran terbaru dari AKAS"
+			>
+				{#if isSyncingAkas}
+					<span class="loading loading-spinner loading-xs"></span>
+					Menarik AKAS...
+				{:else}
+					<Icon name="repeat" />
+					Tarik Pelanggaran AKAS
+				{/if}
+			</button>
+
 			<button
 				type="button"
 				class="btn btn-sm btn-soft btn-secondary"
@@ -140,6 +193,36 @@
 		</div>
 	</div>
 
+	<!-- BANNER INFORMASI INTEGRASI AKAS -->
+	<div
+		class="alert bg-base-100 border border-amber-500/30 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs"
+	>
+		<div class="flex items-center gap-3">
+			<div
+				class="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold shrink-0"
+			>
+				<Icon name="info" />
+			</div>
+			<div class="leading-relaxed text-base-content/80">
+				<div class="font-bold text-base-content flex items-center gap-1.5">
+					Rekapitulasi Pelanggaran & Kedisiplinan Siswa (AKAS)
+				</div>
+				Data jumlah dan poin pelanggaran disinkronkan otomatis dari aplikasi<strong>AKAS</strong>.
+				Jika ingin melihat rincian jenis pelanggaran, tanggal kejadian, catatan guru, dan tindak
+				lanjut pembinaan siswa, silakan menuju aplikasi <strong>AKAS</strong>.
+			</div>
+		</div>
+		<a
+			href={akasBaseUrl}
+			target="_blank"
+			rel="noreferrer"
+			class="btn btn-xs btn-outline btn-warning gap-1.5 font-bold shadow-none"
+		>
+			<Icon name="export" />
+			Buka Aplikasi AKAS
+		</a>
+	</div>
+
 	<!-- TABEL CATATAN WALI -->
 	<div class="bg-base-100 overflow-x-auto rounded-xl border border-base-200 shadow-md">
 		<table class="table table-sm w-full">
@@ -147,6 +230,18 @@
 				<tr class="bg-base-200 text-base-content font-bold">
 					<th class="w-12 text-center">No</th>
 					<th class="min-w-44">Nama Peserta Didik</th>
+					<th
+						class="w-24 text-center bg-amber-500/10 text-amber-700 dark:text-amber-400"
+						title="Jumlah Pelanggaran tercatat di AKAS"
+					>
+						Pelanggaran (AKAS)
+					</th>
+					<th
+						class="w-24 text-center bg-amber-500/10 text-amber-700 dark:text-amber-400"
+						title="Total akumulasi poin pelanggaran siswa di AKAS"
+					>
+						Poin (AKAS)
+					</th>
 					<th class="w-20 text-center" title="Sakit">Sakit (Hari)</th>
 					<th class="w-20 text-center" title="Izin">Izin (Hari)</th>
 					<th class="w-24 text-center" title="Tanpa Keterangan">Alfa (Hari)</th>
@@ -163,6 +258,29 @@
 								<div class="text-[10px] text-base-content/50">{r.nisn}</div>
 							{/if}
 						</td>
+
+						<!-- REKAP PELANGGARAN DARI AKAS -->
+						<td class="text-center bg-amber-500/5">
+							{#if r.jumlahPelanggaran > 0}
+								<span class="badge badge-xs badge-warning font-bold px-2 py-0.5">
+									{r.jumlahPelanggaran}x
+								</span>
+							{:else}
+								<span class="text-base-content/40 text-xs">0</span>
+							{/if}
+						</td>
+
+						<!-- POIN PELANGGARAN DARI AKAS -->
+						<td class="text-center bg-amber-500/5">
+							{#if r.poinPelanggaran > 0}
+								<span class="badge badge-xs badge-error font-bold px-2 py-0.5">
+									{r.poinPelanggaran} Poin
+								</span>
+							{:else}
+								<span class="text-emerald-600 dark:text-emerald-400 font-semibold text-xs">0</span>
+							{/if}
+						</td>
+
 						<td class="text-center">
 							<input
 								type="number"

@@ -16,6 +16,8 @@ import {
 	getRtsNilaiList,
 	getRtsCatatanWaliList
 } from '$lib/server/rapor-sisipan/rts-service';
+import { getAkasConfig } from '$lib/server/akas/client';
+import { syncViolationsFromAkas } from '$lib/server/akas/sync';
 import type { PageServerLoad } from './$types';
 
 interface MuridGridItem {
@@ -60,6 +62,9 @@ interface CatatanWaliItem {
 	sakit: number;
 	izin: number;
 	alfa: number;
+	jumlahPelanggaran: number;
+	poinPelanggaran: number;
+	akasViolationsSyncedAt: string | null;
 }
 
 export const load: PageServerLoad = async ({ parent, url, depends, locals }) => {
@@ -110,7 +115,8 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			showRataFormatif,
 			showSts,
 			showNaSts,
-			isAdmin
+			isAdmin,
+			akasBaseUrl: 'https://akas.smage.my.id'
 		};
 	}
 
@@ -141,7 +147,8 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			showRataFormatif,
 			showSts,
 			showNaSts,
-			isAdmin
+			isAdmin,
+			akasBaseUrl: 'https://akas.smage.my.id'
 		};
 	}
 
@@ -167,7 +174,16 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			isWaliKelasOrAdmin: false,
 			maxFormatif,
 			maxSumatif,
-			isAdmin
+			maxTugas: maxFormatif,
+			showRataTugas,
+			showRataFormatif,
+			showSts,
+			showNaSts,
+			availableLingkupMateri: [],
+			canEditSelectedMapel: false,
+			isUserPengampuAny: false,
+			isAdmin,
+			akasBaseUrl: 'https://akas.smage.my.id'
 		};
 	}
 
@@ -383,9 +399,28 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 	let progressList: ProgressItem[] = [];
 	let catatanWaliList: CatatanWaliItem[] = [];
 
+	// Ambil konfigurasi AKAS sekolah
+	const akasConfig = sekolah?.id ? await getAkasConfig(sekolah.id) : null;
+
 	if (isWaliKelasOrAdmin) {
 		// Catatan wali kelas
-		const catatanRecords = await getRtsCatatanWaliList(kelas.id);
+		let catatanRecords = await getRtsCatatanWaliList(kelas.id);
+
+		// Inisialisasi awal: jika data rekap AKAS belum pernah ditarik (akasViolationsSyncedAt null),
+		// dan AKAS API key tersedia, lakukan auto-pull otomatis!
+		const hasSyncedAkas = catatanRecords.some((c) => Boolean(c.akasViolationsSyncedAt));
+		if (!hasSyncedAkas && muridRecords.length > 0 && akasConfig?.apiKey) {
+			try {
+				await syncViolationsFromAkas({
+					sekolahId: sekolah.id,
+					kelasId: kelas.id
+				});
+				catatanRecords = await getRtsCatatanWaliList(kelas.id);
+			} catch (err) {
+				console.warn('[RTS AKAS Initial Sync Error]:', err);
+			}
+		}
+
 		const catatanMap = new Map(catatanRecords.map((c) => [c.muridId, c]));
 
 		catatanWaliList = muridRecords.map((m, idx) => {
@@ -398,7 +433,10 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 				catatanWali: c?.catatanWali || '',
 				sakit: c?.sakit ?? 0,
 				izin: c?.izin ?? 0,
-				alfa: c?.alfa ?? 0
+				alfa: c?.alfa ?? 0,
+				jumlahPelanggaran: c?.jumlahPelanggaran ?? 0,
+				poinPelanggaran: c?.poinPelanggaran ?? 0,
+				akasViolationsSyncedAt: c?.akasViolationsSyncedAt ?? null
 			};
 		});
 
@@ -456,6 +494,7 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 		showRataFormatif,
 		showSts,
 		showNaSts,
-		isAdmin
+		isAdmin,
+		akasBaseUrl: akasConfig?.baseUrl || 'https://akas.smage.my.id'
 	};
 };

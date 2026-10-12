@@ -14,11 +14,13 @@ import {
 import { runStartupEnsures } from '$lib/server/db/ensure-bootstrap';
 import { isAuthorizedUser, resolveRoutePermission } from './routes/pengguna/permissions';
 import { startBellScheduler } from '$lib/server/bell-scheduler';
+import { startAkasDailyScheduler } from '$lib/server/akas/scheduler';
 
 setTimeout(() => {
 	startBellScheduler().catch((e) => {
 		console.error('[hooks] bell scheduler failed to start:', e);
 	});
+	startAkasDailyScheduler();
 	runStartupEnsures().catch((e) => {
 		console.error('[hooks] startup ensures failed:', e);
 	});

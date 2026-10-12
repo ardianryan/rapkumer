@@ -361,6 +361,7 @@
 			kelasId={kelasAktif.id}
 			kelasNama={kelasAktif.nama}
 			items={data.catatanWaliList}
+			akasBaseUrl={data.akasBaseUrl}
 			canEdit={true}
 			onSaved={reloadData}
 		/>

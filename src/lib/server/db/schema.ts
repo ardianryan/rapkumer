@@ -1967,6 +1967,9 @@ export const tableRtsCatatanWali = sqliteTable(
 		sakit: int(),
 		izin: int(),
 		alfa: int(),
+		jumlahPelanggaran: int().default(0),
+		poinPelanggaran: int().default(0),
+		akasViolationsSyncedAt: text(),
 		...audit
 	},
 	(table) => [

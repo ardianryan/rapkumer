@@ -105,6 +105,9 @@ export async function ensureRaporSisipanSchema() {
 			"sakit" integer,
 			"izin" integer,
 			"alfa" integer,
+			"jumlah_pelanggaran" integer DEFAULT 0,
+			"poin_pelanggaran" integer DEFAULT 0,
+			"akas_violations_synced_at" text,
 			"created_at" text NOT NULL,
 			"updated_at" text,
 			CONSTRAINT "rts_catatan_wali_sekolah_id_sekolah_id_fk" FOREIGN KEY ("sekolah_id") REFERENCES "sekolah" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
@@ -114,4 +117,26 @@ export async function ensureRaporSisipanSchema() {
 		`CREATE UNIQUE INDEX IF NOT EXISTS "rts_catatan_wali_unique" ON "rts_catatan_wali" ("kelas_id", "murid_id")`,
 		`CREATE INDEX IF NOT EXISTS "rts_catatan_wali_murid_idx" ON "rts_catatan_wali" ("murid_id")`
 	]);
+
+	try {
+		await db.$client.execute(
+			`ALTER TABLE "rts_catatan_wali" ADD COLUMN "jumlah_pelanggaran" integer DEFAULT 0`
+		);
+	} catch {
+		// column already exists
+	}
+	try {
+		await db.$client.execute(
+			`ALTER TABLE "rts_catatan_wali" ADD COLUMN "poin_pelanggaran" integer DEFAULT 0`
+		);
+	} catch {
+		// column already exists
+	}
+	try {
+		await db.$client.execute(
+			`ALTER TABLE "rts_catatan_wali" ADD COLUMN "akas_violations_synced_at" text`
+		);
+	} catch {
+		// column already exists
+	}
 }

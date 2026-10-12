@@ -252,3 +252,78 @@ export async function fetchAkasStudents(baseUrl: string, apiKey: string, kelas?:
 
 	return allStudents;
 }
+
+export interface AkasViolationItem {
+	id: string;
+	user_id: string;
+	violation_type_id?: string;
+	violationTypeId?: string;
+	date: string;
+	description?: string | null;
+	evidence_url?: string | null;
+	kelas?: string | null;
+	type?: {
+		id: string;
+		name: string;
+		category?: string;
+		points: number;
+	} | null;
+	student?: {
+		id: string;
+		nama: string;
+		nis?: string | null;
+		nisn?: string | null;
+		kelas?: string | null;
+	} | null;
+}
+
+/**
+ * Tarik data riwayat pelanggaran dari AKAS (GET /api/v1/violations).
+ */
+export async function fetchAkasViolations(
+	baseUrl: string,
+	apiKey: string,
+	params: {
+		kelas?: string;
+		user_id?: string;
+	}
+): Promise<AkasViolationItem[]> {
+	const cleanBase = baseUrl.trim().replace(/\/+$/, '');
+	const allViolations: AkasViolationItem[] = [];
+
+	let page = 1;
+	let lastPage: number;
+
+	do {
+		const query = new URLSearchParams({
+			page: String(page),
+			per_page: '100'
+		});
+		if (params.kelas) query.set('kelas', params.kelas);
+		if (params.user_id) query.set('user_id', params.user_id);
+
+		const url = `${cleanBase}/api/v1/violations?${query.toString()}`;
+		const res = await fetch(url, {
+			method: 'GET',
+			headers: {
+				Accept: 'application/json',
+				'X-API-Key': apiKey.trim()
+			},
+			signal: AbortSignal.timeout(15000)
+		});
+
+		if (!res.ok) {
+			const errBody = await res.json().catch(() => ({}));
+			throw new Error(errBody.message || `HTTP ${res.status} saat menarik pelanggaran AKAS`);
+		}
+
+		const data = await res.json();
+		if (Array.isArray(data.data)) {
+			allViolations.push(...data.data);
+		}
+		lastPage = data.last_page || 1;
+		page++;
+	} while (page <= lastPage);
+
+	return allViolations;
+}
