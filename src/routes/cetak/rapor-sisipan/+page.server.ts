@@ -107,10 +107,13 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 		throw redirect(303, '/forbidden?required=wali_kelas');
 	}
 
-	const muridList = await db.query.tableMurid.findMany({
+	const muridListRaw = await db.query.tableMurid.findMany({
 		where: eq(tableMurid.kelasId, kelas.id),
 		orderBy: asc(tableMurid.nama)
 	});
+	const muridList = muridListRaw.sort((a, b) =>
+		a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' })
+	);
 
 	const requestedMuridId = Number(url.searchParams.get('murid_id'));
 	const selectedMuridId =

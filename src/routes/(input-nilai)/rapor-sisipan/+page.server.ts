@@ -179,11 +179,14 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			(await isWaliOfKelas(typedUser, kelas.id)));
 	const isWaliKelasOrAdmin = isAdmin || typedUser?.type === 'kepala_sekolah' || isWaliKelasOwn;
 
-	// Ambil daftar murid di kelas ini terlebih dahulu untuk deteksi agama murid
-	const muridRecords = await db.query.tableMurid.findMany({
+	// Ambil daftar murid di kelas ini terlebih dahulu untuk deteksi agama murid (urut abjad)
+	const muridRecordsRaw = await db.query.tableMurid.findMany({
 		where: eq(tableMurid.kelasId, kelas.id),
 		orderBy: asc(tableMurid.nama)
 	});
+	const muridRecords = muridRecordsRaw.sort((a, b) =>
+		a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' })
+	);
 
 	function muridAgamaKey(agama: string | null | undefined): string | null {
 		const a = (agama ?? '').trim().toLowerCase();

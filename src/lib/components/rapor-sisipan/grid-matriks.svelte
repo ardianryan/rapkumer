@@ -182,14 +182,153 @@
 		}
 	}
 
-	// Parsing input nilai agar angka 0-100 valid
+	// Parsing input nilai agar angka 0-100 valid (mendukung desimal titik dan koma khas Excel Indonesia)
 	function parseScoreInput(val: string): number | null {
-		const clean = val.trim();
+		const clean = val.trim().replace(',', '.');
 		if (!clean) return null;
 		const n = Number(clean);
 		if (Number.isNaN(n) || n < 0) return null;
 		if (n > 100) return 100;
 		return Math.round(n * 100) / 100;
+	}
+
+	// Helper untuk mengatur nilai sel berdasarkan indeks kolom matriks
+	function setCellValue(rowIndex: number, colIndex: number, rawVal: string): boolean {
+		if (rowIndex < 0 || rowIndex >= rows.length) return false;
+		const row = rows[rowIndex];
+		const parsed = parseScoreInput(rawVal);
+
+		const numFormatif = komponenFormatif.length;
+		const numSumatif = komponenSumatif.length;
+
+		// 1. Kolom Tugas / Formatif
+		if (colIndex < numFormatif) {
+			const f = komponenFormatif[colIndex];
+			if (f) {
+				row.nilaiFormatif[f.kode] = parsed;
+				return true;
+			}
+		}
+
+		// 2. Kolom Asesmen Formatif / Sumatif Materi
+		const sumatifIdx = colIndex - numFormatif;
+		if (sumatifIdx >= 0 && sumatifIdx < numSumatif) {
+			const s = komponenSumatif[sumatifIdx];
+			if (s) {
+				row.nilaiSumatif[s.kode] = parsed;
+				return true;
+			}
+		}
+
+		// 3. Kolom STS Tes
+		let currentPos = numFormatif + numSumatif;
+		if (effectiveAdaStsTes) {
+			if (colIndex === currentPos) {
+				row.stsTes = parsed;
+				return true;
+			}
+			currentPos++;
+		}
+
+		// 4. Kolom STS Non-Tes
+		if (effectiveAdaStsNonTes) {
+			if (colIndex === currentPos) {
+				row.stsNonTes = parsed;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// Handler Copy-Paste langsung dari Excel / Spreadsheet
+	function handlePaste(e: ClipboardEvent, startRowIndex: number, startColIndex: number) {
+		if (!canEdit) return;
+		const clipboardText = e.clipboardData?.getData('text/plain');
+		if (!clipboardText) return;
+
+		// Cek apakah data berisi multiple baris atau kolom (khas copy Excel)
+		// Excel memisahkan baris dengan \r\n atau \n dan kolom dengan \t
+		const hasMultipleRows = clipboardText.includes('\n');
+		const hasMultipleCols = clipboardText.includes('\t');
+
+		if (!hasMultipleRows && !hasMultipleCols) {
+			// Jika cuma 1 teks/angka tunggal tanpa newline atau tab, biarkan paste bawaan browser
+			return;
+		}
+
+		e.preventDefault();
+
+		// Pecah baris-baris
+		const rawLines = clipboardText.split(/\r\n|\r|\n/);
+		// Hapus baris terakhir jika kosong (sering terjadi saat copy dari excel ada trailing newline)
+		if (rawLines.length > 0 && rawLines[rawLines.length - 1].trim() === '') {
+			rawLines.pop();
+		}
+
+		if (rawLines.length === 0) return;
+
+		let affectedCells = 0;
+		let affectedRows = 0;
+
+		rawLines.forEach((line, lineOffset) => {
+			const targetRow = startRowIndex + lineOffset;
+			if (targetRow >= rows.length) return;
+
+			const cells = line.split('\t');
+			let rowModified = false;
+
+			cells.forEach((cellVal, colOffset) => {
+				const targetCol = startColIndex + colOffset;
+				const ok = setCellValue(targetRow, targetCol, cellVal);
+				if (ok) {
+					affectedCells++;
+					rowModified = true;
+				}
+			});
+
+			if (rowModified) {
+				affectedRows++;
+			}
+		});
+
+		if (affectedCells > 0) {
+			toast(
+				`Berhasil menempelkan ${affectedCells} nilai (${affectedRows} murid) dari Excel.`,
+				'success'
+			);
+		}
+	}
+
+	// Handler Paste ke bawah untuk Catatan Guru
+	function handlePasteCatatan(e: ClipboardEvent, startRowIndex: number) {
+		if (!canEdit) return;
+		const clipboardText = e.clipboardData?.getData('text/plain');
+		if (!clipboardText) return;
+
+		const hasMultipleRows = clipboardText.includes('\n');
+		if (!hasMultipleRows) return; // single paste bawaan browser
+
+		e.preventDefault();
+
+		const rawLines = clipboardText.split(/\r\n|\r|\n/);
+		if (rawLines.length > 0 && rawLines[rawLines.length - 1].trim() === '') {
+			rawLines.pop();
+		}
+		if (rawLines.length === 0) return;
+
+		let count = 0;
+		rawLines.forEach((line, offset) => {
+			const targetRow = startRowIndex + offset;
+			if (targetRow < rows.length) {
+				rows[targetRow].catatanGuru = line.trim();
+				count++;
+			}
+		});
+
+		if (count > 0) {
+			toast(`Berhasil menempelkan catatan untuk ${count} murid dari Excel.`, 'success');
+		}
 	}
 
 	async function handleSaveAll() {
@@ -464,14 +603,16 @@
 	{/if}
 
 	<!-- INFORMASI PETUNJUK -->
-	<div class="flex flex-wrap items-center justify-between text-xs text-base-content/70 px-1">
-		<div class="flex items-center gap-2">
-			<span
-				>💡 <em
-					>Matriks Nilai <strong>{mapelNama}</strong>. Gunakan tombol panah (↑, ↓, ←, →) atau Enter
-					untuk berpindah kotak nilai secara cepat.</em
-				></span
-			>
+	<div class="flex flex-wrap items-center justify-between text-xs text-base-content/70 px-1 gap-2">
+		<div class="flex flex-wrap items-center gap-2">
+			<span>
+				💡 <em
+					>Matriks Nilai <strong>{mapelNama}</strong>: Bisa langsung
+					<strong>Copy dari Excel</strong>
+					dan <strong>Paste (Ctrl+V)</strong> pada kotak nilai untuk mengisi otomatis ke bawah. Gunakan
+					panah (↑, ↓, ←, →) atau Enter untuk berpindah sel.</em
+				>
+			</span>
 		</div>
 		<div class="flex items-center gap-3">
 			<span class="inline-flex items-center gap-1">
@@ -627,6 +768,7 @@
 										);
 									}}
 									onkeydown={(e) => handleKeyDown(e, rIdx, colIdx)}
+									onpaste={(e) => handlePaste(e, rIdx, colIdx)}
 									disabled={!canEdit}
 								/>
 							</td>
@@ -655,6 +797,7 @@
 										);
 									}}
 									onkeydown={(e) => handleKeyDown(e, rIdx, colIdx)}
+									onpaste={(e) => handlePaste(e, rIdx, colIdx)}
 									disabled={!canEdit}
 								/>
 							</td>
@@ -681,6 +824,7 @@
 										row.stsTes = parseScoreInput((e.target as HTMLInputElement).value);
 									}}
 									onkeydown={(e) => handleKeyDown(e, rIdx, colIdx)}
+									onpaste={(e) => handlePaste(e, rIdx, colIdx)}
 									disabled={!canEdit}
 								/>
 							</td>
@@ -701,6 +845,7 @@
 										row.stsNonTes = parseScoreInput((e.target as HTMLInputElement).value);
 									}}
 									onkeydown={(e) => handleKeyDown(e, rIdx, colIdx)}
+									onpaste={(e) => handlePaste(e, rIdx, colIdx)}
 									disabled={!canEdit}
 								/>
 							</td>
@@ -729,10 +874,12 @@
 						<!-- CATATAN GURU -->
 						<td class="p-1">
 							<input
+								id="cell-catatan-{rIdx}"
 								type="text"
 								class="input input-xs bg-base-200/50 focus:bg-base-100 w-full rounded px-2"
 								placeholder="Catatan kemajuan belajar peserta didik..."
 								bind:value={row.catatanGuru}
+								onpaste={(e) => handlePasteCatatan(e, rIdx)}
 								disabled={!canEdit}
 							/>
 						</td>

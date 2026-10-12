@@ -37,10 +37,13 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		);
 	}
 
-	const muridList = await db.query.tableMurid.findMany({
+	const muridListRaw = await db.query.tableMurid.findMany({
 		where: eq(tableMurid.kelasId, kelasId),
 		orderBy: asc(tableMurid.nama)
 	});
+	const muridList = muridListRaw.sort((a, b) =>
+		a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' })
+	);
 
 	const nilaiList = await getRtsNilaiList(kelasId, mataPelajaranId);
 	const nilaiMap = new Map(nilaiList.map((n) => [n.muridId, n]));

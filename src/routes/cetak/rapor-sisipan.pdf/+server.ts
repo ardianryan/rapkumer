@@ -50,10 +50,13 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 
 	if (isBulk || muridIdParam === 'all') {
 		// Cetak seluruh siswa di kelas
-		const muridList = await db.query.tableMurid.findMany({
+		const muridListRaw = await db.query.tableMurid.findMany({
 			where: eq(tableMurid.kelasId, kelas.id),
 			orderBy: asc(tableMurid.nama)
 		});
+		const muridList = muridListRaw.sort((a, b) =>
+			a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' })
+		);
 
 		if (muridList.length === 0) {
 			throw error(400, 'Tidak ada peserta didik di kelas ini.');
