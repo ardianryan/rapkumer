@@ -1715,6 +1715,29 @@ export const tableDapodikSettingsRelations = relations(tableDapodikSettings, ({ 
 	})
 }));
 
+// Konfigurasi integrasi API ScholarGate (SMAGE ID) per sekolah (diatur via UI Pengaturan dan disimpan di DB)
+export const tableScholargateSettings = sqliteTable(
+	'scholargate_settings',
+	{
+		id: int().primaryKey({ autoIncrement: true }),
+		sekolahId: int()
+			.references(() => tableSekolah.id, { onDelete: 'cascade' })
+			.notNull(),
+		baseUrl: text(),
+		apiKey: text(),
+		referer: text(),
+		...audit
+	},
+	(table) => [unique().on(table.sekolahId)]
+);
+
+export const tableScholargateSettingsRelations = relations(tableScholargateSettings, ({ one }) => ({
+	sekolah: one(tableSekolah, {
+		fields: [tableScholargateSettings.sekolahId],
+		references: [tableSekolah.id]
+	})
+}));
+
 /**
  * Referensi mata pelajaran nasional Dapodik (endpoint getMataPelajaran).
  * Primary key = ID referensi Dapodik (mis. 400200000 = "Guru Kelas SD/MI/SLB") sehingga

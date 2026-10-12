@@ -2,6 +2,7 @@
 	/* eslint-disable svelte/no-navigation-without-resolve -- page uses links for internal navigation */
 	import FormEnhance from '$lib/components/form-enhance.svelte';
 	import Icon from '$lib/components/icon.svelte';
+	import { toast } from '$lib/components/toast.svelte';
 	import { jenisKelamin } from '$lib/statics';
 	import {
 		golonganByStatus,
@@ -31,6 +32,41 @@
 	let tanggalDiangkat = $state(profile?.tanggalDiangkat ?? '');
 	let tanggalBekerja = $state(profile?.tanggalBekerja ?? '');
 	let tanggalGajiBerkala = $state(profile?.tanggalGajiBerkala ?? '');
+
+	let syncingSmageId = $state(false);
+
+	async function handleTarikSmageId() {
+		syncingSmageId = true;
+		try {
+			const res = await fetch('/api/profil/tarik-smage-id', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' }
+			});
+
+			const json = await res.json();
+			if (!res.ok) {
+				throw new Error(json.error || 'Gagal menarik data dari SMAGE ID.');
+			}
+
+			if (json.profile) {
+				if (json.profile.namaLengkap) namaLengkap = json.profile.namaLengkap;
+				if (json.profile.nip) nip = json.profile.nip;
+				if (json.profile.tempatLahir) tempatLahir = json.profile.tempatLahir;
+				if (json.profile.tanggalLahir) tanggalLahir = json.profile.tanggalLahir;
+				if (json.profile.jenisKelamin) jenisKelaminValue = json.profile.jenisKelamin;
+			}
+
+			toast(
+				json.message || 'Profil berhasil diperbarui dan disimpan otomatis dari SMAGE ID.',
+				'success'
+			);
+		} catch (err: unknown) {
+			const msg = err instanceof Error ? err.message : String(err);
+			toast(msg, 'error');
+		} finally {
+			syncingSmageId = false;
+		}
+	}
 
 	const golonganOptions = $derived(golonganByStatus[statusKepegawaian] ?? []);
 	const jabatanOptions = $derived(golongan ? (jabatanByGolongan[golongan] ?? []) : []);
@@ -69,11 +105,30 @@
 
 <section class="card bg-base-100 rounded-lg border border-none p-6 shadow-md">
 	<div class="space-y-4">
-		<header class="space-y-2">
-			<h1 class="text-2xl font-bold">Edit Profil</h1>
-			<p class="text-base-content/70 text-sm">
-				Perbarui informasi profil pribadi Anda. Data tersimpan di akun {profile?.username ?? ''}.
-			</p>
+		<header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+			<div class="space-y-1">
+				<h1 class="text-2xl font-bold">Edit Profil</h1>
+				<p class="text-base-content/70 text-sm">
+					Perbarui informasi profil pribadi Anda. Data tersimpan di akun {profile?.username ?? ''}.
+				</p>
+			</div>
+			<div class="shrink-0">
+				<button
+					type="button"
+					class="btn btn-outline btn-primary btn-sm gap-2"
+					onclick={handleTarikSmageId}
+					disabled={syncingSmageId}
+					title="Tarik data identitas resmi dari SMAGE ID (ScholarGate) dan langsung simpan ke database"
+				>
+					{#if syncingSmageId}
+						<span class="loading loading-spinner loading-xs"></span>
+						Menarik Data...
+					{:else}
+						<Icon name="repeat" />
+						Tarik Data dari SMAGE ID
+					{/if}
+				</button>
+			</div>
 		</header>
 
 		<FormEnhance action="?/save">

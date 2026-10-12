@@ -40,6 +40,7 @@ import {
 import { isR2Configured } from '$lib/server/storage-r2';
 import { resolveSekolahAcademicContext } from '$lib/server/db/academic';
 import { getAkasConfig, maskAkasApiKey } from '$lib/server/akas/client';
+import { getScholargateConfig, maskScholargateApiKey } from '$lib/server/scholargate/client';
 import path from 'node:path';
 
 interface AddressEntry {
@@ -153,6 +154,17 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		};
 	}
 
+	let scholargateData = null;
+	if (isAdminOrKepalaSekolah && locals.sekolah?.id) {
+		const sgConfig = await getScholargateConfig(locals.sekolah.id);
+		scholargateData = {
+			baseUrl: sgConfig.baseUrl,
+			referer: sgConfig.referer,
+			maskedKey: sgConfig.apiKey ? maskScholargateApiKey(sgConfig.apiKey) : null,
+			keySet: Boolean(sgConfig.apiKey)
+		};
+	}
+
 	// Personal AI key card is offered to every non-admin role (guru mapel,
 	// wali kelas, wali asuh) — each user must bring their own key.
 	const isGuruOrUser =
@@ -186,7 +198,8 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 			envKeyPresent: Boolean(process.env.GEMINI_API_KEY)
 		},
 		hiddenMenuPaths: (locals.sekolah?.hiddenMenuPaths as string[]) ?? [],
-		akas: akasData
+		akas: akasData,
+		scholargate: scholargateData
 	};
 };
 

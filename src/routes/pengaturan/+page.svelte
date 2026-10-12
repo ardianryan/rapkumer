@@ -13,6 +13,7 @@
 	import AiKeyCard from '$lib/components/settings/ai-key-card.svelte';
 	import MenuVisibilityCard from '$lib/components/settings/menu-visibility-card.svelte';
 	import AkasSettingsCard from '$lib/components/settings/akas-settings-card.svelte';
+	import ScholargateSettingsCard from '$lib/components/settings/scholargate-settings-card.svelte';
 	import type { PageData } from './$types';
 
 	const { data } = $props<{ data: PageData }>();
@@ -228,6 +229,10 @@
 
 		{#if data.akas}
 			<AkasSettingsCard akasData={data.akas} />
+		{/if}
+
+		{#if data.scholargate}
+			<ScholargateSettingsCard scholargateData={data.scholargate} />
 		{/if}
 
 		{#if user?.type === 'admin' && data.storage}
