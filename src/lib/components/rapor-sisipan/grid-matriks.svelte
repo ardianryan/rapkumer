@@ -56,20 +56,80 @@
 	const effectiveBobotSumatif = $derived(allowSts ? bobotSumatif : 100);
 	const effectiveBobotSts = $derived(allowSts ? bobotSts : 0);
 
-	// svelte-ignore state_referenced_locally
-	let rows = $state(
-		muridList.map((m, idx) => ({
+	function parseScoreRecord(rec: unknown): Record<string, number | null> {
+		if (!rec) return {};
+		if (typeof rec === 'string') {
+			try {
+				const p = JSON.parse(rec);
+				if (typeof p === 'object' && p !== null) return p;
+			} catch {
+				return {};
+			}
+		}
+		if (typeof rec === 'object' && rec !== null) {
+			return { ...(rec as Record<string, number | null>) };
+		}
+		return {};
+	}
+
+	function normalizeStudentRow(m: MuridItem, idx: number) {
+		const fObj = parseScoreRecord(m.nilaiFormatif);
+		const sObj = parseScoreRecord(m.nilaiSumatif);
+
+		// Fallback key formatif jika kode di DB berbeda (mis. F1 vs T1)
+		komponenFormatif.forEach((f, fIdx) => {
+			if (fObj[f.kode] == null) {
+				const altKeys = [`F${fIdx + 1}`, `Tugas ${fIdx + 1}`, `F_${f.kode}`, `T_${f.kode}`, f.nama];
+				for (const k of altKeys) {
+					if (fObj[k] != null) {
+						fObj[f.kode] = fObj[k];
+						break;
+					}
+				}
+			}
+		});
+
+		// Fallback key sumatif jika kode di DB berbeda (mis. S1 vs F1)
+		komponenSumatif.forEach((s, sIdx) => {
+			if (sObj[s.kode] == null) {
+				const altKeys = [
+					`S${sIdx + 1}`,
+					`LM${sIdx + 1}`,
+					`F${sIdx + 1}`,
+					`TP${sIdx + 1}`,
+					`S_${s.kode}`,
+					`F_${s.kode}`
+				];
+				for (const k of altKeys) {
+					if (sObj[k] != null) {
+						sObj[s.kode] = sObj[k];
+						break;
+					}
+				}
+			}
+		});
+
+		return {
 			muridId: m.id,
 			no: idx + 1,
 			nama: m.nama,
 			nisn: m.nisn,
-			nilaiFormatif: { ...(m.nilaiFormatif || {}) },
-			nilaiSumatif: { ...(m.nilaiSumatif || {}) },
+			nilaiFormatif: fObj,
+			nilaiSumatif: sObj,
 			stsTes: m.stsTes ?? null,
 			stsNonTes: m.stsNonTes ?? null,
 			catatanGuru: m.catatanGuru ?? ''
-		}))
-	);
+		};
+	}
+
+	// svelte-ignore state_referenced_locally
+	let rows = $state(muridList.map(normalizeStudentRow));
+
+	$effect(() => {
+		if (muridList) {
+			rows = muridList.map(normalizeStudentRow);
+		}
+	});
 
 	let isSaving = $state(false);
 	let isImporting = $state(false);

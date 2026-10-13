@@ -2,6 +2,10 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { getRtsSetup, saveRtsNilaiKolektif } from '$lib/server/rapor-sisipan/rts-service';
 import { parseRtsExcel } from '$lib/server/rapor-sisipan/excel';
 
+import db from '$lib/server/db';
+import { tableMurid } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
+
 export const POST: RequestHandler = async ({ request, locals }) => {
 	const user = locals.user;
 	if (!user) {
@@ -35,12 +39,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
+		const muridKelas = await db.query.tableMurid.findMany({
+			columns: { id: true, nama: true, nisn: true },
+			where: eq(tableMurid.kelasId, kelasId)
+		});
+
 		const arrayBuffer = await file.arrayBuffer();
 		const items = await parseRtsExcel(arrayBuffer, {
 			komponenFormatif: setup.komponenFormatif,
 			komponenSumatif: setup.komponenSumatif,
 			adaStsTes: setup.adaStsTes,
-			adaStsNonTes: setup.adaStsNonTes
+			adaStsNonTes: setup.adaStsNonTes,
+			daftarMuridKelas: muridKelas
 		});
 
 		if (items.length === 0) {

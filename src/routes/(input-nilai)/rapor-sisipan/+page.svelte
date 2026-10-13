@@ -334,22 +334,24 @@
 					{/if}
 
 					<!-- GRID MATRIKS SPREADSHEET PENUH -->
-					<GridMatriks
-						kelasId={kelasAktif.id}
-						mapelId={selectedMapel.id}
-						mapelNama={selectedMapel.nama}
-						komponenFormatif={setup.komponenFormatif}
-						komponenSumatif={setup.komponenSumatif}
-						adaStsTes={setup.adaStsTes}
-						adaStsNonTes={setup.adaStsNonTes}
-						bobotSumatif={setup.bobotSumatifTp}
-						bobotSts={setup.bobotSts}
-						muridList={data.daftarMurid}
-						allowSts={data.showSts}
-						canEdit={data.canEditSelectedMapel}
-						onSaved={reloadData}
-						onOpenSetup={() => (setupOpen = true)}
-					/>
+					{#key `${selectedMapel.id}-${kelasAktif.id}`}
+						<GridMatriks
+							kelasId={kelasAktif.id}
+							mapelId={selectedMapel.id}
+							mapelNama={selectedMapel.nama}
+							komponenFormatif={setup.komponenFormatif}
+							komponenSumatif={setup.komponenSumatif}
+							adaStsTes={setup.adaStsTes}
+							adaStsNonTes={setup.adaStsNonTes}
+							bobotSumatif={setup.bobotSumatifTp}
+							bobotSts={setup.bobotSts}
+							muridList={data.daftarMurid}
+							allowSts={data.showSts}
+							canEdit={data.canEditSelectedMapel}
+							onSaved={reloadData}
+							onOpenSetup={() => (setupOpen = true)}
+						/>
+					{/key}
 				{/if}
 			</div>
 		{/if}

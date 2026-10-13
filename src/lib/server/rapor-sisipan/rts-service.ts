@@ -7,7 +7,7 @@ import {
 	type RtsKomponenFormatifItem,
 	type RtsKomponenSumatifItem
 } from '$lib/server/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 export interface RtsSetupData {
 	id?: number;
@@ -185,14 +185,18 @@ export async function deleteRtsSetup(kelasId: number, mataPelajaranId: number, s
 }
 
 /**
- * Ambil seluruh nilai siswa RTS untuk rombel & mapel
+ * Ambil seluruh nilai siswa RTS untuk rombel & mapel (bisa single mapel atau list ID keluarga mapel)
  */
-export async function getRtsNilaiList(kelasId: number, mataPelajaranId: number) {
+export async function getRtsNilaiList(kelasId: number, mataPelajaranId: number | number[]) {
+	const mapelCondition = Array.isArray(mataPelajaranId)
+		? inArray(tableRtsNilaiSiswa.mataPelajaranId, mataPelajaranId)
+		: eq(tableRtsNilaiSiswa.mataPelajaranId, mataPelajaranId);
+
 	return db.query.tableRtsNilaiSiswa.findMany({
-		where: and(
-			eq(tableRtsNilaiSiswa.kelasId, kelasId),
-			eq(tableRtsNilaiSiswa.mataPelajaranId, mataPelajaranId)
-		)
+		where: and(eq(tableRtsNilaiSiswa.kelasId, kelasId), mapelCondition),
+		with: {
+			murid: true
+		}
 	});
 }
 

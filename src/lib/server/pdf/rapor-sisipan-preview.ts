@@ -180,19 +180,55 @@ export async function getRaporSisipanDataForStudent(params: {
 	const maxFormatif = sekolah.rtsMaxFormatif ?? 4;
 	const maxSumatif = sekolah.rtsMaxSumatif ?? 3;
 
+	function parseJsonScore(val: unknown): Record<string, number | null> {
+		if (!val) return {};
+		if (typeof val === 'string') {
+			try {
+				const p = JSON.parse(val);
+				if (typeof p === 'object' && p !== null) return p;
+			} catch {
+				return {};
+			}
+		}
+		if (typeof val === 'object' && val !== null) {
+			return val as Record<string, number | null>;
+		}
+		return {};
+	}
+
 	// Format baris nilai tiap mapel
 	const rtsMapelItems: RaporSisipanMapelItem[] = filteredMapels.map((m, idx) => {
 		const s = setupMap.get(m.id);
-		const n = nilaiMap.get(m.id);
+		let n = nilaiMap.get(m.id);
+
+		// Jika mapel agama dan nilai belum ada untuk mapel ini, coba cari dari varian/induk agama di kelas
+		if (!n && isKeluargaAgama(m.nama)) {
+			n = nilaiList.find(
+				(item) =>
+					item.nilaiAkhirRts != null &&
+					allClassMapels.some(
+						(other) => other.id === item.mataPelajaranId && isKeluargaAgama(other.nama)
+					)
+			);
+		}
 
 		// Array nilai formatif sejumlah maxFormatif
 		const formatifValues: Array<number | string> = [];
 		const sFormatif = s?.komponenFormatif ?? [];
-		const nFormatif = (n?.nilaiFormatif ?? {}) as Record<string, number | null>;
+		const nFormatif = parseJsonScore(n?.nilaiFormatif);
 		for (let i = 0; i < maxFormatif; i++) {
 			if (i < sFormatif.length) {
 				const f = sFormatif[i];
-				const val = nFormatif[f.kode];
+				let val = nFormatif[f.kode];
+				if (val == null) {
+					const altKeys = [`F${i + 1}`, `Tugas ${i + 1}`, `F_${f.kode}`, `T_${f.kode}`, f.nama];
+					for (const k of altKeys) {
+						if (nFormatif[k] != null) {
+							val = nFormatif[k];
+							break;
+						}
+					}
+				}
 				formatifValues.push(val != null ? val : '-');
 			} else {
 				// Guru tidak melaksanakan asesmen ini
@@ -203,11 +239,27 @@ export async function getRaporSisipanDataForStudent(params: {
 		// Array nilai sumatif sejumlah maxSumatif
 		const sumatifValues: Array<number | string> = [];
 		const sSumatif = s?.komponenSumatif ?? [];
-		const nSumatif = (n?.nilaiSumatif ?? {}) as Record<string, number | null>;
+		const nSumatif = parseJsonScore(n?.nilaiSumatif);
 		for (let i = 0; i < maxSumatif; i++) {
 			if (i < sSumatif.length) {
 				const sum = sSumatif[i];
-				const val = nSumatif[sum.kode];
+				let val = nSumatif[sum.kode];
+				if (val == null) {
+					const altKeys = [
+						`S${i + 1}`,
+						`LM${i + 1}`,
+						`F${i + 1}`,
+						`TP${i + 1}`,
+						`S_${sum.kode}`,
+						`F_${sum.kode}`
+					];
+					for (const k of altKeys) {
+						if (nSumatif[k] != null) {
+							val = nSumatif[k];
+							break;
+						}
+					}
+				}
 				sumatifValues.push(val != null ? val : '-');
 			} else {
 				// Guru tidak melaksanakan asesmen ini

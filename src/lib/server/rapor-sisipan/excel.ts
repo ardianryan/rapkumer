@@ -170,6 +170,7 @@ export async function parseRtsExcel(
 		komponenSumatif: RtsKomponenSumatifItem[];
 		adaStsTes: boolean;
 		adaStsNonTes: boolean;
+		daftarMuridKelas?: Array<{ id: number; nama: string; nisn?: string | null }>;
 	}
 ): Promise<RtsNilaiInputItem[]> {
 	const workbook = new ExcelJS.Workbook();
@@ -212,13 +213,41 @@ export async function parseRtsExcel(
 		}
 	});
 
+	const muridById = new Map((params.daftarMuridKelas || []).map((m) => [m.id, m]));
+	const muridByNisn = new Map(
+		(params.daftarMuridKelas || []).filter((m) => m.nisn?.trim()).map((m) => [m.nisn!.trim(), m])
+	);
+	const muridByNama = new Map(
+		(params.daftarMuridKelas || [])
+			.filter((m) => m.nama?.trim())
+			.map((m) => [m.nama.trim().toLowerCase(), m])
+	);
+
 	const results: RtsNilaiInputItem[] = [];
 
 	sheet.eachRow((row, rowNumber) => {
 		if (rowNumber <= 5) return; // Lewati header
 
 		const muridIdRaw = colMapping['id'] ? row.getCell(colMapping['id']).value : null;
-		const muridId = Number(muridIdRaw);
+		let muridId = Number(muridIdRaw);
+
+		const namaVal = colMapping['nama']
+			? String(row.getCell(colMapping['nama']).value || '').trim()
+			: '';
+		const nisnVal = colMapping['nisn']
+			? String(row.getCell(colMapping['nisn']).value || '').trim()
+			: '';
+
+		if (params.daftarMuridKelas && params.daftarMuridKelas.length > 0) {
+			if (!muridById.has(muridId)) {
+				if (nisnVal && muridByNisn.has(nisnVal)) {
+					muridId = muridByNisn.get(nisnVal)!.id;
+				} else if (namaVal && muridByNama.has(namaVal.toLowerCase())) {
+					muridId = muridByNama.get(namaVal.toLowerCase())!.id;
+				}
+			}
+		}
+
 		if (!Number.isInteger(muridId) || muridId <= 0) return;
 
 		const nilaiFormatif: Record<string, number | null> = {};

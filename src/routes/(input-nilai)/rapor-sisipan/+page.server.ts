@@ -370,21 +370,88 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			lingkupMateri: t.lingkupMateri
 		}));
 
-		// Nilai siswa untuk mapel ini
-		const nilaiRecords = await getRtsNilaiList(kelas.id, selectedMapelRecord.id);
-		const nilaiMap = new Map(nilaiRecords.map((n) => [n.muridId, n]));
+		function parseJsonScoreRecord(val: unknown): Record<string, number | null> {
+			if (!val) return {};
+			if (typeof val === 'string') {
+				try {
+					const parsed = JSON.parse(val);
+					if (typeof parsed === 'object' && parsed !== null) {
+						return parsed as Record<string, number | null>;
+					}
+				} catch {
+					return {};
+				}
+			}
+			if (typeof val === 'object' && val !== null) {
+				return val as Record<string, number | null>;
+			}
+			return {};
+		}
+
+		// Nilai siswa untuk mapel ini (jika keluarga agama, ambil juga varian/induk terkait di kelas)
+		const targetMapelIds = isKeluargaAgama(selectedMapelRecord.nama)
+			? allMapelRecords.filter((m) => isKeluargaAgama(m.nama)).map((m) => m.id)
+			: [selectedMapelRecord.id];
+
+		const nilaiRecords = await getRtsNilaiList(kelas.id, targetMapelIds);
+
+		// Bangun map multi-kunci untuk mencocokkan murid secara akurat
+		const byMuridId = new Map<number, (typeof nilaiRecords)[0]>();
+		const byNisn = new Map<string, (typeof nilaiRecords)[0]>();
+		const byNama = new Map<string, (typeof nilaiRecords)[0]>();
+
+		// Urutkan nilai: utamakan yang cocok persis dengan selectedMapelRecord.id
+		const sortedNilaiRecords = [...nilaiRecords].sort((a, b) => {
+			const aMatch = a.mataPelajaranId === selectedMapelRecord!.id ? 1 : 0;
+			const bMatch = b.mataPelajaranId === selectedMapelRecord!.id ? 1 : 0;
+			return bMatch - aMatch;
+		});
+
+		for (const n of sortedNilaiRecords) {
+			if (n.muridId && !byMuridId.has(n.muridId)) {
+				byMuridId.set(n.muridId, n);
+			}
+			const nisn = n.murid?.nisn?.trim();
+			if (nisn && !byNisn.has(nisn)) {
+				byNisn.set(nisn, n);
+			}
+			const nama = n.murid?.nama?.trim().toLowerCase();
+			if (nama && !byNama.has(nama)) {
+				byNama.set(nama, n);
+			}
+		}
 
 		daftarMurid = muridRecords.map((m, idx) => {
-			const n = nilaiMap.get(m.id);
+			// 1. Coba cocokkan via ID murid
+			let n = byMuridId.get(m.id);
+			// 2. Fallback via NISN
+			if (!n && m.nisn?.trim()) {
+				n = byNisn.get(m.nisn.trim());
+			}
+			// 3. Fallback via Nama
+			if (!n && m.nama?.trim()) {
+				n = byNama.get(m.nama.trim().toLowerCase());
+			}
+			// 4. Fallback via nomor urut (jika data terimpor dengan nomor absen 1..N)
+			if (!n && byMuridId.has(idx + 1)) {
+				const candidate = byMuridId.get(idx + 1);
+				if (candidate && !muridRecords.some((other) => other.id === idx + 1)) {
+					n = candidate;
+				}
+			}
+
+			const formatifObj = parseJsonScoreRecord(n?.nilaiFormatif);
+			const sumatifObj = parseJsonScoreRecord(n?.nilaiSumatif);
+
 			return {
 				id: m.id,
 				no: idx + 1,
 				nama: m.nama,
 				nisn: m.nisn,
 				nis: m.nis,
-				nilaiFormatif: (n?.nilaiFormatif as Record<string, number | null>) || null,
+				nilaiFormatif: Object.keys(formatifObj).length > 0 ? formatifObj : null,
 				rataFormatif: n?.rataFormatif ?? null,
-				nilaiSumatif: (n?.nilaiSumatif as Record<string, number | null>) || null,
+				nilaiSumatif: Object.keys(sumatifObj).length > 0 ? sumatifObj : null,
 				rataSumatifTp: n?.rataSumatifTp ?? null,
 				stsTes: n?.stsTes ?? null,
 				stsNonTes: n?.stsNonTes ?? null,
@@ -441,12 +508,21 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 		});
 
 		// Progress pengisian per mapel (menggunakan activeClassMapels yang sudah disaring)
+		const classMuridIdSet = new Set(muridRecords.map((m) => m.id));
 		progressList = activeClassMapels.map((m) => {
+			const relatedMapelIds = isKeluargaAgama(m.nama)
+				? new Set(allMapelRecords.filter((rec) => isKeluargaAgama(rec.nama)).map((rec) => rec.id))
+				: new Set([m.id]);
+
 			const gradedCount = allNilaiInKelas.filter(
-				(n) => n.mataPelajaranId === m.id && n.nilaiAkhirRts != null
+				(n) =>
+					relatedMapelIds.has(n.mataPelajaranId) &&
+					n.nilaiAkhirRts != null &&
+					classMuridIdSet.has(n.muridId)
 			).length;
 			const totalMurid = muridRecords.length;
-			const persentase = totalMurid > 0 ? Math.round((gradedCount / totalMurid) * 1000) / 10 : 0;
+			const validGraded = Math.min(gradedCount, totalMurid);
+			const persentase = totalMurid > 0 ? Math.round((validGraded / totalMurid) * 1000) / 10 : 0;
 
 			return {
 				id: m.id,
@@ -454,7 +530,7 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 				guruNama: m.pengampu?.nama ?? null,
 				isSetup: setupSet.has(m.id),
 				totalMurid,
-				muridDinilai: gradedCount,
+				muridDinilai: validGraded,
 				persentase,
 				canEdit: isFullAdmin || assignedMapelIds.has(m.id)
 			};
