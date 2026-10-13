@@ -495,6 +495,7 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 		showSts,
 		showNaSts,
 		isAdmin,
-		akasBaseUrl: akasConfig?.baseUrl || 'https://akas.smage.my.id'
+		akasBaseUrl: akasConfig?.baseUrl || 'https://akas.smage.my.id',
+		isAkasMode: akasConfig?.sumberPresensi === 'akas'
 	};
 };

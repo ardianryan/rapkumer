@@ -362,6 +362,7 @@
 			kelasNama={kelasAktif.nama}
 			items={data.catatanWaliList}
 			akasBaseUrl={data.akasBaseUrl}
+			isAkasMode={data.isAkasMode}
 			canEdit={true}
 			onSaved={reloadData}
 		/>

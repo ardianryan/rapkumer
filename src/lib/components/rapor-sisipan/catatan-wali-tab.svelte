@@ -22,6 +22,7 @@
 		kelasNama: string;
 		items: CatatanWaliRow[];
 		akasBaseUrl?: string;
+		isAkasMode?: boolean;
 		canEdit?: boolean;
 		onSaved?: () => void;
 	}
@@ -31,6 +32,7 @@
 		kelasNama,
 		items,
 		akasBaseUrl = 'https://akas.smage.my.id',
+		isAkasMode = false,
 		canEdit = true,
 		onSaved
 	}: Props = $props();
@@ -54,9 +56,8 @@
 
 	let isSaving = $state(false);
 	let isSyncing = $state(false);
-	let isSyncingAkas = $state(false);
 
-	async function handleSyncPresensi() {
+	async function handleSync() {
 		if (!canEdit) return;
 		isSyncing = true;
 		try {
@@ -66,35 +67,17 @@
 				body: JSON.stringify({ kelasId })
 			});
 			const data = await res.json();
-			if (!res.ok) throw new Error(data.error || 'Gagal menyinkronkan presensi.');
+			if (!res.ok) throw new Error(data.error || 'Gagal menyinkronkan data.');
 
-			toast(data.message || 'Presensi berhasil ditarik otomatis!', 'success');
+			toast(
+				data.message || (isAkasMode ? 'Data AKAS berhasil ditarik!' : 'Presensi berhasil ditarik!'),
+				'success'
+			);
 			onSaved?.();
 		} catch (err) {
 			toast((err as Error).message, 'error');
 		} finally {
 			isSyncing = false;
-		}
-	}
-
-	async function handleSyncPelanggaranAkas() {
-		if (!canEdit) return;
-		isSyncingAkas = true;
-		try {
-			const res = await fetch('/api/rapor-sisipan/sinkron-pelanggaran-akas', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ kelasId })
-			});
-			const data = await res.json();
-			if (!res.ok) throw new Error(data.error || 'Gagal menyinkronkan data pelanggaran AKAS.');
-
-			toast(data.message || 'Data pelanggaran AKAS berhasil diperbarui!', 'success');
-			onSaved?.();
-		} catch (err) {
-			toast((err as Error).message, 'error');
-		} finally {
-			isSyncingAkas = false;
 		}
 	}
 
@@ -146,33 +129,19 @@
 		<div class="flex flex-wrap items-center gap-2">
 			<button
 				type="button"
-				class="btn btn-sm btn-soft btn-warning"
-				onclick={handleSyncPelanggaranAkas}
-				disabled={!canEdit || isSyncingAkas}
-				title="Tarik rekapitulasi jumlah & poin pelanggaran terbaru dari AKAS"
-			>
-				{#if isSyncingAkas}
-					<span class="loading loading-spinner loading-xs"></span>
-					Menarik AKAS...
-				{:else}
-					<Icon name="repeat" />
-					Tarik Pelanggaran AKAS
-				{/if}
-			</button>
-
-			<button
-				type="button"
-				class="btn btn-sm btn-soft btn-secondary"
-				onclick={handleSyncPresensi}
+				class="btn btn-sm btn-soft {isAkasMode ? 'btn-warning' : 'btn-secondary'}"
+				onclick={handleSync}
 				disabled={!canEdit || isSyncing}
-				title="Tarik rekapan ketidakhadiran dari absensi harian paruh semester"
+				title={isAkasMode
+					? 'Tarik rekapitulasi kehadiran (S/I/A) serta pelanggaran & poin terbaru dari AKAS'
+					: 'Tarik rekapan ketidakhadiran dari absensi harian paruh semester'}
 			>
 				{#if isSyncing}
 					<span class="loading loading-spinner loading-xs"></span>
-					Menyinkronkan...
+					{isAkasMode ? 'Menarik Data AKAS...' : 'Menyinkronkan...'}
 				{:else}
 					<Icon name="repeat" />
-					Tarik Presensi Otomatis
+					{isAkasMode ? 'Tarik Data AKAS' : 'Tarik Presensi Otomatis'}
 				{/if}
 			</button>
 
@@ -205,10 +174,10 @@
 			</div>
 			<div class="leading-relaxed text-base-content/80">
 				<div class="font-bold text-base-content flex items-center gap-1.5">
-					Rekapitulasi Pelanggaran & Kedisiplinan Siswa (AKAS)
+					Integrasi Data AKAS (Kehadiran & Kedisiplinan)
 				</div>
-				Data jumlah dan poin pelanggaran disinkronkan otomatis dari aplikasi<strong>AKAS</strong>.
-				Jika ingin melihat rincian jenis pelanggaran, tanggal kejadian, catatan guru, dan tindak
+				Data kehadiran (Sakit, Izin, Alfa) dan rekapitulasi kedisiplinan (pelanggaran & poin) disinkronkan
+				terpusat dari aplikasi<strong>AKAS</strong>. Untuk meninjau detail kejadian maupun tindak
 				lanjut pembinaan siswa, silakan menuju aplikasi <strong>AKAS</strong>.
 			</div>
 		</div>
@@ -232,15 +201,15 @@
 					<th class="min-w-44">Nama Peserta Didik</th>
 					<th
 						class="w-24 text-center bg-amber-500/10 text-amber-700 dark:text-amber-400"
-						title="Jumlah Pelanggaran tercatat di AKAS"
+						title="Jumlah Pelanggaran siswa tercatat di AKAS"
 					>
-						Pelanggaran (AKAS)
+						Pelanggaran
 					</th>
 					<th
 						class="w-24 text-center bg-amber-500/10 text-amber-700 dark:text-amber-400"
 						title="Total akumulasi poin pelanggaran siswa di AKAS"
 					>
-						Poin (AKAS)
+						Poin
 					</th>
 					<th class="w-20 text-center" title="Sakit">Sakit (Hari)</th>
 					<th class="w-20 text-center" title="Izin">Izin (Hari)</th>
@@ -285,27 +254,36 @@
 							<input
 								type="number"
 								min="0"
-								class="input input-xs bg-base-200/70 text-center w-14 font-bold"
+								class="input input-xs text-center w-14 font-bold {isAkasMode
+									? 'bg-base-300/40 text-base-content/70 cursor-not-allowed border-dashed'
+									: 'bg-base-200/70'}"
 								bind:value={r.sakit}
-								disabled={!canEdit}
+								disabled={!canEdit || isAkasMode}
+								title={isAkasMode ? 'Terkunci (Sinkron otomatis dari AKAS)' : undefined}
 							/>
 						</td>
 						<td class="text-center">
 							<input
 								type="number"
 								min="0"
-								class="input input-xs bg-base-200/70 text-center w-14 font-bold"
+								class="input input-xs text-center w-14 font-bold {isAkasMode
+									? 'bg-base-300/40 text-base-content/70 cursor-not-allowed border-dashed'
+									: 'bg-base-200/70'}"
 								bind:value={r.izin}
-								disabled={!canEdit}
+								disabled={!canEdit || isAkasMode}
+								title={isAkasMode ? 'Terkunci (Sinkron otomatis dari AKAS)' : undefined}
 							/>
 						</td>
 						<td class="text-center">
 							<input
 								type="number"
 								min="0"
-								class="input input-xs bg-base-200/70 text-center w-14 font-bold"
+								class="input input-xs text-center w-14 font-bold {isAkasMode
+									? 'bg-base-300/40 text-base-content/70 cursor-not-allowed border-dashed'
+									: 'bg-base-200/70'}"
 								bind:value={r.alfa}
-								disabled={!canEdit}
+								disabled={!canEdit || isAkasMode}
+								title={isAkasMode ? 'Terkunci (Sinkron otomatis dari AKAS)' : undefined}
 							/>
 						</td>
 						<td>
