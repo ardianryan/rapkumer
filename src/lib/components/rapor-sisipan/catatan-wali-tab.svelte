@@ -166,26 +166,38 @@
 	<div
 		class="alert bg-base-100 border border-amber-500/30 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs"
 	>
-		<div class="flex items-center gap-3">
+		<div class="flex items-start gap-3">
 			<div
-				class="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold shrink-0"
+				class="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold shrink-0 mt-0.5"
 			>
 				<Icon name="info" />
 			</div>
-			<div class="leading-relaxed text-base-content/80">
-				<div class="font-bold text-base-content flex items-center gap-1.5">
+			<div class="leading-relaxed text-base-content/80 space-y-1">
+				<div class="font-bold text-base-content flex items-center gap-1.5 text-xs">
 					Integrasi Data AKAS (Kehadiran & Kedisiplinan)
 				</div>
-				Data kehadiran (Sakit, Izin, Alfa) dan rekapitulasi kedisiplinan (pelanggaran & poin) disinkronkan
-				terpusat dari aplikasi<strong>AKAS</strong>. Untuk meninjau detail kejadian maupun tindak
-				lanjut pembinaan siswa, silakan menuju aplikasi <strong>AKAS</strong>.
+				<p>
+					Data kehadiran dan kedisiplinan siswa disinkronkan terpusat dari aplikasi <strong
+						>AKAS</strong
+					>.
+				</p>
+				<ul class="list-disc list-inside space-y-0.5 text-base-content/70">
+					<li>
+						<strong class="text-base-content">Pengisian/Perbaikan Kehadiran:</strong> Silakan
+						berkoordinasi dengan <strong>Guru BK</strong> untuk penginputan melalui AKAS.
+					</li>
+					<li>
+						<strong class="text-base-content">Detail Kasus & Pembinaan:</strong> Kunjungi aplikasi
+						<strong>AKAS</strong> untuk meninjau riwayat lengkap siswa.
+					</li>
+				</ul>
 			</div>
 		</div>
 		<a
 			href={akasBaseUrl}
 			target="_blank"
 			rel="noreferrer"
-			class="btn btn-xs btn-outline btn-warning gap-1.5 font-bold shadow-none"
+			class="btn btn-xs btn-outline btn-warning gap-1.5 font-bold shadow-none self-center shrink-0"
 		>
 			<Icon name="export" />
 			Buka Aplikasi AKAS
