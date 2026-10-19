@@ -7,13 +7,15 @@
 		total: number;
 	};
 
-	let { progress } = $props<{
+	let {
+		progress
+	}: {
 		progress: {
 			akademik: ProgressItem;
 			ekstrakurikuler: ProgressItem;
 			kokurikuler: ProgressItem;
 		};
-	}>();
+	} = $props();
 </script>
 
 <div class="card-clean p-5 sm:p-6">

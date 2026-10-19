@@ -5,7 +5,7 @@
 	import { openQrisImage } from '$lib/components/qris-image-modal';
 	import type { PageData } from './$types';
 
-	const { data } = $props<{ data: PageData }>();
+	const { data }: { data: PageData } = $props();
 	const appVersion = $derived(data.appVersion ?? '0.0.0');
 </script>
 

@@ -4,6 +4,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { getRaporSisipanDataForStudent } from '$lib/server/pdf/rapor-sisipan-preview';
 import { renderRaporSisipanHTML } from '$lib/server/pdf/templates/rapor-sisipan';
 import { isWaliOfKelas } from '$lib/server/kelas-akses';
+import { resolveFaseKelas } from '$lib/tingkat';
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
@@ -147,7 +148,7 @@ export const load: PageServerLoad = async ({ parent, url, locals }) => {
 		kelas: {
 			id: kelas.id,
 			nama: kelas.nama,
-			fase: kelas.fase,
+			fase: resolveFaseKelas(kelas),
 			waliKelasNama: kelas.waliKelas?.nama ?? null
 		},
 		daftarKelas: daftarKelas ?? [],

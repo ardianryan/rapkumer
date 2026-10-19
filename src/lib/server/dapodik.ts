@@ -33,6 +33,7 @@ import { defaultPermissionsByType } from '../../routes/pengguna/permissions';
 import { normalizeWaliKelasSingleClass } from './db/ensure-pembelajaran';
 import { agamaMapelOptions } from '$lib/statics';
 import { buildCapaianKompetensi, type TujuanScoreEntry } from '$lib/rapor-modes';
+import { resolveFaseKelas } from '$lib/tingkat';
 
 /** Nama mapel agama → key opsi (islam/kristen/katolik/buddha/hindu/konghuchu/kepercayaan/umum). */
 const keyByName = new Map<string, string>(agamaMapelOptions.map((o) => [o.name, o.key]));
@@ -1427,12 +1428,14 @@ async function upsertKelasFromRombel(
 				}));
 
 			let kelasId: number | null = null;
+			const targetFase = resolveFaseKelas({ nama });
 			if (existing) {
 				await db
 					.update(tableKelas)
 					.set({
 						nama,
 						dapodikRombonganBelajarId: rombelId,
+						...(existing.fase ? {} : { fase: targetFase }),
 						...(waliKelasId ? { waliKelasId } : {})
 					})
 					.where(eq(tableKelas.id, existing.id));
@@ -1446,6 +1449,7 @@ async function upsertKelasFromRombel(
 						tahunAjaranId: target.tahunAjaranId,
 						semesterId: target.id,
 						nama,
+						fase: targetFase,
 						dapodikRombonganBelajarId: rombelId,
 						...(waliKelasId ? { waliKelasId } : {})
 					})

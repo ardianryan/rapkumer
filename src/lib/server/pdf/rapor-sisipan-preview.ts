@@ -19,6 +19,7 @@ import {
 } from '$lib/server/pdf/preview-utils';
 import { isKeluargaAgama, isKeluargaPks, muridAgamaKey } from '$lib/server/mapel-picker';
 import { agamaMapelOptions, agamaParentName, pksMapelOptions, pksParentName } from '$lib/statics';
+import { resolveFaseKelas } from '$lib/tingkat';
 import type { RaporSisipanStudentData, RaporSisipanMapelItem } from './templates/rapor-sisipan';
 
 function normalizeText(value: string | null | undefined) {
@@ -342,7 +343,7 @@ export async function getRaporSisipanDataForStudent(params: {
 		},
 		rombel: {
 			nama: kelas.nama,
-			fase: kelas.fase || 'E'
+			fase: resolveFaseKelas(kelas)
 		},
 		periode: {
 			tahunPelajaran,

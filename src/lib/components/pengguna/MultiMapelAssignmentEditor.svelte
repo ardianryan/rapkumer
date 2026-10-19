@@ -1,17 +1,19 @@
-<script lang="ts">
-	import Icon from '$lib/components/icon.svelte';
-
+<script module lang="ts">
 	export type GuruMapelAssignment = {
 		mapelNama: string;
 		kelasIds: number[];
 	};
+</script>
+
+<script lang="ts">
+	import Icon from '$lib/components/icon.svelte';
 
 	let {
 		availableMapel = [],
 		availableKelas = [],
 		assignments = $bindable([]),
 		disabled = false
-	} = $props<{
+	}: {
 		availableMapel?: Array<{ id?: number; nama: string; kode?: string | null }>;
 		availableKelas?: Array<{
 			id: number;
@@ -21,7 +23,7 @@
 		}>;
 		assignments?: GuruMapelAssignment[];
 		disabled?: boolean;
-	}>();
+	} = $props();
 
 	// Deduplikasi dan bersihkan daftar mata pelajaran
 	const cleanAvailableMapel = $derived.by(() => {

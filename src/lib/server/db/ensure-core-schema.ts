@@ -1,5 +1,8 @@
 import db from '$lib/server/db';
 import { ensureSchema } from './ensure-helper';
+import { tableKelas } from './schema';
+import { eq } from 'drizzle-orm';
+import { resolveFaseKelas } from '$lib/tingkat';
 
 const CORE = 'core';
 
@@ -362,5 +365,26 @@ export async function ensureCoreSchema() {
 		`);
 	} catch {
 		// table already exists
+	}
+
+	// Auto-heal / backfill fase untuk kelas yang fase-nya null atau salah (misal kelas 11/12 yang terisi Fase E)
+	try {
+		const kelasRows = await db.query.tableKelas.findMany({
+			columns: { id: true, nama: true, fase: true }
+		});
+		for (const k of kelasRows) {
+			const resolved = resolveFaseKelas(k);
+			const isMisclassified11Or12 =
+				(k.fase === 'Fase E' || k.fase === 'E') &&
+				(k.nama.startsWith('XI') ||
+					k.nama.startsWith('11') ||
+					k.nama.startsWith('XII') ||
+					k.nama.startsWith('12'));
+			if (!k.fase || isMisclassified11Or12) {
+				await db.update(tableKelas).set({ fase: resolved }).where(eq(tableKelas.id, k.id));
+			}
+		}
+	} catch (e) {
+		console.warn('[ensureCoreSchema] failed auto-healing kelas fase:', e);
 	}
 }

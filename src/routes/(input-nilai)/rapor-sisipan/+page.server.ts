@@ -18,6 +18,7 @@ import {
 } from '$lib/server/rapor-sisipan/rts-service';
 import { getAkasConfig } from '$lib/server/akas/client';
 import { syncViolationsFromAkas } from '$lib/server/akas/sync';
+import { resolveFaseKelas } from '$lib/tingkat';
 import type { PageServerLoad } from './$types';
 
 interface MuridGridItem {
@@ -542,7 +543,7 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 		kelasAktif: {
 			id: kelas.id,
 			nama: kelas.nama,
-			fase: kelas.fase,
+			fase: resolveFaseKelas(kelas),
 			waliKelasNama: kelas.waliKelas?.nama ?? null
 		},
 		daftarKelas: daftarKelas ?? [],

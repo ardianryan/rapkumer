@@ -4,10 +4,13 @@
 
 	type DashboardStatistik = App.DashboardStatistik;
 
-	let { rombel, murid } = $props<{
+	let {
+		rombel,
+		murid
+	}: {
 		rombel: DashboardStatistik['rombel'];
 		murid: DashboardStatistik['murid'];
-	}>();
+	} = $props();
 
 	const rombelBadges = $derived.by(() => rombel.perFase);
 </script>

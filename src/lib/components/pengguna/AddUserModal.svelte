@@ -13,7 +13,7 @@
 		sekolahList = [],
 		kelasList = [],
 		editUser = null
-	} = $props<{
+	}: {
 		open?: boolean;
 		mataPelajaran?: { id: number; nama: string }[];
 		sekolahList?: { id: number; nama: string }[];
@@ -27,6 +27,8 @@
 			sekolahId?: number | null;
 			mataPelajaranIds?: number[];
 			kelasIds?: number[];
+			kelasId?: number | null;
+			ownKelasId?: number | null;
 			assignments?: GuruMapelAssignment[];
 			pembelajaranList?: Array<{ kelasId: number; mataPelajaranId: number }>;
 			sso?: {
@@ -34,7 +36,7 @@
 				[key: string]: unknown;
 			} | null;
 		} | null;
-	}>();
+	} = $props();
 
 	const dispatch = createEventDispatcher();
 

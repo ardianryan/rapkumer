@@ -2,7 +2,7 @@
 	/* eslint-disable svelte/no-navigation-without-resolve */
 	import Icon from '$lib/components/icon.svelte';
 
-	let { sekolah } = $props<{ sekolah: Sekolah | null }>();
+	let { sekolah }: { sekolah: Sekolah | null } = $props();
 
 	const sekolahLogo = $derived(sekolah?.id ? `/sekolah/logo/${sekolah.id}` : '/sekolah.png');
 	const sekolahNama = $derived(sekolah?.nama ?? 'SMA Negeri 1 Gedeg');

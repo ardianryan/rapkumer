@@ -9,7 +9,7 @@
 	type SemesterRow = typeof import('$lib/server/db/schema').tableSemester.$inferSelect;
 	type TahunAjaranWithSemester = TahunAjaranRow & { semester: SemesterRow[] };
 
-	const { data } = $props<{ data: PageData }>();
+	const { data }: { data: PageData } = $props();
 	// svelte-ignore state_referenced_locally
 	const sekolahList = (data.sekolahList ?? []) as Sekolah[];
 	// svelte-ignore state_referenced_locally

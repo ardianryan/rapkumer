@@ -21,6 +21,7 @@ import {
 	type DimensiProfilLulusanKey
 } from '$lib/statics';
 import { muridAgamaKey } from '$lib/server/mapel-picker';
+import { resolveFaseKelas } from '$lib/tingkat';
 import {
 	buildKokurikulerNarrative,
 	DEFAULT_KOKURIKULER_MESSAGE,
@@ -556,7 +557,7 @@ export async function getRaporPreviewPayload({ locals, url }: RaporContext) {
 		},
 		rombel: {
 			nama: murid.kelas?.nama ?? '',
-			fase: murid.kelas?.fase ?? ''
+			fase: resolveFaseKelas(murid.kelas)
 		},
 		periode: {
 			tahunPelajaran: murid.kelas?.tahunAjaran?.nama ?? murid.semester?.nama ?? '',

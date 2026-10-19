@@ -14,10 +14,13 @@
 		total: number;
 	};
 
-	let { mapel, ekstrakurikuler } = $props<{
+	let {
+		mapel,
+		ekstrakurikuler
+	}: {
 		mapel: MapelStat;
 		ekstrakurikuler: EkstrakurikulerStat;
-	}>();
+	} = $props();
 
 	function mapelParts(m: MapelStat): string {
 		const parts: string[] = [];
