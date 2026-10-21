@@ -60,6 +60,7 @@ export interface RaporSisipanStudentData {
 	showRataFormatif?: boolean;
 	showSts?: boolean;
 	showNaSts?: boolean;
+	showTtdKepala?: boolean;
 	tanggalCetak: string;
 	mapelList: RaporSisipanMapelItem[];
 	ketidakhadiran: {
@@ -433,6 +434,9 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 				</td>
 			</tr>
 		</tbody>
+		${
+			data.showTtdKepala !== false
+				? `
 		<tbody>
 			<tr>
 				<td colspan="2" class="text-center font-bold" style="padding-top: 10pt;">
@@ -452,7 +456,9 @@ export function renderRaporSisipanHTML(data: RaporSisipanStudentData): string {
 					${data.kepalaSekolah.nip ? 'NIP. ' + escHtml(data.kepalaSekolah.nip) : 'NIP. -'}
 				</td>
 			</tr>
-		</tbody>
+		</tbody>`
+				: ''
+		}
 	</table>
 </div>
 

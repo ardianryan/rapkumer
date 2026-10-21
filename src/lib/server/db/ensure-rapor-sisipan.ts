@@ -44,6 +44,13 @@ export async function ensureRaporSisipanSchema() {
 	} catch {
 		// column already exists
 	}
+	try {
+		await db.$client.execute(
+			`ALTER TABLE "sekolah" ADD COLUMN "rts_show_ttd_kepala" integer NOT NULL DEFAULT 1`
+		);
+	} catch {
+		// column already exists
+	}
 
 	await ensureSchema('rts_mapel_setup', [
 		`CREATE TABLE IF NOT EXISTS "rts_mapel_setup" (

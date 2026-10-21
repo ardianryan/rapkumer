@@ -4,10 +4,11 @@ import {
 	tableRtsNilaiSiswa,
 	tableRtsCatatanWali,
 	tableAsesmenSumatif,
+	tableMurid,
 	type RtsKomponenFormatifItem,
 	type RtsKomponenSumatifItem
 } from '$lib/server/db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 
 export interface RtsSetupData {
 	id?: number;
@@ -359,4 +360,104 @@ export async function saveRtsCatatanWaliMassal(
 			alfa: item.alfa
 		});
 	}
+}
+
+/**
+ * Salin komponen asesmen dan nilai dari mapel sumber ke mapel target (di kelas yang sama atau berbeda)
+ */
+export async function copyRtsSetupAndScores(data: {
+	sekolahId: number;
+	sourceKelasId: number;
+	sourceMapelId: number;
+	targetKelasId: number;
+	targetMapelId: number;
+}): Promise<{ success: boolean; message: string; count: number }> {
+	const { sekolahId, sourceKelasId, sourceMapelId, targetKelasId, targetMapelId } = data;
+
+	if (sourceKelasId === targetKelasId && sourceMapelId === targetMapelId) {
+		throw new Error('Mapel sumber dan target tidak boleh sama.');
+	}
+
+	// 1. Ambil setup asesmen sumber
+	const sourceSetup = await getRtsSetup(sourceKelasId, sourceMapelId);
+	if (!sourceSetup) {
+		throw new Error('Mata pelajaran sumber belum memiliki pengaturan komponen asesmen.');
+	}
+
+	// 2. Salin setup asesmen ke target
+	await saveRtsSetup({
+		sekolahId,
+		kelasId: targetKelasId,
+		mataPelajaranId: targetMapelId,
+		komponenFormatif: sourceSetup.komponenFormatif,
+		komponenSumatif: sourceSetup.komponenSumatif,
+		adaStsTes: sourceSetup.adaStsTes,
+		adaStsNonTes: sourceSetup.adaStsNonTes,
+		bobotSumatifTp: sourceSetup.bobotSumatifTp,
+		bobotSts: sourceSetup.bobotSts
+	});
+
+	// 3. Ambil data nilai dari mapel sumber
+	const sourceNilaiList = await getRtsNilaiList(sourceKelasId, sourceMapelId);
+
+	// 4. Ambil murid di kelas target
+	const targetMuridList = await db.query.tableMurid.findMany({
+		where: eq(tableMurid.kelasId, targetKelasId),
+		orderBy: asc(tableMurid.nama)
+	});
+
+	const itemsToSave: RtsNilaiInputItem[] = [];
+
+	if (sourceKelasId === targetKelasId) {
+		// Kelas sama: salin langsung berdasarkan muridId
+		const sourceMap = new Map(sourceNilaiList.map((n) => [n.muridId, n]));
+		for (const tm of targetMuridList) {
+			const s = sourceMap.get(tm.id);
+			if (s) {
+				itemsToSave.push({
+					muridId: tm.id,
+					nilaiFormatif: s.nilaiFormatif ? { ...s.nilaiFormatif } : {},
+					nilaiSumatif: s.nilaiSumatif ? { ...s.nilaiSumatif } : {},
+					stsTes: s.stsTes,
+					stsNonTes: s.stsNonTes,
+					catatanGuru: s.catatanGuru
+				});
+			}
+		}
+	} else {
+		// Kelas berbeda: petakan berdasarkan nomor urut (urutan nama siswa)
+		const sourceMuridList = await db.query.tableMurid.findMany({
+			where: eq(tableMurid.kelasId, sourceKelasId),
+			orderBy: asc(tableMurid.nama)
+		});
+		const sourceMap = new Map(sourceNilaiList.map((n) => [n.muridId, n]));
+
+		for (let i = 0; i < targetMuridList.length; i++) {
+			const targetM = targetMuridList[i];
+			const sourceM = sourceMuridList[i];
+			if (!sourceM) break;
+
+			const s = sourceMap.get(sourceM.id);
+			if (s) {
+				itemsToSave.push({
+					muridId: targetM.id,
+					nilaiFormatif: s.nilaiFormatif ? { ...s.nilaiFormatif } : {},
+					nilaiSumatif: s.nilaiSumatif ? { ...s.nilaiSumatif } : {},
+					stsTes: s.stsTes,
+					stsNonTes: s.stsNonTes,
+					catatanGuru: s.catatanGuru
+				});
+			}
+		}
+	}
+
+	if (itemsToSave.length > 0) {
+		await saveRtsNilaiKolektif(sekolahId, targetKelasId, targetMapelId, itemsToSave);
+	}
+
+	return {
+		success: true,
+		message: `Berhasil menyalin komponen asesmen dan nilai untuk ${itemsToSave.length} siswa.`,
+		count: itemsToSave.length
+	};
 }

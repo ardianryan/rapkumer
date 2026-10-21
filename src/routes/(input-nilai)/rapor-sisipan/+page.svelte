@@ -5,6 +5,7 @@
 	import Icon from '$lib/components/icon.svelte';
 	import GridMatriks from '$lib/components/rapor-sisipan/grid-matriks.svelte';
 	import SetupModal from '$lib/components/rapor-sisipan/setup-modal.svelte';
+	import CopyMapelModal from '$lib/components/rapor-sisipan/copy-mapel-modal.svelte';
 	import CatatanWaliTab from '$lib/components/rapor-sisipan/catatan-wali-tab.svelte';
 	import ProgressTab from '$lib/components/rapor-sisipan/progress-tab.svelte';
 	import { toast } from '$lib/components/toast.svelte';
@@ -13,6 +14,7 @@
 
 	let activeTab = $state<'nilai' | 'catatan' | 'monitoring'>('nilai');
 	let setupOpen = $state(false);
+	let copyModalOpen = $state(false);
 	let adminConfigOpen = $state(false);
 	let adminMaxFormatif = $state(4);
 	let adminMaxSumatif = $state(3);
@@ -20,6 +22,7 @@
 	let adminShowRataFormatif = $state(true);
 	let adminShowSts = $state(true);
 	let adminShowNaSts = $state(true);
+	let adminShowTtdKepala = $state(true);
 	let isSavingAdminConfig = $state(false);
 
 	$effect(() => {
@@ -29,6 +32,7 @@
 		if (data.showRataFormatif !== undefined) adminShowRataFormatif = data.showRataFormatif;
 		if (data.showSts !== undefined) adminShowSts = data.showSts;
 		if (data.showNaSts !== undefined) adminShowNaSts = data.showNaSts;
+		if (data.showTtdKepala !== undefined) adminShowTtdKepala = data.showTtdKepala;
 	});
 
 	const kelasAktif = $derived(data.kelasAktif);
@@ -85,7 +89,8 @@
 					showRataTugas: adminShowRataTugas,
 					showRataFormatif: adminShowRataFormatif,
 					showSts: adminShowSts,
-					showNaSts: adminShowNaSts
+					showNaSts: adminShowNaSts,
+					showTtdKepala: adminShowTtdKepala
 				})
 			});
 			const json = await res.json();
@@ -130,6 +135,7 @@
 							adminShowRataFormatif = data.showRataFormatif ?? true;
 							adminShowSts = data.showSts ?? true;
 							adminShowNaSts = data.showNaSts ?? true;
+							adminShowTtdKepala = data.showTtdKepala ?? true;
 							adminConfigOpen = true;
 						}}
 						title="Atur batas maksimal asesmen & kebijakan tampilan cetak rapor sisipan untuk sekolah"
@@ -304,7 +310,7 @@
 								memasukkan nilai.
 							</p>
 						</div>
-						<div>
+						<div class="flex flex-wrap items-center justify-center gap-2">
 							{#if data.canEditSelectedMapel}
 								<button type="button" class="btn btn-primary" onclick={() => (setupOpen = true)}>
 									<Icon name="gear" />
@@ -314,6 +320,16 @@
 								<span class="badge badge-neutral text-xs">
 									Menunggu guru pengampu ({selectedMapel.guruNama || 'Guru'}) mengatur asesmen
 								</span>
+							{/if}
+							{#if data.isAdmin}
+								<button
+									type="button"
+									class="btn btn-outline btn-primary"
+									onclick={() => (copyModalOpen = true)}
+								>
+									<Icon name="copy" />
+									Salin dari Mapel Lain
+								</button>
 							{/if}
 						</div>
 					</div>
@@ -348,6 +364,9 @@
 							muridList={data.daftarMurid}
 							allowSts={data.showSts}
 							canEdit={data.canEditSelectedMapel}
+							isAdmin={data.isAdmin}
+							daftarKelas={data.daftarKelas}
+							kelasNama={kelasAktif.nama}
 							onSaved={reloadData}
 							onOpenSetup={() => (setupOpen = true)}
 						/>
@@ -558,6 +577,25 @@
 								</p>
 							</div>
 						</label>
+
+						<label
+							class="label cursor-pointer justify-start gap-3 p-1 rounded-lg hover:bg-base-200/50"
+						>
+							<input
+								type="checkbox"
+								class="checkbox checkbox-sm checkbox-primary"
+								bind:checked={adminShowTtdKepala}
+							/>
+							<div>
+								<span class="font-semibold text-base-content"
+									>Tampilkan Kolom Tanda Tangan Kepala Sekolah</span
+								>
+								<p class="text-[11px] text-base-content/60">
+									Sertakan kolom tanda tangan Kepala Sekolah di bagian bawah lembar rapor tengah
+									semester.
+								</p>
+							</div>
+						</label>
 					</div>
 				</div>
 
@@ -592,4 +630,17 @@
 			<button onclick={() => (adminConfigOpen = false)}>tutup</button>
 		</form>
 	</dialog>
+{/if}
+
+<!-- MODAL SALIN KOMPONEN & NILAI DARI MAPEL LAIN (ADMIN) -->
+{#if data.isAdmin && selectedMapel && kelasAktif}
+	<CopyMapelModal
+		bind:open={copyModalOpen}
+		targetKelasId={kelasAktif.id}
+		targetKelasNama={kelasAktif.nama}
+		targetMapelId={selectedMapel.id}
+		targetMapelNama={selectedMapel.nama}
+		daftarKelas={data.daftarKelas}
+		onSuccess={reloadData}
+	/>
 {/if}

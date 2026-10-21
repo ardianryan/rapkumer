@@ -194,6 +194,7 @@ export const tableSekolah = sqliteTable('sekolah', {
 	rtsShowRataFormatif: int().default(1).notNull(),
 	rtsShowSts: int().default(1).notNull(),
 	rtsShowNaSts: int().default(1).notNull(),
+	rtsShowTtdKepala: int().default(1).notNull(),
 	// Daftar path menu yang disembunyikan untuk guru/non-admin
 	hiddenMenuPaths: text({ mode: 'json' }).$type<string[]>().default([]).notNull(),
 	...audit

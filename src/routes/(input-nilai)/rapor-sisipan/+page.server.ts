@@ -95,6 +95,7 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 	const showRataFormatif = (currentSekolah?.rtsShowRataFormatif ?? 1) === 1;
 	const showSts = (currentSekolah?.rtsShowSts ?? 1) === 1;
 	const showNaSts = (currentSekolah?.rtsShowNaSts ?? 1) === 1;
+	const showTtdKepala = (currentSekolah?.rtsShowTtdKepala ?? 1) === 1;
 
 	if (!sekolah?.id) {
 		return {
@@ -116,6 +117,7 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 			showRataFormatif,
 			showSts,
 			showNaSts,
+			showTtdKepala,
 			isAdmin,
 			akasBaseUrl: 'https://akas.smage.my.id'
 		};
@@ -571,6 +573,7 @@ export const load: PageServerLoad = async ({ parent, url, depends, locals }) => 
 		showRataFormatif,
 		showSts,
 		showNaSts,
+		showTtdKepala,
 		isAdmin,
 		akasBaseUrl: akasConfig?.baseUrl || 'https://akas.smage.my.id',
 		isAkasMode: akasConfig?.sumberPresensi === 'akas'

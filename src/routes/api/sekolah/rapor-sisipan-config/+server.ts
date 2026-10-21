@@ -18,7 +18,8 @@ export const GET: RequestHandler = async ({ locals }) => {
 			rtsShowRataTugas: true,
 			rtsShowRataFormatif: true,
 			rtsShowSts: true,
-			rtsShowNaSts: true
+			rtsShowNaSts: true,
+			rtsShowTtdKepala: true
 		}
 	});
 
@@ -29,7 +30,8 @@ export const GET: RequestHandler = async ({ locals }) => {
 		showRataTugas: (s?.rtsShowRataTugas ?? 1) === 1,
 		showRataFormatif: (s?.rtsShowRataFormatif ?? 1) === 1,
 		showSts: (s?.rtsShowSts ?? 1) === 1,
-		showNaSts: (s?.rtsShowNaSts ?? 1) === 1
+		showNaSts: (s?.rtsShowNaSts ?? 1) === 1,
+		showTtdKepala: (s?.rtsShowTtdKepala ?? 1) === 1
 	});
 };
 
@@ -61,6 +63,7 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 			payload.showRataFormatif !== undefined ? (payload.showRataFormatif ? 1 : 0) : 1;
 		const showSts = payload.showSts !== undefined ? (payload.showSts ? 1 : 0) : 1;
 		const showNaSts = payload.showNaSts !== undefined ? (payload.showNaSts ? 1 : 0) : 1;
+		const showTtdKepala = payload.showTtdKepala !== undefined ? (payload.showTtdKepala ? 1 : 0) : 1;
 
 		await db
 			.update(tableSekolah)
@@ -71,6 +74,7 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 				rtsShowRataFormatif: showRataFormatif,
 				rtsShowSts: showSts,
 				rtsShowNaSts: showNaSts,
+				rtsShowTtdKepala: showTtdKepala,
 				updatedAt: new Date().toISOString()
 			})
 			.where(eq(tableSekolah.id, sekolah.id));
@@ -84,7 +88,8 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 			showRataTugas: showRataTugas === 1,
 			showRataFormatif: showRataFormatif === 1,
 			showSts: showSts === 1,
-			showNaSts: showNaSts === 1
+			showNaSts: showNaSts === 1,
+			showTtdKepala: showTtdKepala === 1
 		});
 	} catch (err) {
 		console.error('Error updating RTS config:', err);

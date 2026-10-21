@@ -365,6 +365,7 @@ export async function getRaporSisipanDataForStudent(params: {
 		showRataFormatif: (sekolah.rtsShowRataFormatif ?? 1) === 1,
 		showSts: (sekolah.rtsShowSts ?? 1) === 1,
 		showNaSts: (sekolah.rtsShowNaSts ?? 1) === 1,
+		showTtdKepala: (sekolah.rtsShowTtdKepala ?? 1) === 1,
 		tanggalCetak,
 		mapelList: rtsMapelItems,
 		ketidakhadiran: {

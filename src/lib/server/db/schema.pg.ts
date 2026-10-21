@@ -212,6 +212,7 @@ export const tableSekolah = pgTable('sekolah', {
 	rtsShowRataFormatif: integer().default(1).notNull(),
 	rtsShowSts: integer().default(1).notNull(),
 	rtsShowNaSts: integer().default(1).notNull(),
+	rtsShowTtdKepala: integer().default(1).notNull(),
 	// Daftar path menu yang disembunyikan untuk guru/non-admin
 	hiddenMenuPaths: jsonb().$type<string[]>().default([]).notNull(),
 	...audit

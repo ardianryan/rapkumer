@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/icon.svelte';
 	import type { RtsKomponenFormatifItem, RtsKomponenSumatifItem } from '$lib/server/db/schema';
 	import { toast } from '$lib/components/toast.svelte';
+	import CopyMapelModal from './copy-mapel-modal.svelte';
 
 	interface MuridItem {
 		id: number;
@@ -30,6 +31,9 @@
 		muridList: MuridItem[];
 		allowSts?: boolean;
 		canEdit?: boolean;
+		isAdmin?: boolean;
+		daftarKelas?: Array<{ id: number; nama: string; fase?: string | null }>;
+		kelasNama?: string;
 		onSaved?: () => void;
 		onOpenSetup?: () => void;
 	}
@@ -47,6 +51,9 @@
 		muridList,
 		allowSts = true,
 		canEdit = true,
+		isAdmin = false,
+		daftarKelas = [],
+		kelasNama = '',
 		onSaved,
 		onOpenSetup
 	}: Props = $props();
@@ -496,6 +503,7 @@
 
 	// Fitur Isi Cepat / Bulk Fill modal sederhana
 	let showQuickFill = $state(false);
+	let showCopyModal = $state(false);
 	let quickFillColumn = $state('all_formatif');
 	let quickFillValue = $state(80);
 
@@ -655,11 +663,37 @@
 				<button type="button" class="btn btn-xs btn-primary" onclick={applyQuickFill}>
 					Terapkan
 				</button>
+				{#if isAdmin}
+					<div class="divider divider-horizontal my-0"></div>
+					<button
+						type="button"
+						class="btn btn-xs btn-outline btn-primary gap-1"
+						onclick={() => (showCopyModal = true)}
+					>
+						<Icon name="copy" class="w-3.5 h-3.5" />
+						Salin Komponen & Nilai dari Mapel Lain
+					</button>
+				{/if}
 				<button type="button" class="btn btn-xs btn-ghost" onclick={() => (showQuickFill = false)}>
 					Tutup
 				</button>
 			</div>
 		</div>
+	{/if}
+
+	{#if isAdmin}
+		<CopyMapelModal
+			bind:open={showCopyModal}
+			targetKelasId={kelasId}
+			targetKelasNama={kelasNama}
+			targetMapelId={mapelId}
+			targetMapelNama={mapelNama}
+			{daftarKelas}
+			onSuccess={() => {
+				showQuickFill = false;
+				onSaved?.();
+			}}
+		/>
 	{/if}
 
 	<!-- INFORMASI PETUNJUK -->
