@@ -4,7 +4,7 @@
 # ==============================================================================
 
 # --- Stage 1: Build & Dependencies ---
-FROM node:22-bookworm-slim AS builder
+FROM node:22.23.4-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ RUN pnpm build
 RUN pnpm prune --prod
 
 # --- Stage 2: Production Runtime ---
-FROM node:22-bookworm-slim AS runner
+FROM node:22.23.4-bookworm-slim AS runner
 
 WORKDIR /app
 
