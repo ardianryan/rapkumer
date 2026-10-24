@@ -9,17 +9,18 @@
 
 	let { data } = $props();
 
-	// derive user item type from incoming load data to keep typings simple
-	type UserItem = typeof data.users extends Array<infer U> ? U : Record<string, unknown>;
-
 	// local reactive users copy so UI updates instantly without full reload
-	type LocalUser = UserItem & {
+	// base shape mirrors load's users (never hardcode) + local-only fields
+	type LocalUser = (typeof data.users)[number] & {
+		roles: string[];
 		isNew?: boolean;
 		nama?: string;
 		dapodikPtkId?: string | null;
 		mataPelajaranId?: number | null;
 		mataPelajaranIds?: number[];
 		kelasIds?: number[];
+		waliKelasIds?: number[];
+		waliAsramaIds?: number[];
 		assignments?: Array<{ mapelNama: string; kelasIds: number[] }>;
 		sso?: {
 			userId: number;
@@ -33,7 +34,6 @@
 	};
 	// svelte-ignore state_referenced_locally
 	let users = $state<LocalUser[]>(data.users ?? []);
-
 	// selected ids for bulk actions
 	let selectedIds = $state<number[]>([]);
 
@@ -96,7 +96,7 @@
 		const selectedUsers = users.filter((u) => ids.indexOf(u.id as number) !== -1);
 		const hasWali = selectedUsers.some((u) => {
 			const type = (u as { type?: string }).type;
-			return type === 'wali_kelas' || type === 'wali_asuh';
+			return type === 'wali_kelas' || type === 'wali_asuh' || type === 'wali_asrama';
 		});
 
 		if (hasWali) {
@@ -105,7 +105,7 @@
 				body: AlertWarning,
 				bodyProps: {
 					message:
-						'Tidak dapat menghapus karena satu atau lebih pengguna terpilih berperan sebagai Wali Kelas atau Wali Asuh. Untuk menggantinya, klik tombol <strong>Atur Data Kelas</strong>'
+						'Tidak dapat menghapus karena satu atau lebih pengguna terpilih berperan sebagai Wali Kelas, Wali Asuh, atau Wali Asrama. Untuk menggantinya, klik tombol <strong>Atur Data Kelas</strong>'
 				},
 				onPositive: {
 					label: 'Atur Data Kelas',
@@ -154,7 +154,6 @@
 							if (parsedBody && typeof parsedBody === 'object') {
 								const pb = parsedBody as Record<string, unknown>;
 								if (typeof pb.message === 'string' && pb.message.trim()) msg = pb.message;
-								else if (pb.type === 'warning' && typeof pb.message === 'string') msg = pb.message;
 								else if (
 									pb.error &&
 									typeof (pb.error as Record<string, unknown>).message === 'string'
@@ -168,6 +167,7 @@
 						} catch {
 							// keep default msg
 						}
+						if (!msg.trim()) msg = 'Gagal menghapus';
 						try {
 							if (
 								parsedBody &&

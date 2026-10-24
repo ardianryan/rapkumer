@@ -86,17 +86,16 @@
 	// svelte-ignore state_referenced_locally
 	let bypassJadwalValue = $state(bypassJadwal);
 
-	function parseJsonList<T>(jsonStr: string): T[] {
+	function parseArray<T>(value: string): T[] {
 		try {
-			const parsed = JSON.parse(jsonStr);
+			const parsed = JSON.parse(value);
 			return Array.isArray(parsed) ? parsed : [];
 		} catch {
 			return [];
 		}
 	}
-
 	// svelte-ignore state_referenced_locally
-	let liburDates = $state<string[]>(parseJsonList<string>(liburNasional));
+	let liburDates = $state<string[]>(parseArray(liburNasional));
 
 	let newLiburDate = $state('');
 
@@ -112,7 +111,7 @@
 	}
 
 	// svelte-ignore state_referenced_locally
-	let semesterRanges = $state<SemesterRange[]>(parseJsonList<SemesterRange>(liburSemester));
+	let semesterRanges = $state<SemesterRange[]>(parseArray(liburSemester));
 
 	function addSemesterRange() {
 		semesterRanges = [...semesterRanges, { start: '', end: '' }];

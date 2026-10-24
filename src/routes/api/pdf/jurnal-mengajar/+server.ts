@@ -240,6 +240,7 @@ export const GET = (async ({ locals, url }) => {
 
 	const printData = {
 		sekolah: {
+			id: sekolahId,
 			nama: sekolah?.nama ?? ''
 		},
 		murid: {
@@ -260,7 +261,9 @@ export const GET = (async ({ locals, url }) => {
 		},
 		guru: {
 			nama: userName,
-			nip: guruNip
+			nip: guruNip,
+			// Hanya akun wali_kelas yang dapat mengunggah tanda tangan sendiri.
+			ttdUserId: isWaliKelas ? (user.id ?? null) : null
 		},
 		isWaliKelas,
 		guruLabel,

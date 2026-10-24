@@ -96,6 +96,9 @@ export async function ensureDapodikSchema() {
 	await mergeDuplicateAgamaMapel();
 }
 
+// https://www.sqlite.org/rowidtable.html — SQLite tak mendukung DROP CONSTRAINT;
+// rebuild tabel penuh (baru + salin data + rename). tidak ada tabel lain yang
+// mereferensikan dapodik_pembelajaran → drop lama aman.
 const TABLE_DAPODIK_PEMBELAJARAN = 'dapodik_pembelajaran';
 let pembelajaranUniqueMigrated = false;
 

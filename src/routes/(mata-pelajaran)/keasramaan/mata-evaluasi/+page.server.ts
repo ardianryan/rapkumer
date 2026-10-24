@@ -5,7 +5,7 @@ import {
 	tableAsesmenKeasramaan
 } from '$lib/server/db/schema';
 import { fail, redirect } from '@sveltejs/kit';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 
 const TABLE_MISSING_MESSAGE =
 	'Tabel keasramaan belum tersedia. Jalankan "pnpm db:push" untuk menerapkan migrasi terbaru.';
@@ -19,7 +19,7 @@ function isTableMissingError(error: unknown) {
 
 export async function load({ depends, parent }) {
 	depends('app:keasramaan');
-	const { kelasAktif, user } = await parent();
+	const { kelasAktif } = await parent();
 	const kelasId = kelasAktif?.id ?? null;
 
 	let keasramaanRaw: Awaited<ReturnType<typeof db.query.tableKeasramaan.findMany>> = [];
@@ -61,7 +61,8 @@ function canManageKeasramaan(user: unknown): boolean {
 		u.type === 'admin' ||
 		u.type === 'kepala_sekolah' ||
 		u.type === 'wali_kelas' ||
-		u.type === 'wali_asuh'
+		u.type === 'wali_asuh' ||
+		u.type === 'wali_asrama'
 	);
 }
 

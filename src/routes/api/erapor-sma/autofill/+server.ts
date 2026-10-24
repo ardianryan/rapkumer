@@ -53,7 +53,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		const tpStartCol = 8; // Kolom H
 		let tpEndCol = 8;
 
-		for (let c = 8; c <= ws.columnCount; c++) {
+		for (let c = 8; c <= (ws.columnCount ?? 0); c++) {
 			const colHeader6 = ws.getRow(6).getCell(c).value?.toString().trim();
 			if (colHeader6 === 'TR' || colHeader6 === 'OP' || colHeader6 === 'NILAI') {
 				tpEndCol = c - 1;

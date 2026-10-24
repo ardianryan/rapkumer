@@ -1,4 +1,5 @@
 <script lang="ts">
+	/* eslint-disable svelte/no-unused-props -- bypassJadwal is passed from parent bodyProps */
 	import { invalidate } from '$app/navigation';
 	import { hideModal, updateModal } from '$lib/components/global-modal.svelte';
 	import { toast } from '$lib/components/toast.svelte';
@@ -22,8 +23,7 @@
 		simulasiHari,
 		simulasiJam,
 		tipePresensi = 'awal_mapel',
-		jenisPresensi = 'wali_kelas_saja',
-		bypassJadwal = false
+		jenisPresensi = 'wali_kelas_saja'
 	}: {
 		daftarMurid: MuridItem[];
 		kelasId?: number;
@@ -72,7 +72,6 @@
 	}
 
 	let step = $state<'pilih-mode' | 'pilih-murid'>('pilih-mode');
-	let pilihanHadirSemua = $state<string>('');
 	let searchTerm = $state('');
 	let selectedIds = $state<number[]>([]);
 	let keteranganMap = $state<Record<number, string>>({});
@@ -120,8 +119,7 @@
 			}
 		} else {
 			selectedIds = selectedIds.filter((x) => x !== id);
-			const { [id]: _, ...rest } = keteranganMap;
-			keteranganMap = rest;
+			delete keteranganMap[id];
 		}
 	}
 
@@ -152,7 +150,6 @@
 	}
 
 	function pilihTidak() {
-		pilihanHadirSemua = 'tidak';
 		step = 'pilih-murid';
 		updateModal({
 			onPositive: {
@@ -171,7 +168,6 @@
 
 	function goToStep1() {
 		step = 'pilih-mode';
-		pilihanHadirSemua = '';
 		updateModal({
 			onPositive: {
 				label: 'Ya',

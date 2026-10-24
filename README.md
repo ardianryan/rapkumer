@@ -192,6 +192,22 @@ pnpm package:win             # Menyiapkan artefak installer sistem operasi Windo
 
 Sebagai bentuk integritas etika open-source dan apresiasi mendalam, platform ini berakar dan dikembangkan lebih lanjut dari proyek utama **[Rapkumer](https://github.com/apoxicam/rapkumer)** yang diprakarsai oleh tim pengembang aslinya. Repositori ini memperluas kapabilitas inti tersebut dengan dukungan server skala institusi, integrasi multi-database, dan fitur spesifik sekolah.
 
+### Skills untuk AI Coding Agent (opencode)
+
+Skills (instruksi untuk agent coding) disimpan di folder `.agents/skills/` dan dibaca otomatis oleh opencode. Terdapat dua kelompok:
+
+- **Strix (security testing):** 9 skill untuk menjalankan AI pentest, memperbaiki temuan keamanan, dan menyiapkan CI scanning. Cara install/pembaruan:
+
+  ```sh
+  npx skills add usestrix/strix
+  ```
+
+  Panduan instalasi Strix CLI, konfigurasi LLM, dan perintah scan tersedia di `docs/SKILLS.md`.
+
+- **Bahasa Indonesia:** skill `bahasa-inti` (aturan inti penulisan bahasa Indonesia) dan `bahasa-website` (penulisan UX/microcopy) — sudah termasuk di repository.
+
+Restart ulang session opencode setelah menambah atau memperbarui skills agar dikenali.
+
 ### 🌐 Tautan Hulu (Upstream) & Diskusi Komunitas
 
 - **Repositori Resmi Hulu**: [github.com/apoxicam/rapkumer](https://github.com/apoxicam/rapkumer)

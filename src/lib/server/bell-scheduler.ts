@@ -238,13 +238,13 @@ async function checkSekolah(
 		const parsed = JSON.parse(presensiSettings.liburNasional || '[]');
 		if (Array.isArray(parsed)) liburNasional = parsed;
 	} catch {
-		// Abaikan error parsing JSON
+		// Invalid holiday JSON falls back to the empty list.
 	}
 	try {
 		const parsed = JSON.parse(presensiSettings.liburSemester || '[]');
 		if (Array.isArray(parsed)) liburSemester = parsed;
 	} catch {
-		// Abaikan error parsing JSON
+		// Invalid semester holiday JSON falls back to the empty list.
 	}
 	if (liburNasional.includes(dateStr)) return;
 	for (const range of liburSemester) {

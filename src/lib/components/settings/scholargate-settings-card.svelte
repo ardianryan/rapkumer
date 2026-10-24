@@ -5,7 +5,7 @@
 
 	interface ScholargateData {
 		baseUrl: string;
-		maskedKey: string;
+		maskedKey?: string | null;
 		keySet: boolean;
 		referer: string;
 	}

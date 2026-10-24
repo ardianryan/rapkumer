@@ -5,7 +5,7 @@
 
 	interface AkasData {
 		baseUrl: string;
-		maskedKey: string;
+		maskedKey?: string | null;
 		keySet: boolean;
 		sumberPresensi: 'lokal' | 'akas';
 	}

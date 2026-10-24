@@ -26,7 +26,11 @@ import {
 } from '$lib/server/storage-settings';
 import { dataRoot, soundsDir, uploadsDir } from '$lib/server/data-dirs';
 import { validatePasswordStrength } from '$lib/server/password-policy';
-import { isBukuTamuPasskeySet, setBukuTamuPasskey } from '$lib/server/buku-tamu-pass';
+import {
+	isBukuTamuPasskeySet,
+	setBukuTamuPasskey,
+	getBukuTamuPasskey
+} from '$lib/server/buku-tamu-pass';
 import {
 	clearAiSettings,
 	clearUserAiSettings,
@@ -132,10 +136,11 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		!isSsoUser &&
 		(url.searchParams.get('force') === '1' || Boolean(locals.user?.mustChangePassword));
 
+	const sekolahIdLoad = locals.sekolah?.id;
 	const bukuTamuPasskeySet =
-		isAdminOrKepalaSekolah && locals.sekolah?.id
-			? await isBukuTamuPasskeySet(locals.sekolah.id)
-			: false;
+		isAdminOrKepalaSekolah && sekolahIdLoad ? await isBukuTamuPasskeySet(sekolahIdLoad) : false;
+	const bukuTamuPasskey =
+		isAdminOrKepalaSekolah && sekolahIdLoad ? await getBukuTamuPasskey(sekolahIdLoad) : null;
 
 	const storedGemini = isAdminOrKepalaSekolah ? await getStoredAiSettings() : null;
 
@@ -183,6 +188,7 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		forcePasswordChange,
 		isSsoUser,
 		bukuTamuPasskeySet,
+		bukuTamuPasskey,
 		gemini: {
 			keySet: Boolean(storedGemini),
 			maskedKey: storedGemini ? maskApiKey(storedGemini.apiKey) : null,

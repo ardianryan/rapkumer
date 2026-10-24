@@ -1,5 +1,4 @@
 <script lang="ts">
-	/* eslint-disable svelte/prefer-writable-derived */
 	import { goto, invalidate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -7,6 +6,7 @@
 	import { showModal } from '$lib/components/global-modal.svelte';
 	import IsiSekaligusModal from '$lib/components/absen/isi-sekaligus-modal.svelte';
 	import DownloadRekapModal from '$lib/components/absen/download-rekap-modal.svelte';
+	import ImportPresensiModal from '$lib/components/absen/import-presensi-modal.svelte';
 	import HapusPresensiModal from '$lib/components/absen/hapus-presensi-modal.svelte';
 	import TarikAkasModal from '$lib/components/absen/tarik-akas-modal.svelte';
 	import TableHarian from '$lib/components/absen/table-harian.svelte';
@@ -349,12 +349,7 @@
 	const hasMurid = $derived.by(() => data.muridCount > 0);
 	const hasFilteredMurid = $derived.by(() => data.totalMurid > 0);
 
-	// svelte-ignore state_referenced_locally
-	let selectedTanggal = $state(data.tanggal);
-
-	$effect(() => {
-		selectedTanggal = data.tanggal;
-	});
+	let selectedTanggal = $derived(data.tanggal);
 
 	const isToday = $derived.by(() => {
 		const y = serverTime.now.getFullYear();
@@ -363,15 +358,7 @@
 		return data.tanggal === `${y}-${m}-${day}`;
 	});
 
-	// svelte-ignore state_referenced_locally
-	let selectedMode = $state<
-		| 'harian'
-		| 'bulanan'
-		| 'rapor'
-		| 'persentase_harian'
-		| 'persentase_bulanan'
-		| 'persentase_semester'
-	>(data.mode);
+	let selectedMode = $derived(data.mode);
 	// svelte-ignore state_referenced_locally
 	let selectedBulan = $state(
 		data.mode === 'bulanan' || data.mode === 'persentase_bulanan'
@@ -384,10 +371,6 @@
 			? data.tahun
 			: serverTime.now.getFullYear()
 	);
-
-	$effect(() => {
-		selectedMode = data.mode;
-	});
 
 	$effect(() => {
 		if (data.mode === 'bulanan' || data.mode === 'persentase_bulanan') {
@@ -539,6 +522,18 @@
 			onNegative: {
 				label: 'Batal'
 			},
+			dismissible: true
+		});
+	}
+
+	function openImportPresensi() {
+		let action: () => Promise<void>;
+		showModal({
+			title: 'Import Presensi',
+			body: ImportPresensiModal,
+			bodyProps: { onAction: (value: () => Promise<void>) => (action = value) },
+			onPositive: { label: 'Import', action: () => action() },
+			onNegative: { label: 'Batal' },
 			dismissible: true
 		});
 	}
@@ -866,14 +861,23 @@
 				</button>
 			</div>
 		</div>
-		<button
-			type="button"
-			class="btn btn-soft shadow-none max-sm:w-full sm:w-auto"
-			onclick={openDownloadRekap}
-		>
-			<Icon name="download" />
-			Download Rekap (.xlsx)
-		</button>
+		<div class="join max-sm:w-full sm:w-auto">
+			<button
+				type="button"
+				class="btn btn-soft join-item shadow-none max-sm:flex-1"
+				onclick={openDownloadRekap}
+			>
+				<Icon name="download" /> Download Rekap (.xlsx)
+			</button>
+			<div class="dropdown dropdown-end">
+				<button type="button" class="btn btn-soft join-item shadow-none" aria-label="Menu rekap"
+					><Icon name="down" /></button
+				>
+				<ul class="dropdown-content menu bg-base-100 rounded-box z-10 mt-1 w-48 p-2 shadow">
+					<li><button type="button" onclick={openImportPresensi}>Import Presensi</button></li>
+				</ul>
+			</div>
+		</div>
 	</div>
 
 	{#if showSimulasi}
@@ -1052,8 +1056,6 @@
 	{:else if data.mode === 'persentase_semester'}
 		<TablePersentaseSemester
 			rows={data.persentaseSemesterRows}
-			tanggalMulai={data.tanggalMulaiRapor}
-			tanggalAkhir={data.tanggalAkhirRapor}
 			totalHariBelajar={data.totalHariBelajar}
 			jenisPresensi={data.jenisPresensi}
 			tipePresensi={data.tipePresensi}

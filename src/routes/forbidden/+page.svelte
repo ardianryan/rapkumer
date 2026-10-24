@@ -1,6 +1,22 @@
 <script lang="ts">
+	/* eslint-disable svelte/no-navigation-without-resolve -- halaman statis, link untuk navigasi pengguna */
 	import { page } from '$app/state';
 	import Icon from '$lib/components/icon.svelte';
+	import { groupedUserPermissions } from '../pengguna/permissions';
+
+	// Key yang bukan permission, melainkan pembatas scope/role.
+	const scopeLabels: Record<string, string> = {
+		kelas_id: 'Kelas yang Anda ampu',
+		mapel_id: 'Mata pelajaran yang Anda ampu',
+		admin: 'Hanya admin sekolah',
+		'admin/kepala_sekolah': 'Hanya admin atau kepala sekolah'
+	};
+
+	const permissionLabels = new Map<string, string>(
+		Object.entries(groupedUserPermissions).flatMap(([group, { values }]) =>
+			values.map((value) => [`${group}_${value[0]}`, value[1]] as [string, string])
+		)
+	);
 
 	const isMenuDisabled = $derived(page.url.searchParams.get('reason') === 'menu_disabled');
 	const required = $derived(
@@ -10,6 +26,10 @@
 			.filter(Boolean)
 	);
 
+	const needed = $derived([
+		...new Set(required.map((key) => scopeLabels[key] ?? permissionLabels.get(key) ?? key))
+	]);
+
 	function goBack() {
 		if (history.length > 1) history.back();
 		else location.href = '/';
@@ -17,61 +37,47 @@
 </script>
 
 <div class="flex items-center justify-center">
-	<div class="w-full">
-		<div class="overflow-hidden rounded-lg shadow-md">
-			<div class="from-primary to-secondary bg-linear-to-r p-8 text-white">
-				<div class="flex items-center gap-6">
-					<div class="flex h-24 w-24 items-center justify-center rounded-lg bg-white/10">
-						<Icon name="lock" class="text-4xl text-white" />
-					</div>
-					<div>
-						<h1 class="text-2xl font-semibold">
-							{isMenuDisabled ? 'Menu Dinonaktifkan' : 'Akses Ditolak'}
-						</h1>
-						<p class="mt-1 text-sm opacity-90">
-							{isMenuDisabled
-								? 'Menu ini sedang dinonaktifkan sementara oleh Administrator atau Kurikulum Sekolah.'
-								: 'Anda tidak memiliki izin yang diperlukan untuk membuka halaman ini.'}
-						</p>
-					</div>
+	<div class="card bg-base-100 w-full max-w-none shadow-md">
+		<div class="card-body items-center text-center">
+			<Icon name="lock" class="text-warning h-10 w-10" />
+
+			<h1 class="text-2xl font-bold">
+				{isMenuDisabled ? 'Menu Dinonaktifkan' : 'Akses Ditolak'}
+			</h1>
+			<p class="text-base-content/70 max-w-md text-sm">
+				{isMenuDisabled
+					? 'Menu ini sedang dinonaktifkan sementara oleh Administrator atau Kurikulum Sekolah.'
+					: 'Akun Anda belum memiliki izin yang diperlukan untuk membuka halaman ini.'}
+			</p>
+
+			{#if isMenuDisabled}
+				<div class="bg-base-200 rounded-box mt-2 w-full px-4 py-3 text-left">
+					<p class="text-sm font-semibold">Informasi Visibilitas Menu</p>
+					<p class="text-base-content/70 mt-1 text-xs">
+						Halaman ini disembunyikan dari antarmuka guru untuk menjaga fokus pengisian pada modul
+						lain yang sedang berlangsung (misalnya periode Rapor Sisipan).
+					</p>
 				</div>
-			</div>
-
-			<div class="bg-base-100 p-6">
-				<div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-					<div class="flex-1">
-						{#if isMenuDisabled}
-							<h3 class="text-lg font-medium">Informasi Visibilitas Menu</h3>
-							<p class="text-muted mt-2 text-sm">
-								Halaman ini disembunyikan dari antarmuka guru untuk menjaga fokus pengisian pada
-								modul lain yang sedang berlangsung (misalnya periode Rapor Sisipan).
-							</p>
-						{:else}
-							<h3 class="text-lg font-medium">Izin yang dibutuhkan</h3>
-							{#if required.length}
-								<div class="mt-3 flex flex-wrap gap-2">
-									{#each required as perm (perm)}
-										<span class="badge badge-error">{perm}</span>
-									{/each}
-								</div>
-							{:else}
-								<p class="text-muted mt-2 text-sm">Tidak ada informasi izin tersedia.</p>
-							{/if}
-						{/if}
-					</div>
-
-					<div class="flex shrink-0 flex-col items-stretch gap-2 md:items-end">
-						<div class="flex gap-2">
-							<button class="btn btn-soft shadow-none" onclick={goBack} aria-label="Kembali"
-								>Kembali</button
-							>
-						</div>
-					</div>
+			{:else if needed.length}
+				<div class="bg-base-200 rounded-box mt-2 w-full px-4 py-3 text-left">
+					<p class="text-sm font-semibold">Izin yang dibutuhkan</p>
+					<ul class="mt-2 flex flex-wrap gap-2">
+						{#each needed as item (item)}
+							<li><span class="badge badge-soft badge-warning">{item}</span></li>
+						{/each}
+					</ul>
 				</div>
+			{/if}
 
-				<p class="text-muted mt-6 text-sm">
-					Hubungi administrator sekolah jika Anda merasa membutuhkan akses ke halaman ini.
-				</p>
+			<p class="text-base-content/70 text-sm mt-2">
+				{isMenuDisabled
+					? 'Hubungi administrator sekolah jika menu ini perlu diaktifkan kembali.'
+					: 'Hubungi administrator sekolah untuk membuka izin ini di menu Pengguna.'}
+			</p>
+
+			<div class="card-actions mt-4 justify-center gap-3">
+				<button type="button" class="btn btn-soft shadow-none" onclick={goBack}>Kembali</button>
+				<a href="/" class="btn btn-primary shadow-none">Ke Dashboard</a>
 			</div>
 		</div>
 	</div>

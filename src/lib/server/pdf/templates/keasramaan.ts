@@ -1,7 +1,10 @@
 import { sharedStyles, formatValue, formatUpper, FALLBACK, getTutwuriBwDataUri } from './shared';
+import { ttdStempelBoxHTML } from '$lib/server/tanda-tangan-sekolah';
+import { guruTtdBoxHTML } from '$lib/server/tanda-tangan-guru';
 
 interface KeasramaanPrintData {
 	sekolah: {
+		id?: number;
 		nama: string;
 		alamat: string;
 		logoUrl?: string | null;
@@ -11,8 +14,9 @@ interface KeasramaanPrintData {
 	rombel: { nama: string; fase: string };
 	periode: { tahunAjaran: string; semester: string };
 	waliAsrama: { nama: string; nip?: string | null } | null;
+	waliAsramaTtdUserId?: number | null;
 	waliKelas: { nama: string; nip?: string | null } | null;
-	waliAsuh: { nama: string; nip?: string | null } | null;
+	waliAsuh: { nama: string; nip?: string | null; ttdUserId?: number | null } | null;
 	kepalaSekolah: { nama: string; nip?: string | null; statusKepalaSekolah?: string | null } | null;
 	ttd: { tempat: string; tanggal: string };
 	kehadiran: { sakit: number; izin: number; alfa: number } | null;
@@ -300,6 +304,8 @@ export function renderKeasramaanHTML(data: KeasramaanPrintData): string {
 	const waliAsuhLabel = 'Wali Asuh';
 	const waliAsuhName = data.waliAsuh ? formatValue(data.waliAsuh.nama) : FALLBACK;
 	const waliAsuhNip = data.waliAsuh?.nip ? `${formatValue(data.waliAsuh.nip)}` : '';
+	const waliAsramaTtd = guruTtdBoxHTML(data.waliAsramaTtdUserId, '6rem');
+	const waliAsuhTtd = guruTtdBoxHTML(data.waliAsuh?.ttdUserId, '6rem');
 
 	const kepalaSekolahLabel = data.kepalaSekolah ? kepalaSekolahTitle : '';
 	const kepalaSekolahNama = data.kepalaSekolah ? formatValue(data.kepalaSekolah.nama) : '';
@@ -399,8 +405,8 @@ ${kehadiranSection}
 			<td class="font-bold">${waliAsuhLabel}</td>
 		</tr>
 		<tr>
-			<td class="h-24"></td>
-			<td></td>
+			<td class="h-24">${waliAsramaTtd ?? ''}</td>
+			<td>${waliAsuhTtd ?? ''}</td>
 		</tr>
 		<tr>
 			<td class="font-bold underline">${waliAsramaName}</td>
@@ -422,7 +428,7 @@ ${kehadiranSection}
 		</tr>
 		<tr>
 			<td class="h-24"></td>
-			<td></td>
+			<td>${ttdStempelBoxHTML(data.sekolah.id, '6rem')}</td>
 		</tr>
 		<tr>
 			<td class="text-center">____________________</td>

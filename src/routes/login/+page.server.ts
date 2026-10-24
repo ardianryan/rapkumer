@@ -16,6 +16,7 @@ import { tableAuthUserPembelajaran, tableKelas, tableMataPelajaran } from '$lib/
 import { eq, sql } from 'drizzle-orm';
 import { fail, redirect } from '@sveltejs/kit';
 import { getZitadelConfig } from '$lib/server/zitadel';
+import { ensureWaliAsramaAccount } from '../pengguna/consolidation.server';
 import type { Actions, PageServerLoad } from './$types';
 
 function resolveRedirectTarget(value: string | null) {
@@ -146,6 +147,16 @@ export const actions: Actions = {
 		await clearLoginAttempts(username);
 		await recordLoginAttempt(username, client, true);
 
+		// Sinkronkan permission wali asrama (mis. default baru ditambahkan)
+		// sebelum sesi dibuat, supaya menu sesuai permission terbaru.
+		if (user.type === 'wali_asrama' && user.pegawaiId) {
+			try {
+				await ensureWaliAsramaAccount(user.pegawaiId);
+			} catch (err) {
+				console.warn('[login action] gagal sinkron permission wali asrama', err);
+			}
+		}
+
 		const session = await createSession(user.id, {
 			userAgent: request.headers.get('user-agent'),
 			ipAddress: client
@@ -201,6 +212,24 @@ export const actions: Actions = {
 					});
 					if (waliKelas.sekolahId) {
 						cookies.set(cookieNames.ACTIVE_SEKOLAH_ID, String(waliKelas.sekolahId), {
+							path: '/',
+							secure
+						});
+					}
+				}
+			} else if (authUser.type === 'wali_asrama' && authUser.pegawaiId) {
+				// Wali asrama: kelas yang diampunya (kelas.waliAsramaId).
+				const waliAsrama = await db.query.tableKelas.findFirst({
+					columns: { id: true, sekolahId: true },
+					where: eq(tableKelas.waliAsramaId, authUser.pegawaiId)
+				});
+				if (waliAsrama) {
+					cookies.set(cookieNames.ACTIVE_KELAS_ID, String(waliAsrama.id), {
+						path: '/',
+						secure
+					});
+					if (waliAsrama.sekolahId) {
+						cookies.set(cookieNames.ACTIVE_SEKOLAH_ID, String(waliAsrama.sekolahId), {
 							path: '/',
 							secure
 						});

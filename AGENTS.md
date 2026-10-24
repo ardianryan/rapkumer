@@ -16,6 +16,7 @@ pnpm package:win             # stage windows installer artifacts
 pnpm prepare                 # svelte-kit sync (auto-runs on install)
 pnpm check                   # svelte-kit sync + svelte-check
 pnpm check:watch             # svelte-kit sync + svelte-check --watch
+pnpm check:wali-asrama       # self-check alur wali asrama (DB temp, kode asli via Vite SSR)
 pnpm lint                    # prettier --check . && eslint .
 pnpm format                  # prettier --write . (tabs, single quotes, no trailing comma, width 100)
 strix -n -t ./ --scan-mode quick   # AI pentest (install & usage: docs/SKILLS.md)
@@ -57,7 +58,7 @@ strix -n -t ./ --scan-mode quick   # AI pentest (install & usage: docs/SKILLS.md
 - Custom session auth (not Lucia). Session TTL 12h, refresh threshold 2h.
 - Cookie names from `$lib/utils.ts` `cookieNames`: `rapkumer-session`, `active-sekolah-id`, `active-kelas-id`.
 - Default admin: `Admin` / `Admin123` (created by `ensureDefaultAdmin()` on first start).
-- User types: `admin`, `wali_kelas`, `wali_asuh`, `user`. Permissions stored as JSON array on `auth_user.permissions`.
+- User types: `admin`, `wali_kelas`, `wali_asuh`, `wali_asrama`, `user`. Permissions stored as JSON array on `auth_user.permissions`.
 - Three hooks composed via `sequence(csrfGuard, authGuard, cookieParser)` in `src/hooks.server.ts`.
 - CSRF: SvelteKit's built-in disabled (`csrf.trustedOrigins: ['*']`). Custom guard checks origin/referer.
 - `event.locals.sekolah` scopes all queries — set by `cookieParser` hook.
@@ -129,6 +130,7 @@ The 4 logic blocks below are **mutually exclusive** — gated by `isWaliKelasMas
 ## Quality
 
 - Run `pnpm lint` then `pnpm check` before committing.
+- `state_referenced_locally` fails `pnpm check` via `svelte-check --fail-on-warnings` (default in `scripts/svelte-check-wrapper.mjs`). Intentional initial-value captures from `data`/props must opt out with a `// svelte-ignore state_referenced_locally` comment directly above the `$state(...)` line — only when the one-time snapshot is deliberate.
 - No test framework wired (vitest/playwright absent).
 
 ## Security (Strix)

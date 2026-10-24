@@ -1,5 +1,5 @@
 <script lang="ts">
-	/* eslint-disable svelte/no-navigation-without-resolve */
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import Icon from '$lib/components/icon.svelte';
 	import { favoritesStore, type Favorite } from '$lib/stores/favorites.svelte';
@@ -76,7 +76,7 @@
 						class="flex items-center justify-between px-2.5 py-1.5 rounded-xl hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-all group"
 					>
 						<a
-							href={fav.path}
+							href={resolve(fav.path as '/')}
 							class="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:text-primary truncate flex-1"
 						>
 							<span class="h-1.5 w-1.5 rounded-full bg-primary/60"></span>

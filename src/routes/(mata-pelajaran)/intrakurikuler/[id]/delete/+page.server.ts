@@ -1,5 +1,6 @@
 import db from '$lib/server/db/index.js';
 import { tableKelas, tableMataPelajaran, tableTujuanPembelajaran } from '$lib/server/db/schema.js';
+import { isWaliOfKelas } from '$lib/server/kelas-akses';
 import { eq, inArray, and, like } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import { parseJenjangKelas } from '$lib/utils.js';
@@ -41,6 +42,12 @@ export const actions = {
 				return fail(404, { fail: 'Mata pelajaran tidak ditemukan.' });
 			}
 
+			// Wali kelas hanya boleh menghapus mapel di kelas miliknya
+			const userObj = locals.user as { type?: string; pegawaiId?: number | null } | null;
+			if (userObj?.type === 'wali_kelas' && !(await isWaliOfKelas(userObj, mapel.kelasId))) {
+				return fail(403, { fail: 'Anda tidak memiliki izin untuk menghapus di kelas ini.' });
+			}
+
 			const sekolahId = locals.sekolah?.id;
 			let targetKelasIds: number[] = [mapel.kelasId];
 
@@ -71,7 +78,6 @@ export const actions = {
 					eq(tableMataPelajaran.nama, mapel.nama)
 				)
 			});
-
 			const isPksParent = mapel.nama === 'Pendalaman Kitab Suci';
 			const isAgamaParent = mapel.nama === 'Pendidikan Agama dan Budi Pekerti';
 

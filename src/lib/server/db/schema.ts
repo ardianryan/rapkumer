@@ -31,12 +31,14 @@ export const tableAuthUser = sqliteTable(
 		// Login dipaksa untuk mengganti sandi lewat /pengaturan sebelum akses lain.
 		mustChangePassword: int({ mode: 'boolean' }).default(false).notNull(),
 		permissions: text({ mode: 'json' }).notNull().default('[]').$type<UserPermission[]>(),
-		// tipe user: admin (penuh), kepala_sekolah (penuh, per sekolah aktif), wali_kelas (terbatas ke kelas_id), wali_asuh (terbatas ke keasramaan), atau user (default/other)
-		type: text({ enum: ['admin', 'kepala_sekolah', 'wali_kelas', 'wali_asuh', 'user'] })
+		// tipe user: admin (penuh), kepala_sekolah (penuh, per sekolah aktif), wali_kelas (terbatas ke kelas_id), wali_asuh (terbatas ke keasramaan), wali_asrama (terbatas ke kelas yang diampunya + keasramaan), atau user (default/other)
+		type: text({
+			enum: ['admin', 'kepala_sekolah', 'wali_kelas', 'wali_asuh', 'wali_asrama', 'user']
+		})
 			.notNull()
 			.default('admin'),
 		// optional: directly associate a user to a sekolah so login can pick it reliably
-		sekolahId: int().references(() => tableSekolah.id),
+		sekolahId: int().references((): AnySQLiteColumn => tableSekolah.id),
 		// referensi opsional ke pegawai (nama wali kelas disimpan di tablePegawai)
 		pegawaiId: int().references(() => tablePegawai.id),
 		// untuk wali_kelas kita bisa menyimpan kelas_id yang diijinkan
@@ -1502,6 +1504,10 @@ export const tableBukuTamuSettings = sqliteTable(
 		sekolahId: int()
 			.references(() => tableSekolah.id, { onDelete: 'cascade' })
 			.notNull(),
+		// ponytail: plaintext on purpose — the guest-book gate is low-sensitivity and the
+		// admin UI must display the active passkey. Upgrade path: encrypt at rest (or show
+		// once at save) if the threat model changes.
+		passkey: text(),
 		passkeyHash: text(),
 		passkeySalt: text(),
 		unlockToken: text(),

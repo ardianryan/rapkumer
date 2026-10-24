@@ -328,14 +328,15 @@
 {:else}
 	<main class="drawer lg:drawer-open">
 		<input id="my-drawer-2" type="checkbox" class="drawer-toggle" />
-		<div class="drawer-content flex min-h-screen flex-col">
+		<div class="drawer-content flex min-h-dvh flex-col">
 			<Navbar {stopServer} {stoppingServer} {logout} {loggingOut} />
 
 			<div
 				class="border-slate-200/70 bg-slate-50/80 dark:border-slate-800/80 dark:bg-base-200/50 flex flex-1 flex-col overflow-hidden border-t transition-colors lg:mr-2 lg:mb-2 lg:rounded-2xl lg:border-t-0 lg:border-l"
 			>
 				<div
-					class="max-h-[calc(100vh-4.2rem)] min-h-[calc(100vh-4.2rem)] max-w-none overflow-y-auto md:max-h-[calc(100vh-4.6rem)] md:min-h-[calc(100vh-4.6rem)]"
+					data-scroll-container
+					class="max-h-[calc(100dvh-4.2rem)] min-h-[calc(100dvh-4.2rem)] max-w-none overflow-y-auto overscroll-contain md:max-h-[calc(100dvh-4.6rem)] md:min-h-[calc(100dvh-4.6rem)]"
 				>
 					<div class="m-4 flex flex-row xl:gap-4">
 						<div class="w-full max-w-7xl min-w-0 flex-1">

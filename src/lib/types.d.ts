@@ -42,6 +42,7 @@ interface CoverPrintData {
 
 interface BiodataPrintData {
 	sekolah: {
+		id?: number;
 		nama: string;
 		bgLogoSrc?: string | null;
 		statusKepalaSekolah?: string | null;
@@ -98,6 +99,7 @@ interface BiodataPrintData {
 
 interface RaporPrintData {
 	sekolah: {
+		id?: number;
 		nama: string;
 		alamat: string;
 		bgLogoSrc?: string | null;
@@ -120,6 +122,7 @@ interface RaporPrintData {
 	waliKelas: {
 		nama: string;
 		nip?: string | null;
+		ttdUserId?: number | null;
 	};
 	kepalaSekolah: {
 		nama: string;
@@ -159,6 +162,7 @@ interface RaporPrintData {
 
 interface PiagamPrintData {
 	sekolah: {
+		id?: number;
 		nama: string;
 		jenjang: 'sd' | 'smp' | 'sma' | 'slb' | 'pkbm' | 'srt';
 		jenjangVariant?: string | null;
@@ -205,12 +209,14 @@ interface PiagamPrintData {
 		waliKelas: {
 			nama: string;
 			nip?: string | null;
+			ttdUserId?: number | null;
 		};
 	};
 }
 
 interface KeasramaanPrintData {
 	sekolah: {
+		id?: number;
 		nama: string;
 		alamat: string;
 		logoUrl?: string | null;
@@ -318,9 +324,11 @@ declare module 'exceljs' {
 	export interface Worksheet {
 		name?: string;
 		rowCount: number;
-		columnCount: number;
+		columnCount?: number;
 		getRow(row: number): Row;
-		getCell(address: string): Cell;
+		addRow(row: unknown[]): void;
+		mergeCells(range: string): void;
+		getCell(address: string | number, column?: number): Cell;
 		addRows(rows: Array<unknown>): void;
 		getColumn(index: number): { width?: number; hidden?: boolean };
 		views?: unknown;

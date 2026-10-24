@@ -8,6 +8,9 @@
 	import ChangeUsernameCard from '$lib/components/settings/change-username-card.svelte';
 	import ChangePasswordCard from '$lib/components/settings/change-password-card.svelte';
 	import StorageLocationCard from '$lib/components/settings/storage-location-card.svelte';
+	import KopSuratCard from '$lib/components/settings/kop-surat-card.svelte';
+	import TandaTanganCard from '$lib/components/settings/tanda-tangan-card.svelte';
+	import TandaTanganGuruCard from '$lib/components/settings/tanda-tangan-guru-card.svelte';
 	import DatabaseCard from '$lib/components/settings/database-card.svelte';
 	import BukuTamuPasskeyCard from '$lib/components/settings/buku-tamu-passkey-card.svelte';
 	import AiKeyCard from '$lib/components/settings/ai-key-card.svelte';
@@ -16,7 +19,11 @@
 	import ScholargateSettingsCard from '$lib/components/settings/scholargate-settings-card.svelte';
 	import type { PageData } from './$types';
 
-	const { data } = $props<{ data: PageData }>();
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	let user = $derived(page.data.user);
 	const isAdmin = $derived(user?.type === 'admin' || user?.type === 'kepala_sekolah');
@@ -28,7 +35,7 @@
 	let wasForcePasswordChange = $state(data.forcePasswordChange);
 	let passwordChanged = $state(false);
 
-	type TabId = 'akun' | 'visibilitas' | 'ai' | 'sistem';
+	type TabId = 'akun' | 'dokumen' | 'visibilitas' | 'ai' | 'sistem';
 
 	// Tab aktif yang disinkronkan dengan URL parameter ?tab=...
 	let activeTab = $state<TabId>('akun');
@@ -38,11 +45,12 @@
 		if (
 			paramTab &&
 			(paramTab === 'akun' ||
+				paramTab === 'dokumen' ||
 				paramTab === 'visibilitas' ||
 				paramTab === 'ai' ||
 				paramTab === 'sistem')
 		) {
-			if (isAdmin || paramTab === 'akun' || paramTab === 'ai') {
+			if (isAdmin || paramTab === 'akun' || paramTab === 'ai' || paramTab === 'dokumen') {
 				activeTab = paramTab;
 			}
 		}
@@ -133,6 +141,21 @@
 			<button
 				type="button"
 				role="tab"
+				aria-selected={activeTab === 'dokumen'}
+				class="tab tab-sm sm:tab-md font-semibold rounded-lg transition-all {activeTab === 'dokumen'
+					? 'tab-active bg-base-100 shadow-sm text-primary font-bold'
+					: 'hover:text-base-content text-base-content/70'}"
+				onclick={() => switchTab('dokumen')}
+			>
+				<Icon name="pen" class="h-4 w-4 mr-1.5" />
+				Kop & Tanda Tangan
+			</button>
+		{/if}
+
+		{#if isAdmin}
+			<button
+				type="button"
+				role="tab"
 				aria-selected={activeTab === 'visibilitas'}
 				class="tab tab-sm sm:tab-md font-semibold rounded-lg transition-all {activeTab ===
 				'visibilitas'
@@ -188,9 +211,21 @@
 			<ChangePasswordCard onsuccess={handlePasswordSuccess} isSsoUser={data.isSsoUser} />
 		</div>
 
-		{#if isAdmin}
-			<BukuTamuPasskeyCard passkeySet={data.bukuTamuPasskeySet} />
+		{#if user?.type === 'wali_kelas' || user?.type === 'wali_asuh' || user?.type === 'wali_asrama' || user?.type === 'user'}
+			<TandaTanganGuruCard />
 		{/if}
+
+		{#if isAdmin}
+			<BukuTamuPasskeyCard
+				passkeySet={data.bukuTamuPasskeySet}
+				activePasskey={data.bukuTamuPasskey}
+			/>
+		{/if}
+	</div>
+{:else if activeTab === 'dokumen' && isAdmin}
+	<div class="space-y-4">
+		<KopSuratCard />
+		<TandaTanganCard />
 	</div>
 {:else if activeTab === 'visibilitas' && isAdmin}
 	<div class="space-y-4">

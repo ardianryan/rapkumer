@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import Icon from '../icon.svelte';
 
 	let {
@@ -7,7 +8,8 @@
 		anySelected,
 		canManage,
 		onToggleCreateForm,
-		onOpenBulkDelete
+		onOpenBulkDelete,
+		children
 	}: {
 		isCreateMode: boolean;
 		isEditMode: boolean;
@@ -15,6 +17,7 @@
 		canManage: boolean;
 		onToggleCreateForm: () => void;
 		onOpenBulkDelete: () => void;
+		children?: Snippet;
 	} = $props();
 </script>
 
@@ -40,7 +43,7 @@
 			</button>
 		{:else}
 			<button
-				class={`btn btn-soft w-full shadow-none sm:max-w-40 ${isCreateMode ? 'btn-error' : ''}`}
+				class={`btn btn-soft shadow-none sm:ml-auto ${isCreateMode ? 'btn-error' : ''}`}
 				type="button"
 				onclick={onToggleCreateForm}
 				disabled={!canManage || isEditMode}
@@ -50,4 +53,8 @@
 			</button>
 		{/if}
 	</div>
+
+	{#if children}
+		{@render children()}
+	{/if}
 </div>

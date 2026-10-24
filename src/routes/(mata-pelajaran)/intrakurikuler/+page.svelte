@@ -12,11 +12,11 @@
 		agamaMapelLabelByName,
 		agamaMapelNames,
 		agamaParentName,
-		jenisMapel,
 		pksMapelLabelByName,
 		pksMapelNames,
 		pksParentName
 	} from '$lib/statics';
+	import { jenisMapelLabel, jenisMapelLabelShort } from '$lib/jenis-mapel';
 	import IntrakurikulerModals from '$lib/components/intrakurikuler/modals.svelte';
 	import { touchDragSource, dropTarget } from '$lib/touch-drag.svelte';
 
@@ -31,6 +31,7 @@
 	}: {
 		data: {
 			mapel: { daftarMapel: MapelWithIndicator[] };
+			kelasId?: number | null;
 			adaDataDapodik?: boolean;
 			isAdmin?: boolean;
 		};
@@ -79,14 +80,26 @@
 		// default to true for backwards compatibility
 		return u?.canManageMapel ?? true;
 	});
-	const canEditUrutan = $derived.by(() => {
+	const baseCanEditUrutan = $derived.by(() => {
 		const u = page.data.user as { canEditUrutan?: boolean } | null | undefined;
 		return u?.canEditUrutan ?? false;
 	});
-	const canAddImportMapel = $derived.by(() => {
+	const baseCanAddImportMapel = $derived.by(() => {
 		const u = page.data.user as { canAddImportMapel?: boolean } | null | undefined;
 		return u?.canAddImportMapel ?? false;
 	});
+
+	// Wali kelas sedang melihat kelas bukan miliknya (mis. kelas tempat ia hanya
+	// jadi guru mapel) → hak turun ke level guru: tak bisa tambah/impor/urutan.
+	const isNonOwnClass = $derived.by(() => {
+		const u = page.data.user as
+			{ type?: string; kelasId?: number | null; ownKelasIds?: number[] | null } | null | undefined;
+		if (u?.type !== 'wali_kelas' || data.kelasId == null) return false;
+		const ownIds = u.ownKelasIds?.length ? u.ownKelasIds : u.kelasId != null ? [u.kelasId] : [];
+		return ownIds.length > 0 && !ownIds.includes(data.kelasId);
+	});
+	const canEditUrutan = $derived(baseCanEditUrutan && !isNonOwnClass);
+	const canAddImportMapel = $derived(baseCanAddImportMapel && !isNonOwnClass);
 
 	// Dapatkan jenjang varian dari sekolah (misalnya 'SMK')
 	const jenjangVariant = $derived.by(() => {
@@ -96,7 +109,7 @@
 
 	// Fungsi khusus untuk jenjang SMK: ubah label "Wajib" menjadi "Umum"
 	function getWajibLabel(): string {
-		return jenjangVariant?.toUpperCase() === 'SMK' ? 'Umum' : 'Wajib';
+		return jenisMapelLabelShort('wajib', page.data.sekolah);
 	}
 
 	// Fungsi untuk mengecek apakah section kejuruan harus ditampilkan (hanya untuk SMK)
@@ -585,7 +598,7 @@
 								<p class="text-[11px] font-normal opacity-70">{mapel.keteranganDapodik}</p>
 							{/if}
 						</td>
-						<td class="whitespace-nowrap">{jenisMapel[mapel.jenis ?? 'wajib']}</td>
+						<td class="whitespace-nowrap">{jenisMapelLabel(mapel.jenis, page.data.sekolah)}</td>
 						<td class="font-mono text-sm"
 							>{mapel.kode ?? (mapel.nama === agamaParentName ? 'PAPB' : '—')}</td
 						>

@@ -22,7 +22,7 @@
 		pegawaiName?: string;
 		username?: string;
 		permissions?: string[];
-		type?: 'admin' | 'kepala_sekolah' | 'user' | 'wali_asuh';
+		type?: 'admin' | 'kepala_sekolah' | 'user' | 'wali_asuh' | 'wali_asrama' | 'wali_kelas';
 	};
 
 	let {
@@ -46,6 +46,13 @@
 		if (!user) return null;
 		// use runtime field `pegawaiName` if the server provided it, otherwise fall back to username
 		return (user as UserLike)?.pegawaiName ?? (user as UserLike)?.username ?? null;
+	});
+
+	const isNonOwnClass = $derived.by(() => {
+		if (!user || user.type !== 'wali_kelas' || !kelasAktif?.id) return false;
+		const u = user as { kelasId?: number | null; ownKelasIds?: number[] | null };
+		const ownIds = u.ownKelasIds?.length ? u.ownKelasIds : u.kelasId != null ? [u.kelasId] : [];
+		return ownIds.length > 0 && !ownIds.includes(kelasAktif.id);
 	});
 
 	// Whether current user can stop the server (client-side guard)
@@ -112,7 +119,7 @@
 	}
 
 	function hasPindahPermission() {
-		if (user?.type === 'wali_asuh') return true;
+		if (user?.type === 'wali_asuh' || user?.type === 'wali_asrama') return true;
 		const perms = user?.permissions ?? [];
 		return perms.includes('kelas_pindah');
 	}
@@ -236,6 +243,7 @@
 		showModal({
 			title: result.meta.title,
 			body: result.ContentPage,
+			typography: true,
 			dismissible: true
 		});
 	}
@@ -316,6 +324,57 @@
 					<div
 						class="dropdown-content bg-base-100 border border-slate-200/80 dark:border-slate-800 z-50 mt-3 w-72 sm:w-80 rounded-2xl p-3 shadow-xl focus:outline-none"
 					>
+						<!-- alert akun pengguna -->
+						{#if user?.type === 'admin'}
+							<div
+								role="alert"
+								class="alert alert-info text-xs py-1.5 px-2.5 mb-2 rounded-xl flex items-center gap-2"
+							>
+								<Icon name="info" class="h-3.5 w-3.5 shrink-0" />
+								<span>Masuk sebagai <strong>Admin</strong></span>
+							</div>
+						{:else if user?.type === 'kepala_sekolah'}
+							<div
+								role="alert"
+								class="alert alert-info text-xs py-1.5 px-2.5 mb-2 rounded-xl flex items-center gap-2"
+							>
+								<Icon name="info" class="h-3.5 w-3.5 shrink-0" />
+								<span><strong>{displayUserName}</strong> - Kepala Sekolah</span>
+							</div>
+						{:else if user?.type === 'user'}
+							<div
+								role="alert"
+								class="alert alert-info text-xs py-1.5 px-2.5 mb-2 rounded-xl flex items-center gap-2"
+							>
+								<Icon name="info" class="h-3.5 w-3.5 shrink-0" />
+								<span><strong>{displayUserName}</strong> - Guru Mapel</span>
+							</div>
+						{:else if user?.type === 'wali_kelas' && isNonOwnClass}
+							<div
+								role="alert"
+								class="alert alert-info text-xs py-1.5 px-2.5 mb-2 rounded-xl flex items-center gap-2"
+							>
+								<Icon name="info" class="h-3.5 w-3.5 shrink-0" />
+								<span><strong>{displayUserName}</strong> - Guru Mapel</span>
+							</div>
+						{:else if user?.type === 'wali_asuh'}
+							<div
+								role="alert"
+								class="alert alert-info text-xs py-1.5 px-2.5 mb-2 rounded-xl flex items-center gap-2"
+							>
+								<Icon name="info" class="h-3.5 w-3.5 shrink-0" />
+								<span><strong>{displayUserName}</strong> - Wali Asuh</span>
+							</div>
+						{:else if user?.type === 'wali_asrama'}
+							<div
+								role="alert"
+								class="alert alert-info text-xs py-1.5 px-2.5 mb-2 rounded-xl flex items-center gap-2"
+							>
+								<Icon name="info" class="h-3.5 w-3.5 shrink-0" />
+								<span><strong>{displayUserName}</strong> - Wali Asrama</span>
+							</div>
+						{/if}
+
 						<!-- Header -->
 						<div
 							class="flex items-center justify-between px-1 py-1 border-b border-slate-200/60 dark:border-slate-800 mb-2"

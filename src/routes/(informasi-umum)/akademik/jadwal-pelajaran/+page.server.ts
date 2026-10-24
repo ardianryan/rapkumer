@@ -267,7 +267,7 @@ export const actions: Actions = {
 		try {
 			fs.unlinkSync(soundPath);
 		} catch {
-			// ignore
+			// ignore if old sound file does not exist
 		}
 
 		await db
@@ -321,7 +321,7 @@ export const actions: Actions = {
 			try {
 				fs.unlinkSync(path.join(soundDir, `${sekolahId}_custom_${kodeLama}.mp3`));
 			} catch {
-				// ignore
+				// ignore if old sound file does not exist
 			}
 			const buffer = Buffer.from(await soundFile.arrayBuffer());
 			fs.mkdirSync(soundDir, { recursive: true });
@@ -332,7 +332,7 @@ export const actions: Actions = {
 			try {
 				fs.unlinkSync(path.join(soundDir, `${sekolahId}_custom_${kodeLama}.mp3`));
 			} catch {
-				// ignore
+				// ignore if old sound file does not exist
 			}
 			soundFileName = null;
 			soundMimeType = null;
@@ -345,7 +345,7 @@ export const actions: Actions = {
 					path.join(soundDir, `${sekolahId}_custom_${kode}.mp3`)
 				);
 			} catch {
-				// ignore
+				// ignore if file rename fails
 			}
 		}
 

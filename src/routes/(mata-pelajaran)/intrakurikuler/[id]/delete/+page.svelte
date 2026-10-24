@@ -4,12 +4,8 @@
 	import { page } from '$app/state';
 	import FormEnhance from '$lib/components/form-enhance.svelte';
 	import Icon from '$lib/components/icon.svelte';
-	import {
-		agamaMapelLabelByName,
-		agamaMapelNames,
-		agamaParentName,
-		jenisMapel
-	} from '$lib/statics.js';
+	import { agamaMapelLabelByName, agamaMapelNames, agamaParentName } from '$lib/statics.js';
+	import { jenisMapelLabel } from '$lib/jenis-mapel';
 
 	import { parseJenjangKelas } from '$lib/utils.js';
 
@@ -27,19 +23,9 @@
 		const kelasNama = data.mapel.kelas?.nama;
 		return kelasNama ? parseJenjangKelas(kelasNama) : null;
 	});
-
-	// Dapatkan jenjang varian dari sekolah (misalnya 'SMK')
-	const jenjangVariant = $derived.by(() => {
-		const sekolah = page.data.sekolah as { jenjangVariant?: string | null } | null | undefined;
-		return sekolah?.jenjangVariant ?? null;
-	});
-
 	// Fungsi untuk mendapatkan label jenis mapel yang dinamis berdasarkan jenjang
 	function getJenisMapelLabel(jenis: string): string {
-		if (jenis === 'wajib' && jenjangVariant?.toUpperCase() === 'SMK') {
-			return 'Mata Pelajaran Umum';
-		}
-		return jenisMapel[jenis as MataPelajaran['jenis']] ?? jenis;
+		return jenisMapelLabel(jenis as MataPelajaran['jenis'], page.data.sekolah);
 	}
 </script>
 

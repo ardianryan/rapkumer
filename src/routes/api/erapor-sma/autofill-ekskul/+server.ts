@@ -71,7 +71,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			const row = ws.getRow(r);
 			let foundEkskulHeader = false;
 
-			for (let c = 1; c <= ws.columnCount; c++) {
+			for (let c = 1; c <= (ws.columnCount ?? 0); c++) {
 				const headerText = normalizeText(row.getCell(c).value);
 				if (headerText.includes('peserta_didik_id')) colPesertaDidikId = c;
 				else if (headerText === 'nisn') colNisn = c;

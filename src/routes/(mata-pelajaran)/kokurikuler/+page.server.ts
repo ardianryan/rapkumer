@@ -1,8 +1,8 @@
 import db from '$lib/server/db';
-import { tableKelas, tableKokurikuler } from '$lib/server/db/schema';
 import { isWaliOfKelas, ownedKelasIdSet } from '$lib/server/kelas-akses';
+import { tableKelas, tableKokurikuler } from '$lib/server/db/schema';
 import { profilPelajarPancasilaDimensions, type DimensiProfilLulusanKey } from '$lib/statics';
-import { fail, redirect } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { readBufferToAoA } from '$lib/utils/excel.js';
 import { cookieNames } from '$lib/utils';
@@ -112,25 +112,18 @@ export const actions = {
 
 		// Server-side permission: wali_kelas may only add for their own kelas
 		if (locals?.user && (locals.user as unknown as { type?: string }).type === 'wali_kelas') {
-			const u = locals.user as { kelasId?: number; permissions?: string[]; pegawaiId?: number };
-			const hasAccessOther = Array.isArray(u.permissions)
-				? u.permissions.includes('kelas_pindah')
-				: false;
+			const u = locals.user as { pegawaiId?: number | null };
 
-			let isOwnClass = false;
-			const userKelasId = u.kelasId;
-			if (userKelasId != null && Number.isInteger(Number(userKelasId))) {
-				isOwnClass = Number(userKelasId) === kelasId;
-			} else if (u.pegawaiId) {
-				const owned = await db.query.tableKelas.findFirst({
-					columns: { id: true },
-					where: and(eq(tableKelas.id, kelasId), eq(tableKelas.waliKelasId, u.pegawaiId))
+			const owned = u.pegawaiId
+				? await db.query.tableKelas.findFirst({
+						columns: { id: true },
+						where: and(eq(tableKelas.id, kelasId), eq(tableKelas.waliKelasId, u.pegawaiId))
+					})
+				: null;
+			if (!owned) {
+				return fail(403, {
+					fail: 'Anda tidak memiliki izin untuk menambah kokurikuler di kelas ini.'
 				});
-				isOwnClass = !!owned;
-			}
-
-			if (!isOwnClass && !hasAccessOther) {
-				throw redirect(303, `/forbidden?required=kelas_id`);
 			}
 		}
 

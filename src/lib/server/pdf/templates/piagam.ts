@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { uploadsDir } from '$lib/server/data-dirs';
 import { getKopSuratLines } from '$lib/statics';
+import { kopSuratDataUri } from '$lib/server/kop-surat';
+import { ttdStempelBoxHTML } from '$lib/server/tanda-tangan-sekolah';
+import { guruTtdBoxHTML } from '$lib/server/tanda-tangan-guru';
 import { sharedStyles, formatUpper, formatValue, escHtml } from './shared';
 
 export interface PiagamPrintData {
@@ -40,7 +43,7 @@ export interface PiagamPrintData {
 		tempat: string;
 		tanggal: string;
 		kepalaSekolah: { nama: string; nip?: string | null; statusKepalaSekolah?: string | null };
-		waliKelas: { nama: string; nip?: string | null };
+		waliKelas: { nama: string; nip?: string | null; ttdUserId?: number | null };
 	};
 }
 
@@ -179,6 +182,12 @@ function piagamStyles(margin16mm = true): string {
 	margin-bottom: 2mm;
 }
 
+.kop-image {
+	width: 100%;
+	display: block;
+	margin-bottom: 2mm;
+}
+
 .header-logo {
 	width: 20mm;
 	height: 20mm;
@@ -297,7 +306,7 @@ function piagamStyles(margin16mm = true): string {
 
 .kepala-status {
 	font-size: 12pt;
-	margin-bottom: 16mm;
+	margin-bottom: 1mm;
 }
 
 .ttd-name {
@@ -398,16 +407,19 @@ export function renderPiagamHTML(data: PiagamPrintData, template: '1' | '2'): st
 	);
 
 	function footerHTML(): string {
+		const waliTtdBox = guruTtdBoxHTML(ttd.waliKelas.ttdUserId, '15mm', '0mm', '6mm');
 		return `
 	<div class="footer">
 		<div class="footer-left">
 			<div class="kepala-status">${ttd.kepalaSekolah.statusKepalaSekolah === 'plt' ? 'Plt. Kepala Sekolah' : 'Kepala Sekolah'}</div>
+			${ttdStempelBoxHTML(sekolahId, '15mm', '3mm', '6mm')}
 			<div class="ttd-name">${formatValue(ttd.kepalaSekolah.nama)}</div>
 			<div class="ttd-nip">${escHtml(ttd.kepalaSekolah.nip ?? '')}</div>
 		</div>
 		<div class="footer-right">
 			<div class="footer-label">${escHtml(ttd.tempat)}, ${escHtml(ttd.tanggal)}</div>
-			<div class="footer-label">Wali Kelas</div>
+			<div class="footer-label"${waliTtdBox ? ' style="margin-bottom:0;"' : ''}>Wali Kelas</div>
+			${waliTtdBox ?? ''}
 			<div class="ttd-name">${formatValue(ttd.waliKelas.nama)}</div>
 			<div class="ttd-nip">${escHtml(ttd.waliKelas.nip ?? '')}</div>
 		</div>
@@ -416,6 +428,7 @@ export function renderPiagamHTML(data: PiagamPrintData, template: '1' | '2'): st
 
 	if (template === '1') {
 		const bgCert = getBgCertificateDataUri(sekolahId);
+		const customKop = kopSuratDataUri(sekolahId, 'landscape');
 
 		return `<!DOCTYPE html>
 <html lang="id">
@@ -429,7 +442,10 @@ ${piagamStyles(!bgCert)}
 <body class="font-palatino">
 ${bgCert ? `<div class="piagam-bg" style="background-image: url('${bgCert}')"></div>` : ''}
 <div class="piagam-page">
-	<div class="header">
+	${
+		customKop
+			? `<img src="${customKop}" alt="" class="kop-image">`
+			: `<div class="header">
 		${logoDinasUrl ? `<img src="${logoDinasUrl}" alt="" class="header-logo">` : '<div class="header-logo"></div>'}
 		<div class="header-center">
 			${kopLines.map((line) => `<div class="header-text">${line}</div>`).join('')}
@@ -440,7 +456,8 @@ ${bgCert ? `<div class="piagam-bg" style="background-image: url('${bgCert}')"></
 		${logoUrl ? `<img src="${logoUrl}" alt="" class="header-logo">` : '<div class="header-logo"></div>'}
 	</div>
 
-	<div class="double-line"></div>
+	<div class="double-line"></div>`
+	}
 
 	<div class="main-content">
 		<div class="title-main">${formatUpper(penghargaan.judul)}</div>

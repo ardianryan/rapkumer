@@ -63,6 +63,7 @@ export const groupedUserPermissions = {
 			['modul_ajar', 'Modul Ajar'],
 			['catatan_wali_kelas', 'Catatan Wali Kelas'],
 			['rekap_nilai', 'Rekap Nilai'],
+			['rekap_keasramaan', 'Rekap Keasramaan'],
 			['keputusan', 'Keputusan'],
 			['buku_tamu', 'Buku Tamu'],
 			['presensi_guru', 'Presensi Guru'],
@@ -90,12 +91,10 @@ export const defaultPermissionsByType: Partial<Record<AuthUser['type'], UserPerm
 		'mata_pelajaran_intrakurikuler',
 		'mata_pelajaran_kokurikuler',
 		'mata_pelajaran_ekstrakurikuler',
-		'mata_pelajaran_keasramaan',
 		'input_nilai_asesmen_formatif',
 		'input_nilai_asesmen_sumatif',
 		'input_nilai_asesmen_kokurikuler',
 		'input_nilai_nilai_ekstrakurikuler',
-		'input_nilai_asesmen_keasramaan',
 		'administrasi_absen',
 		'administrasi_rpm',
 		'administrasi_jurnal_mengajar',
@@ -111,6 +110,18 @@ export const defaultPermissionsByType: Partial<Record<AuthUser['type'], UserPerm
 		'input_nilai_asesmen_keasramaan',
 		'cetak_dokumen',
 		'kelas_pindah',
+		'administrasi_rekap_keasramaan',
+		'administrasi_dinas_luar'
+	],
+	// Wali asrama: kelas yang diampunya (kelas.wali_asrama_id). Masuk ke halaman
+	// keasramaan + asesmen keasramaan, mengajukan dinas luar, dan pada /cetak
+	// hanya "Rapor Keasramaan". `kelas_pindah` supaya bisa pindah kelas via navbar.
+	wali_asrama: [
+		'mata_pelajaran_keasramaan',
+		'input_nilai_asesmen_keasramaan',
+		'cetak_dokumen',
+		'kelas_pindah',
+		'administrasi_rekap_keasramaan',
 		'administrasi_dinas_luar'
 	],
 	user: [
@@ -175,6 +186,7 @@ export const menuRoutePermissions: { path: string; permission: UserPermission }[
 	{ path: '/modul-ajar', permission: 'administrasi_modul_ajar' },
 	{ path: '/catatan-wali-kelas', permission: 'administrasi_catatan_wali_kelas' },
 	{ path: '/nilai-akhir', permission: 'administrasi_rekap_nilai' },
+	{ path: '/rekap-keasramaan', permission: 'administrasi_rekap_keasramaan' },
 	{ path: '/keputusan', permission: 'administrasi_keputusan' },
 	{ path: '/buku-tamu', permission: 'administrasi_buku_tamu' },
 	{ path: '/presensi-guru', permission: 'administrasi_presensi_guru' },
@@ -230,7 +242,19 @@ export function isAuthorizedUser(
 	// Admins are authorized for everything by policy
 	if ('type' in user && (user.type === 'admin' || user.type === 'kepala_sekolah')) return true;
 	const effective = getEffectivePermissions(user);
-	return allowedPermissions.some((r) => effective.has(r));
+	return allowedPermissions.some(
+		(r) => effective.has(r) && (!KEASRAMAAN_PERMISSIONS.has(r) || canAccessKeasramaan(user))
+	);
+}
+
+const KEASRAMAAN_PERMISSIONS = new Set<UserPermission>([
+	'mata_pelajaran_keasramaan',
+	'input_nilai_asesmen_keasramaan',
+	'administrasi_rekap_keasramaan'
+]);
+
+export function canAccessKeasramaan(user?: Pick<AuthUser, 'type'> | null): boolean {
+	return !!user && ['admin', 'kepala_sekolah', 'wali_asuh', 'wali_asrama'].includes(user.type);
 }
 
 /**

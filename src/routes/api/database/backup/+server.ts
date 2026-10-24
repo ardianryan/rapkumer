@@ -3,7 +3,6 @@ import { readFile, stat } from 'node:fs/promises';
 import db from '$lib/server/db';
 import { resolveDatabasePath } from '$lib/server/db-url';
 import { isAdminUser } from '../../../pengguna/permissions';
-
 export async function GET({ locals }) {
 	const user = locals.user;
 	if (!isAdminUser(user)) {
