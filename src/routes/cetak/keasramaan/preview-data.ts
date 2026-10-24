@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit';
+import { canAccessKeasramaan } from '../../pengguna/permissions';
 import { asc, and, eq } from 'drizzle-orm';
 import db from '$lib/server/db';
 import {
@@ -24,6 +25,7 @@ import {
 import { parseTPMode } from '$lib/rapor-params';
 import { computeRaporAttendance } from '$lib/server/pdf/attendance-utils';
 import { isWaliAsramaOfKelas } from '$lib/server/kelas-akses';
+import { guruTtdUserId } from '$lib/server/tanda-tangan-guru';
 
 export type KeasramaanContext = {
 	locals: App.Locals;
@@ -196,7 +198,8 @@ export type KeasramaanPrintData = {
 	};
 	waliAsrama: { nama: string; nip: string } | null;
 	waliKelas: { nama: string; nip: string } | null;
-	waliAsuh: { nama: string; nip: string } | null;
+	waliAsuh: { nama: string; nip: string; ttdUserId?: number | null } | null;
+	waliAsramaTtdUserId?: number | null;
 	kepalaSekolah: { nama: string; nip: string } | null;
 	ttd: {
 		tempat: string;
@@ -211,6 +214,9 @@ export type KeasramaanPrintData = {
 };
 
 export async function getKeasramaanPreviewPayload({ locals, url }: KeasramaanContext) {
+	if (!canAccessKeasramaan(locals.user)) {
+		throw error(403, 'Akses ditolak.');
+	}
 	const sekolah = locals.sekolah;
 	if (!sekolah?.id) {
 		throw error(404, 'Sekolah tidak ditemukan.');
@@ -463,6 +469,15 @@ export async function getKeasramaanPreviewPayload({ locals, url }: KeasramaanCon
 	const ttdTempat = fallbackTempat(sekolah);
 
 	const logoSrc = await getLogoSrc(sekolah.id);
+	const waliAsramaTtdUserId = await guruTtdUserId(kelasData.waliAsrama?.id, 'wali_asrama');
+	let waliAsuhTtdUserId: number | null = null;
+	if (murid.waliAsuhNama) {
+		const waliAsuhPegawai = await db.query.tablePegawai.findFirst({
+			columns: { id: true },
+			where: and(eq(tablePegawai.nama, murid.waliAsuhNama), eq(tablePegawai.sekolahId, sekolah.id))
+		});
+		waliAsuhTtdUserId = await guruTtdUserId(waliAsuhPegawai?.id, 'wali_asuh');
+	}
 
 	const computedKehadiran =
 		kelasData.semester?.id && kelasData.tahunAjaran?.id
@@ -498,11 +513,12 @@ export async function getKeasramaanPreviewPayload({ locals, url }: KeasramaanCon
 		waliAsrama: kelasData.waliAsrama
 			? { nama: kelasData.waliAsrama.nama, nip: kelasData.waliAsrama.nip ?? '' }
 			: null,
+		waliAsramaTtdUserId,
 		waliKelas: kelasData.waliKelas
 			? { nama: kelasData.waliKelas.nama, nip: kelasData.waliKelas.nip ?? '' }
 			: null,
 		waliAsuh: murid.waliAsuhNama
-			? { nama: murid.waliAsuhNama, nip: murid.waliAsuhNip ?? '' }
+			? { nama: murid.waliAsuhNama, nip: murid.waliAsuhNip ?? '', ttdUserId: waliAsuhTtdUserId }
 			: null,
 		kepalaSekolah: sekolah.kepalaSekolah
 			? ({
