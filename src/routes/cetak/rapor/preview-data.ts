@@ -13,13 +13,13 @@ import {
 } from '$lib/server/db/schema';
 import { parseRaporPeriode } from '$lib/rapor-params';
 import {
-	jenisMapel,
 	agamaMapelNames,
 	agamaParentName,
 	agamaMapelOptions,
 	pksMapelOptions,
 	type DimensiProfilLulusanKey
 } from '$lib/statics';
+import { jenisMapelLabel } from '$lib/jenis-mapel';
 import { muridAgamaKey } from '$lib/server/mapel-picker';
 import {
 	buildKokurikulerNarrative,
@@ -43,6 +43,7 @@ import {
 	getLogoSrc as getBgLogoSrc
 } from '$lib/server/pdf/preview-utils';
 import { computeRaporAttendance } from '$lib/server/pdf/attendance-utils';
+import { waliKelasTtdUserId as resolveWaliKelasTtdUserId } from '$lib/server/tanda-tangan-guru';
 
 const LOCALE_ID = 'id-ID';
 
@@ -115,6 +116,7 @@ export async function getRaporPreviewPayload({ locals, url }: RaporContext) {
 				with: {
 					waliKelas: {
 						columns: {
+							id: true,
 							nama: true,
 							nip: true
 						}
@@ -362,7 +364,9 @@ export async function getRaporPreviewPayload({ locals, url }: RaporContext) {
 				priority,
 				normalizedName,
 				displayName,
-				kelompok: jenisMapel[mapel.jenis] ?? null,
+				kelompok: jenisMapelLabel(mapel.jenis, {
+					jenjangVariant: sekolah.jenjangVariant
+				}),
 				nilaiAkhir: formatNilai(isRTS ? (item.nilaiAkhirRts ?? null) : (item.nilaiAkhir ?? null)),
 				deskripsi: buildCapaianKompetensi(
 					muridNama,
@@ -527,6 +531,8 @@ export async function getRaporPreviewPayload({ locals, url }: RaporContext) {
 				})
 			: null);
 
+	const waliKelasTtdUserId = await resolveWaliKelasTtdUserId(waliKelasPegawai?.id);
+
 	const semesterData = murid.kelas?.semester ?? murid.semester;
 	const tahunAjaranData = murid.kelas?.tahunAjaran;
 	const computedKehadiran =
@@ -536,6 +542,7 @@ export async function getRaporPreviewPayload({ locals, url }: RaporContext) {
 
 	const raporData: RaporPrintData = {
 		sekolah: {
+			id: sekolah.id,
 			nama: sekolah.nama,
 			alamat: composeAlamat(sekolah),
 			bgLogoSrc,
@@ -560,7 +567,8 @@ export async function getRaporPreviewPayload({ locals, url }: RaporContext) {
 		},
 		waliKelas: {
 			nama: waliKelasPegawai?.nama ?? '',
-			nip: waliKelasPegawai?.nip ?? null
+			nip: waliKelasPegawai?.nip ?? null,
+			ttdUserId: waliKelasTtdUserId
 		},
 		kepalaSekolah: {
 			nama: sekolah.kepalaSekolah?.nama ?? '',

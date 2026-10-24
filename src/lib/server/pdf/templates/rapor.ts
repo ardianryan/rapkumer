@@ -1,8 +1,12 @@
 import { sharedStyles, formatValue, formatUpper, escHtml, getTutwuriBwDataUri } from './shared';
 import { parseTingkat, lastGradeOfFase, isGraduatingFase, isGraduatingGrade } from '$lib/tingkat';
+import { ttdStempelBoxHTML } from '$lib/server/tanda-tangan-sekolah';
+import { guruTtdBoxHTML } from '$lib/server/tanda-tangan-guru';
+import { jenisMapelLabel } from '$lib/jenis-mapel';
 
 export interface RaporPrintData {
 	sekolah: {
+		id?: number;
 		nama: string;
 		alamat: string;
 		bgLogoSrc?: string | null;
@@ -25,6 +29,7 @@ export interface RaporPrintData {
 	waliKelas: {
 		nama: string;
 		nip?: string | null;
+		ttdUserId?: number | null;
 	};
 	kepalaSekolah: {
 		nama: string;
@@ -83,15 +88,10 @@ export function renderRaporHTML(data: RaporPrintData): string {
 		kelompokMap[jenis].items.push(n);
 	}
 
-	const isSMK = data.sekolah.jenjangVariant === 'SMK';
-	const jenisLabelText: Record<string, string> = {
-		belum_dipetakan: 'Belum Dipetakan',
-		wajib: isSMK ? 'Mata Pelajaran Umum' : 'Mata Pelajaran Wajib',
-		pilihan: 'Mata Pelajaran Pilihan',
-		kejuruan: 'Mata Pelajaran Kejuruan',
-		mulok: 'Muatan Lokal',
-		pemberdayaan: 'Muatan Pemberdayaan dan Keterampilan'
-	};
+	const jenisLabelText = (jenis: string) =>
+		jenisMapelLabel(jenis as MataPelajaran['jenis'], {
+			jenjangVariant: data.sekolah.jenjangVariant
+		});
 	const jenisOrder = ['wajib', 'pilihan', 'kejuruan', 'pemberdayaan', 'mulok'];
 
 	const kepalaStatus =
@@ -338,7 +338,7 @@ ${jenisOrder
 		const group = kelompokMap[jenis];
 		const letter = String.fromCharCode(65 + idx);
 		return `		<tr class="group-header">
-			<td colspan="4">${letter}. ${jenisLabelText[jenis]}</td>
+			<td colspan="4">${letter}. ${jenisLabelText(jenis)}</td>
 		</tr>
 ${group.items
 	.map(
@@ -520,7 +520,7 @@ ${
 			</tr>
 			<tr>
 				<td class="spacer-5"></td>
-				<td class="spacer-5"></td>
+				<td class="spacer-5">${guruTtdBoxHTML(data.waliKelas.ttdUserId, '5rem', '0mm', '3mm') ?? ''}</td>
 			</tr>
 			<tr>
 				<td class="text-center">____________________</td>
@@ -541,7 +541,7 @@ ${
 				<td colspan="2" class="text-center font-bold" style="padding-top:8pt;">${kepalaStatus}</td>
 			</tr>
 			<tr>
-				<td colspan="2" class="spacer-5"></td>
+				<td colspan="2">${ttdStempelBoxHTML(data.sekolah.id, '5rem')}</td>
 			</tr>
 			<tr>
 				<td colspan="2" class="text-center font-bold underline">${formatValue(data.kepalaSekolah.nama)}</td>

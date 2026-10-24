@@ -7,6 +7,9 @@
 	import ChangeUsernameCard from '$lib/components/settings/change-username-card.svelte';
 	import ChangePasswordCard from '$lib/components/settings/change-password-card.svelte';
 	import StorageLocationCard from '$lib/components/settings/storage-location-card.svelte';
+	import KopSuratCard from '$lib/components/settings/kop-surat-card.svelte';
+	import TandaTanganCard from '$lib/components/settings/tanda-tangan-card.svelte';
+	import TandaTanganGuruCard from '$lib/components/settings/tanda-tangan-guru-card.svelte';
 	import DatabaseCard from '$lib/components/settings/database-card.svelte';
 	import BukuTamuPasskeyCard from '$lib/components/settings/buku-tamu-passkey-card.svelte';
 	import AiKeyCard from '$lib/components/settings/ai-key-card.svelte';
@@ -42,14 +45,21 @@
 	{isAdmin}
 />
 
-{#if wasForcePasswordChange}
-	{#if passwordChanged}
-		<div class="alert alert-success mt-4" role="status">
-			<Icon name="success" />
-			<span>Kata sandi berhasil diubah. Silakan gunakan aplikasi.</span>
-		</div>
-	{:else}
-		<div id="default-password-warning" class="alert alert-warning mt-4 scroll-mt-20" role="alert">
+{#if wasForcePasswordChange && passwordChanged}
+	<div class="alert alert-success mt-4" role="status">
+		<Icon name="success" />
+		<span>Kata sandi berhasil diubah. Silakan gunakan aplikasi.</span>
+	</div>
+{/if}
+
+<div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+	<ChangeUsernameCard />
+	{#if wasForcePasswordChange && !passwordChanged}
+		<div
+			id="default-password-warning"
+			class="alert alert-warning scroll-mt-20 lg:order-first lg:col-span-2"
+			role="alert"
+		>
 			<Icon name="lock" />
 			<span>
 				Jangan gunakan sandi bawaan! Perbarui kata sandi di bagian
@@ -57,10 +67,6 @@
 			</span>
 		</div>
 	{/if}
-{/if}
-
-<div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-	<ChangeUsernameCard />
 	<ChangePasswordCard onsuccess={handlePasswordSuccess} />
 </div>
 
@@ -72,7 +78,26 @@
 
 {#if isAdmin}
 	<div class="mt-4">
-		<BukuTamuPasskeyCard passkeySet={data.bukuTamuPasskeySet} />
+		<KopSuratCard />
+	</div>
+
+	<div class="mt-4">
+		<TandaTanganCard />
+	</div>
+{/if}
+
+{#if user?.type === 'wali_kelas'}
+	<div class="mt-4">
+		<TandaTanganGuruCard />
+	</div>
+{/if}
+
+{#if isAdmin}
+	<div class="mt-4">
+		<BukuTamuPasskeyCard
+			passkeySet={data.bukuTamuPasskeySet}
+			activePasskey={data.bukuTamuPasskey}
+		/>
 	</div>
 {/if}
 
