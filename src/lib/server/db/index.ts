@@ -10,6 +10,7 @@ import * as schemaSqlite from './schema';
 import * as schemaPg from './schema.pg';
 import type { UnifiedDatabaseClient } from './client-types';
 import { translateSqliteToPostgres } from './sql-translate';
+import { assertDatabaseAvailable } from './maintenance';
 
 const defaultDbUrl = 'file:./data/database.sqlite3';
 
@@ -230,6 +231,7 @@ export async function reloadDbClient() {
 		console.info('[db] reloaded database client and drizzle instance');
 	} catch (e) {
 		console.error('[db] failed to reload client', e);
+		throw e;
 	}
 }
 
@@ -239,6 +241,7 @@ const dbProxy = new Proxy(
 	{},
 	{
 		get(_t, prop) {
+			assertDatabaseAvailable();
 			const target = currentDb as Record<string, unknown>;
 			const v = target[String(prop)];
 			if (typeof v === 'function') return (v as (...args: unknown[]) => unknown).bind(target);

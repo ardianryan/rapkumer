@@ -250,7 +250,7 @@
 </script>
 
 <div class="navbar glass-navbar sticky top-0 z-30 px-3 py-2 transition-colors">
-	<div class="flex-none lg:hidden">
+	<div class="hidden flex-none md:block lg:hidden">
 		<label for="my-drawer-2" class="btn btn-square btn-ghost drawer-button">
 			<span class="text-lg">
 				<Icon name="menu-drawer" />

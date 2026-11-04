@@ -5,15 +5,21 @@
 	import { searchQueryMarker } from '$lib/utils';
 	import Icon from './icon.svelte';
 	import { appMenuItems } from './menu';
-	import {
-		isAuthorizedUser,
-		resolveRoutePermission,
-		WALI_KELAS_ONLY_PERMISSIONS
-	} from '../../routes/pengguna/permissions';
+	import { isPathHiddenForUser } from './menu-access';
 
-	const expanded = new StorageState<boolean>('menu-expanded');
+	const defaultExpanded = new StorageState<boolean>('menu-expanded');
 
-	let search = $state('');
+	let {
+		search = $bindable(''),
+		showToolbar = true,
+		expanded = defaultExpanded
+	}: {
+		search?: string;
+		showToolbar?: boolean;
+		/** Shared expand/collapse state so every <Menu /> instance stays in sync. */
+		expanded?: StorageState<boolean>;
+	} = $props();
+
 	const activeSemesterTipe = $derived(
 		(page.data as { activeSemesterTipe?: string | null } | null)?.activeSemesterTipe ?? null
 	);
@@ -44,42 +50,16 @@
 			?.hiddenMenuPaths ?? []
 	);
 
+	const access = $derived({
+		user,
+		kelasAktifId: kelasAktif?.id ?? null,
+		presensiGuruEnabled,
+		hiddenMenuPaths
+	});
+
 	function isHiddenForUser(path?: string): boolean {
 		// Menu items without a path (parent groups) are filtered recursively via subMenu
-		if (!path) return false;
-
-		// Jika bukan admin / kepala_sekolah, sembunyikan jika ada di hiddenMenuPaths
-		if (user && user.type !== 'admin' && user.type !== 'kepala_sekolah') {
-			if (hiddenMenuPaths.includes(path)) return true;
-		}
-
-		if (path === '/presensi-guru' && !presensiGuruEnabled) return true;
-		// /dinas-luar is the permohonan feature for non-admin roles; admin & kepala
-		// sekolah manage perjalanan dinas via the full /sppd page instead.
-		if (
-			path === '/dinas-luar' &&
-			user &&
-			(user.type === 'admin' || user.type === 'kepala_sekolah')
-		) {
-			return true;
-		}
-		// Wali kelas on non-own class: downgrade to guru-level permissions
-		if (user?.type === 'wali_kelas' && kelasAktif?.id != null) {
-			const ownIds = user.ownKelasIds?.length
-				? user.ownKelasIds
-				: user.kelasId != null
-					? [user.kelasId]
-					: [];
-			if (ownIds.length > 0 && !ownIds.includes(kelasAktif.id)) {
-				const required = resolveRoutePermission(path);
-				if (required && WALI_KELAS_ONLY_PERMISSIONS.has(required)) {
-					return true;
-				}
-			}
-		}
-		const required = resolveRoutePermission(path);
-		if (!required) return false;
-		return !isAuthorizedUser([required], user ?? undefined);
+		return isPathHiddenForUser(path, access);
 	}
 
 	function filterMenuByUserType(items: MenuItem[]): MenuItem[] {
@@ -231,21 +211,23 @@
 {/snippet}
 
 <div class="flex-1 flex flex-col min-h-0 w-full">
-	<div class="mb-2.5 flex items-center gap-1.5 shrink-0 w-full">
-		<label
-			class="input input-sm border-slate-200/80 dark:border-slate-800/80 bg-slate-100/80 dark:bg-base-200 rounded-xl flex items-center gap-2 grow px-3 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all"
-		>
-			<Icon name="search" class="h-3.5 w-3.5 text-base-content/50 shrink-0" />
-			<input type="search" class="grow text-xs" bind:value={search} placeholder="Cari menu..." />
-		</label>
-		<label
-			class="btn btn-sm btn-ghost btn-square rounded-xl text-base-content/60 hover:bg-base-200 shadow-none cursor-pointer shrink-0"
-			title={expanded.value ? 'Sempitkan menu' : 'Luaskan menu'}
-		>
-			<input type="checkbox" class="hidden" bind:checked={expanded.value} />
-			<Icon name={expanded.value ? 'collapse-all' : 'expand-all'} class="h-4 w-4" />
-		</label>
-	</div>
+	{#if showToolbar}
+		<div class="mb-2.5 flex items-center gap-1.5 shrink-0 w-full">
+			<label
+				class="input input-sm border-slate-200/80 dark:border-slate-800/80 bg-slate-100/80 dark:bg-base-200 rounded-xl flex items-center gap-2 grow px-3 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all"
+			>
+				<Icon name="search" class="h-3.5 w-3.5 text-base-content/50 shrink-0" />
+				<input type="search" class="grow text-xs" bind:value={search} placeholder="Cari menu..." />
+			</label>
+			<label
+				class="btn btn-sm btn-ghost btn-square rounded-xl text-base-content/60 hover:bg-base-200 shadow-none cursor-pointer shrink-0"
+				title={expanded.value ? 'Sempitkan menu' : 'Luaskan menu'}
+			>
+				<input type="checkbox" class="hidden" bind:checked={expanded.value} />
+				<Icon name={expanded.value ? 'collapse-all' : 'expand-all'} class="h-4 w-4" />
+			</label>
+		</div>
+	{/if}
 	<div class="flex-1 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-14rem)] pr-0.5 w-full">
 		<ul class="menu menu-sm p-0 w-full flex-col flex-nowrap space-y-0.5">
 			{#each menuItems as menu (menu.path ?? menu.title)}
