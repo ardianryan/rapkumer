@@ -21,7 +21,9 @@ function getTodayDateStr(): string {
 export async function runDailyAkasViolationSync(): Promise<void> {
 	await withDatabaseBackground(async () => {
 		try {
-			console.log('[AKAS Scheduler] Memulai sinkronisasi rekap pelanggaran tengah malam (00:00)...');
+			console.log(
+				'[AKAS Scheduler] Memulai sinkronisasi rekap pelanggaran tengah malam (00:00)...'
+			);
 			const settings = await db.query.tablePresensiSettings.findMany();
 
 			for (const setting of settings) {

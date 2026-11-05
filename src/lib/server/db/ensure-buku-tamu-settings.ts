@@ -20,10 +20,9 @@ export async function ensureBukuTamuSettingsSchema() {
 	]);
 
 	// Existing installs predate the plain `passkey` column; add it if missing.
-	const columns = await db.$client.execute(
-		`SELECT name FROM pragma_table_info('${TABLE}') WHERE name = 'passkey'`
-	);
-	if (!columns.rows.length) {
+	try {
 		await db.$client.execute(`ALTER TABLE "${TABLE}" ADD COLUMN "passkey" text`);
+	} catch {
+		// column already exists
 	}
 }

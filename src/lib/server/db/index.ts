@@ -114,19 +114,27 @@ function createClientBundle(): { client: UnifiedDatabaseClient; dbInstance: unkn
 			isPostgres: true,
 			execute: async (statement: string | { sql: string; args?: unknown[] }) => {
 				const sqlStr = (typeof statement === 'string' ? statement : statement.sql).trim();
-				// Intercept SQLite PRAGMAs gracefully
-				if (/^pragma\s+/i.test(sqlStr)) {
+				// Intercept SQLite PRAGMAs & table-valued functions gracefully
+				if (
+					/^pragma\s+/i.test(sqlStr) ||
+					/pragma_table_info/i.test(sqlStr) ||
+					/pragma_index_/i.test(sqlStr)
+				) {
 					const tableInfoMatch = sqlStr.match(
-						/pragma\s+table_info\s*\(\s*["']?([^"')]+)["']?\s*\)/i
+						/(?:pragma\s+table_info|pragma_table_info)\s*\(\s*["']?([^"')]+)["']?\s*\)/i
 					);
 					if (tableInfoMatch) {
 						const table = tableInfoMatch[1].toLowerCase();
+						const colMatch = sqlStr.match(/where\s+name\s*=\s*['"]?([^'")\s]+)['"]?/i);
+						const colName = colMatch ? colMatch[1] : null;
 						const cols = await pgClient.unsafe(
-							`SELECT column_name AS name FROM information_schema.columns WHERE table_name = '${table}'`
+							colName
+								? `SELECT column_name AS name FROM information_schema.columns WHERE table_name = '${table}' AND column_name = '${colName}'`
+								: `SELECT column_name AS name FROM information_schema.columns WHERE table_name = '${table}'`
 						);
 						return { rows: cols as unknown as unknown[] };
 					}
-					// Other pragmas (wal, synchronous, timeout) are no-ops on PG
+					// Other pragmas (wal, synchronous, timeout, index_list, index_info) are no-ops on PG
 					return { rows: [] };
 				}
 				// Intercept SQLite sqlite_master table existence queries
