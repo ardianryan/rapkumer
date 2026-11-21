@@ -1,0 +1,8 @@
+{
+	"upstreamRemote": "upstream",
+	"upstreamBranch": "main",
+	"lastSyncedTag": "v2.1.9",
+	"lastSyncedCommit": "fe81069",
+	"cherryPickedCommits": [],
+	"skippedCommits": []
+}
