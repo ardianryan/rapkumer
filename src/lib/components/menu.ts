@@ -157,6 +157,42 @@ export const appMenuItems: MenuItem[] = [
 		title: 'Cetak Dokumen',
 		icon: 'print',
 		path: '/cetak'
+	},
+	{
+		title: 'Integrasi e-Rapor SMA',
+		icon: 'dapodik',
+		subMenu: [
+			{
+				title: 'Pengaturan API',
+				path: '/erapor',
+				tags: ['erapor', 'bridge', 'api']
+			},
+			{
+				title: 'Pemetaan Data',
+				path: '/erapor/mapping',
+				tags: ['erapor', 'mapping', 'rombel', 'mapel']
+			},
+			{
+				title: 'Sync Kokurikuler',
+				path: '/erapor/sync-kokurikuler',
+				tags: ['erapor', 'kokurikuler', 'p5']
+			},
+			{
+				title: 'Sync Akademik',
+				path: '/erapor/sync-akademik',
+				tags: ['erapor', 'nilai', 'rapor', 'deskripsi']
+			},
+			{
+				title: 'Sync Kehadiran & Wali',
+				path: '/erapor/sync-walas',
+				tags: ['erapor', 'kehadiran', 'catatan']
+			},
+			{
+				title: 'Riwayat Log',
+				path: '/erapor/logs',
+				tags: ['erapor', 'log', 'riwayat']
+			}
+		]
 	}
 ];
 

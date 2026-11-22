@@ -49,12 +49,14 @@ export const tableAuthUser = pgTable(
 		// Login dipaksa untuk mengganti sandi lewat /pengaturan sebelum akses lain.
 		mustChangePassword: boolean().default(false).notNull(),
 		permissions: jsonb().notNull().default('[]').$type<UserPermission[]>(),
-		// tipe user: admin (penuh), kepala_sekolah (penuh, per sekolah aktif), wali_kelas (terbatas ke kelas_id), wali_asuh (terbatas ke keasramaan), atau user (default/other)
-		type: text({ enum: ['admin', 'kepala_sekolah', 'wali_kelas', 'wali_asuh', 'user'] })
+		// tipe user: admin (penuh), kepala_sekolah (penuh, per sekolah aktif), wali_kelas (terbatas ke kelas_id), wali_asuh (terbatas ke keasramaan), wali_asrama (terbatas ke kelas yang diampunya + keasramaan), atau user (default/other)
+		type: text({
+			enum: ['admin', 'kepala_sekolah', 'wali_kelas', 'wali_asuh', 'wali_asrama', 'user']
+		})
 			.notNull()
 			.default('admin'),
 		// optional: directly associate a user to a sekolah so login can pick it reliably
-		sekolahId: integer().references(() => tableSekolah.id),
+		sekolahId: integer().references((): AnyPgColumn => tableSekolah.id),
 		// referensi opsional ke pegawai (nama wali kelas disimpan di tablePegawai)
 		pegawaiId: integer().references(() => tablePegawai.id),
 		// untuk wali_kelas kita bisa menyimpan kelas_id yang diijinkan
@@ -1520,6 +1522,10 @@ export const tableBukuTamuSettings = pgTable(
 		sekolahId: integer()
 			.references(() => tableSekolah.id, { onDelete: 'cascade' })
 			.notNull(),
+		// ponytail: plaintext on purpose — the guest-book gate is low-sensitivity and the
+		// admin UI must display the active passkey. Upgrade path: encrypt at rest (or show
+		// once at save) if the threat model changes.
+		passkey: text(),
 		passkeyHash: text(),
 		passkeySalt: text(),
 		unlockToken: text(),
@@ -2034,3 +2040,112 @@ export const tableRtsCatatanWaliRelations = relations(tableRtsCatatanWali, ({ on
 		references: [tableMurid.id]
 	})
 }));
+
+/**
+ * Pengaturan koneksi Bridge REST API e-Rapor SMA per sekolah
+ */
+export const tableEraporConfig = pgTable('erapor_config', {
+	id: serial().primaryKey(),
+	sekolahId: integer()
+		.references(() => tableSekolah.id, { onDelete: 'cascade' })
+		.notNull()
+		.unique(),
+	apiUrl: text().notNull().default(''),
+	apiKey: text().notNull().default(''),
+	activeSemesterId: text(),
+	timeoutMs: integer().notNull().default(30000),
+	...audit
+});
+
+/**
+ * Pemetaan Rombel/Kelas SIAKAD -> e-Rapor SMA
+ */
+export const tableEraporMapRombel = pgTable(
+	'erapor_map_rombel',
+	{
+		id: serial().primaryKey(),
+		sekolahId: integer()
+			.references(() => tableSekolah.id, { onDelete: 'cascade' })
+			.notNull(),
+		siakadKelasId: integer()
+			.references(() => tableKelas.id, { onDelete: 'cascade' })
+			.notNull(),
+		eraporRombelId: text().notNull(),
+		eraporNmKelas: text(),
+		semesterId: text().notNull(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.sekolahId, table.siakadKelasId, table.semesterId),
+		index('erapor_map_rombel_sekolah_idx').on(table.sekolahId, table.semesterId)
+	]
+);
+
+/**
+ * Pemetaan Mata Pelajaran SIAKAD (berdasarkan nama mapel sekolah) -> e-Rapor SMA
+ */
+export const tableEraporMapMapel = pgTable(
+	'erapor_map_mapel',
+	{
+		id: serial().primaryKey(),
+		sekolahId: integer()
+			.references(() => tableSekolah.id, { onDelete: 'cascade' })
+			.notNull(),
+		siakadMapelNama: text().notNull(),
+		eraporMapelId: text().notNull(),
+		eraporNmMapel: text(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.sekolahId, table.siakadMapelNama),
+		index('erapor_map_mapel_sekolah_idx').on(table.sekolahId)
+	]
+);
+
+/**
+ * Pemetaan Kegiatan Kokurikuler & Subdimensi P5 SIAKAD -> e-Rapor SMA
+ */
+export const tableEraporMapKokurikuler = pgTable(
+	'erapor_map_kokurikuler',
+	{
+		id: serial().primaryKey(),
+		sekolahId: integer()
+			.references(() => tableSekolah.id, { onDelete: 'cascade' })
+			.notNull(),
+		siakadKode: text().notNull(),
+		eraporKelompokId: text().notNull().default(''),
+		eraporKegiatanId: text(),
+		eraporKegiatanNama: text(),
+		dimensiMap: jsonb().$type<Record<string, string>>(),
+		semesterId: text().notNull(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.sekolahId, table.siakadKode, table.semesterId),
+		index('erapor_map_kokurikuler_sekolah_idx').on(table.sekolahId, table.semesterId)
+	]
+);
+
+/**
+ * Riwayat & Log Sinkronisasi Bridge REST API e-Rapor SMA
+ */
+export const tableEraporSyncLogs = pgTable(
+	'erapor_sync_logs',
+	{
+		id: serial().primaryKey(),
+		sekolahId: integer()
+			.references(() => tableSekolah.id, { onDelete: 'cascade' })
+			.notNull(),
+		syncType: text().notNull(),
+		targetInfo: text(),
+		totalData: integer().notNull().default(0),
+		totalSuccess: integer().notNull().default(0),
+		totalFailed: integer().notNull().default(0),
+		requestPayload: text(),
+		responseBody: text(),
+		status: text().notNull(),
+		executedBy: text(),
+		...audit
+	},
+	(table) => [index('erapor_sync_logs_sekolah_idx').on(table.sekolahId)]
+);

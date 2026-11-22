@@ -35,6 +35,7 @@ export function isPathHiddenForUser(
 	const user = ctx.user;
 	// Jika bukan admin / kepala_sekolah, sembunyikan jika ada di hiddenMenuPaths
 	if (user && user.type !== 'admin' && user.type !== 'kepala_sekolah') {
+		if (path.startsWith('/erapor')) return true;
 		if (ctx.hiddenMenuPaths?.includes(path)) return true;
 	}
 

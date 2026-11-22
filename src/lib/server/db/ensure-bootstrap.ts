@@ -31,6 +31,7 @@ import { ensureRaporSisipanSchema } from './ensure-rapor-sisipan';
 import { ensureMenuVisibilitySchema } from './ensure-menu-visibility';
 import { ensureAkasSettingsSchema } from './ensure-akas-settings';
 import { ensureScholargateSettingsSchema } from './ensure-scholargate-settings';
+import { ensureEraporSchema } from './ensure-erapor';
 import { resetEnsuredSchemas } from './ensure-helper';
 
 let startupEnsuresDone = false;
@@ -83,6 +84,7 @@ export async function runStartupEnsures() {
 			await ensureMenuVisibilitySchema();
 			await ensureAkasSettingsSchema();
 			await ensureScholargateSettingsSchema();
+			await ensureEraporSchema();
 			startupEnsuresDone = true;
 		} finally {
 			startupEnsuresPromise = null;

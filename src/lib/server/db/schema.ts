@@ -2022,3 +2022,112 @@ export const tableRtsCatatanWaliRelations = relations(tableRtsCatatanWali, ({ on
 		references: [tableMurid.id]
 	})
 }));
+
+/**
+ * Pengaturan koneksi Bridge REST API e-Rapor SMA per sekolah
+ */
+export const tableEraporConfig = sqliteTable('erapor_config', {
+	id: int().primaryKey({ autoIncrement: true }),
+	sekolahId: int()
+		.references(() => tableSekolah.id, { onDelete: 'cascade' })
+		.notNull()
+		.unique(),
+	apiUrl: text().notNull().default(''),
+	apiKey: text().notNull().default(''),
+	activeSemesterId: text(),
+	timeoutMs: int().notNull().default(30000),
+	...audit
+});
+
+/**
+ * Pemetaan Rombel/Kelas SIAKAD -> e-Rapor SMA
+ */
+export const tableEraporMapRombel = sqliteTable(
+	'erapor_map_rombel',
+	{
+		id: int().primaryKey({ autoIncrement: true }),
+		sekolahId: int()
+			.references(() => tableSekolah.id, { onDelete: 'cascade' })
+			.notNull(),
+		siakadKelasId: int()
+			.references(() => tableKelas.id, { onDelete: 'cascade' })
+			.notNull(),
+		eraporRombelId: text().notNull(),
+		eraporNmKelas: text(),
+		semesterId: text().notNull(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.sekolahId, table.siakadKelasId, table.semesterId),
+		index('erapor_map_rombel_sekolah_idx').on(table.sekolahId, table.semesterId)
+	]
+);
+
+/**
+ * Pemetaan Mata Pelajaran SIAKAD (berdasarkan nama mapel sekolah) -> e-Rapor SMA
+ */
+export const tableEraporMapMapel = sqliteTable(
+	'erapor_map_mapel',
+	{
+		id: int().primaryKey({ autoIncrement: true }),
+		sekolahId: int()
+			.references(() => tableSekolah.id, { onDelete: 'cascade' })
+			.notNull(),
+		siakadMapelNama: text().notNull(),
+		eraporMapelId: text().notNull(),
+		eraporNmMapel: text(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.sekolahId, table.siakadMapelNama),
+		index('erapor_map_mapel_sekolah_idx').on(table.sekolahId)
+	]
+);
+
+/**
+ * Pemetaan Kegiatan Kokurikuler & Subdimensi P5 SIAKAD -> e-Rapor SMA
+ */
+export const tableEraporMapKokurikuler = sqliteTable(
+	'erapor_map_kokurikuler',
+	{
+		id: int().primaryKey({ autoIncrement: true }),
+		sekolahId: int()
+			.references(() => tableSekolah.id, { onDelete: 'cascade' })
+			.notNull(),
+		siakadKode: text().notNull(),
+		eraporKelompokId: text().notNull().default(''),
+		eraporKegiatanId: text(),
+		eraporKegiatanNama: text(),
+		dimensiMap: text({ mode: 'json' }).$type<Record<string, string>>(),
+		semesterId: text().notNull(),
+		...audit
+	},
+	(table) => [
+		unique().on(table.sekolahId, table.siakadKode, table.semesterId),
+		index('erapor_map_kokurikuler_sekolah_idx').on(table.sekolahId, table.semesterId)
+	]
+);
+
+/**
+ * Riwayat & Log Sinkronisasi Bridge REST API e-Rapor SMA
+ */
+export const tableEraporSyncLogs = sqliteTable(
+	'erapor_sync_logs',
+	{
+		id: int().primaryKey({ autoIncrement: true }),
+		sekolahId: int()
+			.references(() => tableSekolah.id, { onDelete: 'cascade' })
+			.notNull(),
+		syncType: text().notNull(),
+		targetInfo: text(),
+		totalData: int().notNull().default(0),
+		totalSuccess: int().notNull().default(0),
+		totalFailed: int().notNull().default(0),
+		requestPayload: text(),
+		responseBody: text(),
+		status: text().notNull(),
+		executedBy: text(),
+		...audit
+	},
+	(table) => [index('erapor_sync_logs_sekolah_idx').on(table.sekolahId)]
+);
