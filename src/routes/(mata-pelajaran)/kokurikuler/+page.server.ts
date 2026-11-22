@@ -1,6 +1,12 @@
 import db from '$lib/server/db';
 import { isWaliOfKelas, ownedKelasIdSet } from '$lib/server/kelas-akses';
-import { tableKelas, tableKokurikuler } from '$lib/server/db/schema';
+import {
+	tableAsesmenKokurikuler,
+	tableKelas,
+	tableKokurikuler,
+	tableMurid
+} from '$lib/server/db/schema';
+import { isNilaiKategori, isProfilDimensionKey } from '$lib/kokurikuler';
 import { profilPelajarPancasilaDimensions, type DimensiProfilLulusanKey } from '$lib/statics';
 import { fail } from '@sveltejs/kit';
 import { and, asc, eq, inArray } from 'drizzle-orm';
@@ -32,10 +38,198 @@ function isTableMissingError(error: unknown) {
 	);
 }
 
-export async function load({ depends, parent }) {
+function parseDimensiList(raw: unknown): DimensiProfilLulusanKey[] {
+	if (Array.isArray(raw)) {
+		return sanitizeDimensions(raw.map((item) => String(item ?? '')));
+	}
+	if (typeof raw === 'string') {
+		try {
+			const parsed = JSON.parse(raw);
+			return Array.isArray(parsed)
+				? sanitizeDimensions(parsed.map((item) => String(item ?? '')))
+				: [];
+		} catch (error) {
+			console.error('Gagal mengurai dimensi kokurikuler', error);
+			return [];
+		}
+	}
+	return [];
+}
+
+type DaftarKelasItem = {
+	id: number;
+	nama: string;
+	fase?: string | null;
+	waliKelas?: { id: number; nama: string } | null;
+};
+
+async function loadAdminKokurikulerMonitoring(daftarKelas: DaftarKelasItem[]) {
+	if (daftarKelas.length === 0) {
+		return { activities: [] };
+	}
+
+	const kelasIds = daftarKelas.map((k) => k.id);
+	const [allKokurikuler, allMurid] = await Promise.all([
+		db.query.tableKokurikuler.findMany({
+			columns: {
+				id: true,
+				kelasId: true,
+				kode: true,
+				tujuan: true,
+				dimensi: true,
+				createdAt: true
+			},
+			where: inArray(tableKokurikuler.kelasId, kelasIds),
+			orderBy: [asc(tableKokurikuler.kode), asc(tableKokurikuler.createdAt)]
+		}),
+		db.query.tableMurid.findMany({
+			columns: { id: true, kelasId: true },
+			where: inArray(tableMurid.kelasId, kelasIds)
+		})
+	]);
+
+	if (allKokurikuler.length === 0) {
+		return { activities: [] };
+	}
+
+	const muridIdsByKelas = new Map<number, Set<number>>();
+	for (const m of allMurid) {
+		if (m.kelasId == null) continue;
+		let set = muridIdsByKelas.get(m.kelasId);
+		if (!set) {
+			set = new Set<number>();
+			muridIdsByKelas.set(m.kelasId, set);
+		}
+		set.add(m.id);
+	}
+
+	const kokurikulerIds = allKokurikuler.map((k) => k.id);
+	const allAsesmen = await db.query.tableAsesmenKokurikuler.findMany({
+		columns: {
+			muridId: true,
+			kokurikulerId: true,
+			dimensi: true,
+			kategori: true
+		},
+		where: inArray(tableAsesmenKokurikuler.kokurikulerId, kokurikulerIds)
+	});
+
+	// Map: kokurikulerId -> muridId -> Set<dimensiKey>
+	const assessedByKokurikuler = new Map<number, Map<number, Set<string>>>();
+	for (const row of allAsesmen) {
+		if (!isProfilDimensionKey(row.dimensi) || !isNilaiKategori(row.kategori)) {
+			continue;
+		}
+		let muridMap = assessedByKokurikuler.get(row.kokurikulerId);
+		if (!muridMap) {
+			muridMap = new Map();
+			assessedByKokurikuler.set(row.kokurikulerId, muridMap);
+		}
+		let dimSet = muridMap.get(row.muridId);
+		if (!dimSet) {
+			dimSet = new Set();
+			muridMap.set(row.muridId, dimSet);
+		}
+		dimSet.add(row.dimensi);
+	}
+
+	// Group kokurikuler records by normalized kode across classes
+	const activityByKode = new Map<
+		string,
+		{
+			kode: string;
+			tujuan: string;
+			byKelasId: Map<number, { id: number; dimensiKeys: DimensiProfilLulusanKey[] }>;
+		}
+	>();
+
+	for (const row of allKokurikuler) {
+		const kodeKey = row.kode.trim().toUpperCase();
+		if (!kodeKey) continue;
+		let group = activityByKode.get(kodeKey);
+		if (!group) {
+			group = {
+				kode: kodeKey,
+				tujuan: row.tujuan,
+				byKelasId: new Map()
+			};
+			activityByKode.set(kodeKey, group);
+		}
+		if (!group.byKelasId.has(row.kelasId)) {
+			group.byKelasId.set(row.kelasId, {
+				id: row.id,
+				dimensiKeys: parseDimensiList(row.dimensi)
+			});
+		}
+	}
+
+	const sortedKelas = [...daftarKelas].sort((a, b) =>
+		a.nama.localeCompare(b.nama, 'id', { numeric: true, sensitivity: 'base' })
+	);
+
+	const activities = Array.from(activityByKode.values()).map((group) => ({
+		kode: group.kode,
+		tujuan: group.tujuan,
+		classes: sortedKelas.map((kelas) => {
+			const muridSet = muridIdsByKelas.get(kelas.id);
+			const totalMurid = muridSet?.size ?? 0;
+			const entry = group.byKelasId.get(kelas.id);
+
+			if (!entry) {
+				return {
+					kelasId: kelas.id,
+					kelasNama: kelas.nama,
+					fase: kelas.fase ?? null,
+					waliKelasNama: kelas.waliKelas?.nama ?? null,
+					kokurikulerId: null,
+					dimensiCount: 0,
+					totalMurid,
+					muridLengkap: 0,
+					persentase: 0,
+					status: 'no_activity' as const
+				};
+			}
+
+			const expectedDims = entry.dimensiKeys;
+			const muridAssessments = assessedByKokurikuler.get(entry.id);
+			let muridLengkap = 0;
+
+			if (totalMurid > 0 && expectedDims.length > 0 && muridSet && muridAssessments) {
+				for (const muridId of muridSet) {
+					const filledDims = muridAssessments.get(muridId);
+					if (filledDims && expectedDims.every((d) => filledDims.has(d))) {
+						muridLengkap += 1;
+					}
+				}
+			}
+
+			const persentase = totalMurid > 0 ? Math.round((muridLengkap / totalMurid) * 100) : 0;
+			const status: 'complete' | 'incomplete' =
+				totalMurid > 0 && muridLengkap === totalMurid ? 'complete' : 'incomplete';
+
+			return {
+				kelasId: kelas.id,
+				kelasNama: kelas.nama,
+				fase: kelas.fase ?? null,
+				waliKelasNama: kelas.waliKelas?.nama ?? null,
+				kokurikulerId: entry.id,
+				dimensiCount: expectedDims.length,
+				totalMurid,
+				muridLengkap,
+				persentase,
+				status
+			};
+		})
+	}));
+
+	return { activities };
+}
+
+export async function load({ depends, parent, locals }) {
 	depends('app:kokurikuler');
 	const { kelasAktif, daftarKelas } = await parent();
 	const kelasId = kelasAktif?.id ?? null;
+	const isAdmin = (locals.user as { type?: string } | null)?.type === 'admin';
 
 	let kokurikulerRaw: Awaited<ReturnType<typeof db.query.tableKokurikuler.findMany>> = [];
 	let tableReady = true;
@@ -56,32 +250,31 @@ export async function load({ depends, parent }) {
 		}
 	}
 
+	const typedDaftarKelas = (daftarKelas ?? []) as DaftarKelasItem[];
+	let adminMonitoring: Awaited<ReturnType<typeof loadAdminKokurikulerMonitoring>> | null = null;
+	if (isAdmin && tableReady) {
+		try {
+			adminMonitoring = await loadAdminKokurikulerMonitoring(typedDaftarKelas);
+		} catch (error) {
+			if (!isTableMissingError(error)) {
+				throw error;
+			}
+		}
+	}
+
 	return {
 		kelasId,
+		isAdmin,
 		tableReady,
-		availableKelas: (
-			(daftarKelas ?? []) as Array<{ id: number; nama: string; fase?: string | null }>
-		).map((k) => ({
+		adminMonitoring,
+		availableKelas: typedDaftarKelas.map((k) => ({
 			id: k.id,
 			nama: k.nama,
 			fase: k.fase ?? null
 		})),
 		kokurikuler: kokurikulerRaw.map((item) => ({
 			...item,
-			dimensi: Array.isArray(item.dimensi)
-				? (item.dimensi as DimensiProfilLulusanKey[])
-				: sanitizeDimensions(
-						typeof item.dimensi === 'string'
-							? (() => {
-									try {
-										return JSON.parse(item.dimensi) as string[];
-									} catch (error) {
-										console.error('Gagal mengurai dimensi kokurikuler', error);
-										return [];
-									}
-								})()
-							: []
-					)
+			dimensi: parseDimensiList(item.dimensi)
 		})),
 		dimensiPilihan: profilPelajarPancasilaDimensions
 	};

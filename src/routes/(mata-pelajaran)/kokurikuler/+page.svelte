@@ -4,6 +4,9 @@
 	import Icon from '$lib/components/icon.svelte';
 	import KokurikulerFormModal from '$lib/components/kokurikuler/form-modal.svelte';
 	import KokurikulerDeleteModal from '$lib/components/kokurikuler/delete-modal.svelte';
+	import KokurikulerMonitoringTab, {
+		type KokurikulerActivityMonitoring
+	} from '$lib/components/kokurikuler/monitoring-tab.svelte';
 	import ImportKokurikulerDialog from '$lib/components/kokurikuler/import-kokurikuler-dialog.svelte';
 	import { showModal } from '$lib/components/global-modal.svelte';
 	import { toast } from '$lib/components/toast.svelte';
@@ -18,6 +21,8 @@
 	}: {
 		data: {
 			kelasId: number | null;
+			isAdmin?: boolean;
+			adminMonitoring?: { activities: KokurikulerActivityMonitoring[] } | null;
 			kokurikuler: Array<Kokurikuler & { dimensi: DimensiProfilLulusanKey[] }>;
 			dimensiPilihan: typeof profilPelajarPancasilaDimensions;
 			tableReady: boolean;
@@ -25,9 +30,10 @@
 		};
 	} = $props();
 
+	let activeTab = $state<'daftar' | 'monitoring'>('daftar');
 	let selectedIds = $state<number[]>([]);
 	let selectedDimensions = $state<DimensiProfilLulusanKey[]>([]);
-	let selectAllCheckbox: HTMLInputElement | null = null;
+	let selectAllCheckbox = $state<HTMLInputElement | null>(null);
 	let lastTableReady = $state<boolean | null>(null);
 	let modalState = $state<
 		| { mode: 'add' }
@@ -239,230 +245,268 @@
 	}}
 />
 
-<div class="card bg-base-100 rounded-lg border border-none p-4 shadow-md">
-	<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-		<div>
-			<h2 class="text-xl font-bold">Daftar Kokurikuler</h2>
-			{#if kelasAktifLabel}
-				<p class="text-base-content/70 text-sm">Kelas aktif: {kelasAktifLabel}</p>
-			{:else}
-				<p class="text-base-content/60 text-sm">
-					Pilih kelas di navbar untuk melihat mata pelajaran intrakurikuler.
-				</p>
-			{/if}
-		</div>
-		<div class="flex flex-row max-sm:w-full">
-			{#if anySelected}
-				<button
-					type="button"
-					class={`btn w-full shadow-none sm:w-fit ${bulkDeleteDisabled || !canEdit ? '' : 'btn-soft btn-error'}`}
-					disabled={bulkDeleteDisabled || !canEdit}
-					onclick={openBulkDeleteModal}
-					title={!canEdit ? 'Anda tidak memiliki izin untuk menghapus' : ''}
-				>
-					<Icon name="del" />
-					Hapus
-				</button>
-			{:else}
-				<button
-					class="btn btn-soft rounded-r-none shadow-none max-sm:flex-1"
-					disabled={!canManage || !canEdit}
-					onclick={openAddModal}
-					title={!canEdit ? 'Anda tidak memiliki izin untuk menambah' : ''}
-				>
-					<Icon name="plus" />
-					Tambah
-				</button>
-
-				<!-- dropdown untuk import dan export -->
-				<div class="dropdown dropdown-end">
-					<button
-						title={!canEdit ? 'Anda tidak memiliki izin' : 'Export dan Import kokurikuler'}
-						type="button"
-						tabindex="0"
-						class={`btn btn-soft rounded-l-none shadow-none ${!canManage || !canEdit ? 'opacity-50' : ''}`}
-						disabled={!canManage || !canEdit}
-						aria-disabled={!canManage || !canEdit}
-					>
-						<Icon name="down" />
-					</button>
-
-					<!-- menu dropdown -->
-					<ul
-						tabindex="-1"
-						class="border-base-300 dropdown-content menu bg-base-100 z-50 mt-2 w-52 rounded-md border p-2 shadow-lg"
-					>
-						<li>
-							<button
-								type="button"
-								class={`w-full text-left ${!canManage ? 'pointer-events-none opacity-50' : ''}`}
-								disabled={!canManage}
-								aria-disabled={!canManage}
-								onclick={() =>
-									showModal({
-										title: 'Impor Kokurikuler',
-										body: ImportKokurikulerDialog,
-										dismissible: true
-									})}
-							>
-								<Icon name="import" />
-								Impor Kokurikuler
-							</button>
-						</li>
-						<li>
-							<button
-								type="button"
-								class={`w-full text-left ${!canManage ? 'pointer-events-none opacity-50' : ''}`}
-								disabled={!canManage}
-								aria-disabled={!canManage}
-								onclick={async () => {
-									try {
-										const resp = await fetch('/kokurikuler/export_kokurikuler', { method: 'GET' });
-										if (!resp.ok) {
-											const body = await resp.json().catch(() => ({}));
-											return toast({
-												message: body?.fail || 'Gagal mengekspor data.',
-												type: 'error'
-											});
-										}
-										const blob = await resp.blob();
-										const url = URL.createObjectURL(blob);
-										// prefer filename from Content-Disposition header set by server
-										let filename = `kokurikuler-${new Date().toISOString().slice(0, 10)}.xlsx`;
-										try {
-											const cd =
-												resp.headers.get('content-disposition') ||
-												resp.headers.get('Content-Disposition');
-											if (cd) {
-												// match filename*=UTF-8''encoded or filename="name"
-												const mStar = cd.match(/filename\*=UTF-8''([^;\n\r]+)/i);
-												const mBasic = cd.match(/filename="?([^";]+)"?/i);
-												if (mStar && mStar[1]) filename = decodeURIComponent(mStar[1]);
-												else if (mBasic && mBasic[1]) filename = mBasic[1];
-											}
-										} catch {
-											/* ignore and fallback */
-										}
-										const a = document.createElement('a');
-										a.href = url;
-										a.download = filename;
-										document.body.appendChild(a);
-										a.click();
-										document.body.removeChild(a);
-										URL.revokeObjectURL(url);
-										toast({ message: 'Ekspor berhasil.', type: 'success' });
-									} catch (err) {
-										console.error(err);
-										toast({ message: 'Terjadi kesalahan saat mengekspor.', type: 'error' });
-									}
-								}}
-							>
-								<Icon name="export" />
-								Ekspor Kokurikuler
-							</button>
-						</li>
-					</ul>
-				</div>
-			{/if}
+{#if data.isAdmin && data.adminMonitoring}
+	<div class="mb-4 flex items-center justify-between gap-2">
+		<div class="tabs tabs-box bg-base-200/70 p-1">
+			<button
+				type="button"
+				class="tab tab-sm font-semibold {activeTab === 'daftar'
+					? 'tab-active bg-base-100 shadow-xs'
+					: ''}"
+				onclick={() => (activeTab = 'daftar')}
+			>
+				Daftar Kokurikuler
+			</button>
+			<button
+				type="button"
+				class="tab tab-sm gap-1.5 font-semibold {activeTab === 'monitoring'
+					? 'tab-active bg-base-100 shadow-xs'
+					: ''}"
+				onclick={() => (activeTab = 'monitoring')}
+			>
+				<Icon name="chart" class="h-3.5 w-3.5" />
+				Monitoring Nilai
+			</button>
 		</div>
 	</div>
+{/if}
 
-	{#if !data.kelasId}
+{#if activeTab === 'monitoring' && data.isAdmin && data.adminMonitoring}
+	<KokurikulerMonitoringTab
+		activities={data.adminMonitoring.activities}
+		kelasAktifId={data.kelasId}
+	/>
+{:else}
+	<div class="card bg-base-100 rounded-lg border border-none p-4 shadow-md">
+		<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+			<div>
+				<h2 class="text-xl font-bold">Daftar Kokurikuler</h2>
+				{#if kelasAktifLabel}
+					<p class="text-base-content/70 text-sm">Kelas aktif: {kelasAktifLabel}</p>
+				{:else}
+					<p class="text-base-content/60 text-sm">
+						Pilih kelas di navbar untuk melihat mata pelajaran intrakurikuler.
+					</p>
+				{/if}
+			</div>
+			<div class="flex flex-row max-sm:w-full">
+				{#if anySelected}
+					<button
+						type="button"
+						class={`btn w-full shadow-none sm:w-fit ${bulkDeleteDisabled || !canEdit ? '' : 'btn-soft btn-error'}`}
+						disabled={bulkDeleteDisabled || !canEdit}
+						onclick={openBulkDeleteModal}
+						title={!canEdit ? 'Anda tidak memiliki izin untuk menghapus' : ''}
+					>
+						<Icon name="del" />
+						Hapus
+					</button>
+				{:else}
+					<button
+						class="btn btn-soft rounded-r-none shadow-none max-sm:flex-1"
+						disabled={!canManage || !canEdit}
+						onclick={openAddModal}
+						title={!canEdit ? 'Anda tidak memiliki izin untuk menambah' : ''}
+					>
+						<Icon name="plus" />
+						Tambah
+					</button>
+
+					<!-- dropdown untuk import dan export -->
+					<div class="dropdown dropdown-end">
+						<button
+							title={!canEdit ? 'Anda tidak memiliki izin' : 'Export dan Import kokurikuler'}
+							type="button"
+							tabindex="0"
+							class={`btn btn-soft rounded-l-none shadow-none ${!canManage || !canEdit ? 'opacity-50' : ''}`}
+							disabled={!canManage || !canEdit}
+							aria-disabled={!canManage || !canEdit}
+						>
+							<Icon name="down" />
+						</button>
+
+						<!-- menu dropdown -->
+						<ul
+							tabindex="-1"
+							class="border-base-300 dropdown-content menu bg-base-100 z-50 mt-2 w-52 rounded-md border p-2 shadow-lg"
+						>
+							<li>
+								<button
+									type="button"
+									class={`w-full text-left ${!canManage ? 'pointer-events-none opacity-50' : ''}`}
+									disabled={!canManage}
+									aria-disabled={!canManage}
+									onclick={() =>
+										showModal({
+											title: 'Impor Kokurikuler',
+											body: ImportKokurikulerDialog,
+											dismissible: true
+										})}
+								>
+									<Icon name="import" />
+									Impor Kokurikuler
+								</button>
+							</li>
+							<li>
+								<button
+									type="button"
+									class={`w-full text-left ${!canManage ? 'pointer-events-none opacity-50' : ''}`}
+									disabled={!canManage}
+									aria-disabled={!canManage}
+									onclick={async () => {
+										try {
+											const resp = await fetch('/kokurikuler/export_kokurikuler', {
+												method: 'GET'
+											});
+											if (!resp.ok) {
+												const body = await resp.json().catch(() => ({}));
+												return toast({
+													message: body?.fail || 'Gagal mengekspor data.',
+													type: 'error'
+												});
+											}
+											const blob = await resp.blob();
+											const url = URL.createObjectURL(blob);
+											// prefer filename from Content-Disposition header set by server
+											let filename = `kokurikuler-${new Date().toISOString().slice(0, 10)}.xlsx`;
+											try {
+												const cd =
+													resp.headers.get('content-disposition') ||
+													resp.headers.get('Content-Disposition');
+												if (cd) {
+													// match filename*=UTF-8''encoded or filename="name"
+													const mStar = cd.match(/filename\*=UTF-8''([^;\n\r]+)/i);
+													const mBasic = cd.match(/filename="?([^";]+)"?/i);
+													if (mStar && mStar[1]) filename = decodeURIComponent(mStar[1]);
+													else if (mBasic && mBasic[1]) filename = mBasic[1];
+												}
+											} catch {
+												/* ignore and fallback */
+											}
+											const a = document.createElement('a');
+											a.href = url;
+											a.download = filename;
+											document.body.appendChild(a);
+											a.click();
+											document.body.removeChild(a);
+											URL.revokeObjectURL(url);
+											toast({ message: 'Ekspor berhasil.', type: 'success' });
+										} catch (err) {
+											console.error(err);
+											toast({ message: 'Terjadi kesalahan saat mengekspor.', type: 'error' });
+										}
+									}}
+								>
+									<Icon name="export" />
+									Ekspor Kokurikuler
+								</button>
+							</li>
+						</ul>
+					</div>
+				{/if}
+			</div>
+		</div>
+
+		{#if !data.kelasId}
+			<div
+				class="alert border-warning/60 bg-warning/10 text-warning-content mt-6 border border-dashed"
+			>
+				<Icon name="info" />
+				<span>Silakan pilih kelas di navbar sebelum menambah kokurikuler.</span>
+			</div>
+		{/if}
+
+		{#if !data.tableReady}
+			<div class="alert border-error/60 bg-error/10 text-error-content mt-4 border border-dashed">
+				<Icon name="warning" />
+				<span>
+					Database kokurikuler belum siap. Jalankan <code>pnpm db:push</code> untuk menerapkan migrasi
+					terbaru.
+				</span>
+			</div>
+		{/if}
+
 		<div
-			class="alert border-warning/60 bg-warning/10 text-warning-content mt-6 border border-dashed"
+			class="bg-base-100 dark:bg-base-200 mt-4 overflow-x-auto rounded-md shadow-md dark:shadow-none"
 		>
-			<Icon name="info" />
-			<span>Silakan pilih kelas di navbar sebelum menambah kokurikuler.</span>
-		</div>
-	{/if}
-
-	{#if !data.tableReady}
-		<div class="alert border-error/60 bg-error/10 text-error-content mt-4 border border-dashed">
-			<Icon name="warning" />
-			<span>
-				Database kokurikuler belum siap. Jalankan <code>pnpm db:push</code> untuk menerapkan migrasi terbaru.
-			</span>
-		</div>
-	{/if}
-
-	<div
-		class="bg-base-100 dark:bg-base-200 mt-4 overflow-x-auto rounded-md shadow-md dark:shadow-none"
-	>
-		<table class="border-base-200 table min-w-[720px] border dark:border-none">
-			<thead>
-				<tr class="bg-base-200 dark:bg-base-300 text-left font-bold">
-					<th style="width: 50px; min-width: 40px;">
-						<input
-							type="checkbox"
-							class="checkbox"
-							bind:this={selectAllCheckbox}
-							disabled={!data.kokurikuler.length || !data.tableReady}
-							checked={allSelected}
-							onchange={(event) => handleSelectAll(event.currentTarget.checked)}
-						/>
-					</th>
-					<th style="width: 60px;">No</th>
-					<th style="width: 100px; min-width: 80px;">Kode</th>
-					<th style="min-width: 200px;">8 DPL</th>
-					<th class="w-full" style="min-width: 260px;">Kegiatan Kokurikuler</th>
-					<th style="width: 140px; min-width: 120px;">Aksi</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each data.kokurikuler as item, index (item.id)}
-					<tr>
-						<td class="align-top">
+			<table class="border-base-200 table min-w-[720px] border dark:border-none">
+				<thead>
+					<tr class="bg-base-200 dark:bg-base-300 text-left font-bold">
+						<th style="width: 50px; min-width: 40px;">
 							<input
 								type="checkbox"
 								class="checkbox"
-								checked={selectedIds.includes(item.id)}
-								disabled={!data.tableReady}
-								onchange={(event) => toggleRowSelection(item.id, event.currentTarget.checked)}
+								bind:this={selectAllCheckbox}
+								disabled={!data.kokurikuler.length || !data.tableReady}
+								checked={allSelected}
+								onchange={(event) => handleSelectAll(event.currentTarget.checked)}
 							/>
-						</td>
-						<td class="align-top">{index + 1}</td>
-						<td class="align-top font-mono text-sm">{item.kode}</td>
-						<td class="align-top">
-							{#if item.dimensi.length}
-								{item.dimensi
-									.map((key) => labelByKey[key as DimensiProfilLulusanKey] ?? key)
-									.join(', ')}
-							{:else}
-								<span class="italic opacity-60">Belum ada dimensi</span>
-							{/if}
-						</td>
-						<td class="align-top">{item.tujuan}</td>
-						<td class="flex items-center justify-end">
-							<button
-								class="btn btn-sm btn-soft rounded-r-none shadow-none"
-								type="button"
-								title={!canEdit ? 'Anda tidak memiliki izin untuk mengedit' : 'Edit kokurikuler'}
-								aria-label="Edit kokurikuler"
-								disabled={!canManage || !canEdit}
-								onclick={() => openEditModal(item)}
-							>
-								<Icon name="edit" />
-							</button>
-							<button
-								class="btn btn-sm btn-soft btn-error rounded-l-none shadow-none"
-								type="button"
-								title={!canEdit ? 'Anda tidak memiliki izin untuk menghapus' : 'Hapus kokurikuler'}
-								aria-label="Hapus kokurikuler"
-								disabled={!canManage || !canEdit}
-								onclick={() => openSingleDeleteModal(item)}
-							>
-								<Icon name="del" />
-							</button>
-						</td>
+						</th>
+						<th style="width: 60px;">No</th>
+						<th style="width: 100px; min-width: 80px;">Kode</th>
+						<th style="min-width: 200px;">8 DPL</th>
+						<th class="w-full" style="min-width: 260px;">Kegiatan Kokurikuler</th>
+						<th style="width: 140px; min-width: 120px;">Aksi</th>
 					</tr>
-				{:else}
-					<tr>
-						<td class="py-6 text-center italic opacity-60" colspan="6">
-							Belum ada data kokurikuler
-						</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
+				</thead>
+				<tbody>
+					{#each data.kokurikuler as item, index (item.id)}
+						<tr>
+							<td class="align-top">
+								<input
+									type="checkbox"
+									class="checkbox"
+									checked={selectedIds.includes(item.id)}
+									disabled={!data.tableReady}
+									onchange={(event) => toggleRowSelection(item.id, event.currentTarget.checked)}
+								/>
+							</td>
+							<td class="align-top">{index + 1}</td>
+							<td class="align-top font-mono text-sm">{item.kode}</td>
+							<td class="align-top">
+								{#if item.dimensi.length}
+									{item.dimensi
+										.map((key) => labelByKey[key as DimensiProfilLulusanKey] ?? key)
+										.join(', ')}
+								{:else}
+									<span class="italic opacity-60">Belum ada dimensi</span>
+								{/if}
+							</td>
+							<td class="align-top">{item.tujuan}</td>
+							<td class="flex items-center justify-end">
+								<button
+									class="btn btn-sm btn-soft rounded-r-none shadow-none"
+									type="button"
+									title={!canEdit ? 'Anda tidak memiliki izin untuk mengedit' : 'Edit kokurikuler'}
+									aria-label="Edit kokurikuler"
+									disabled={!canManage || !canEdit}
+									onclick={() => openEditModal(item)}
+								>
+									<Icon name="edit" />
+								</button>
+								<button
+									class="btn btn-sm btn-soft btn-error rounded-l-none shadow-none"
+									type="button"
+									title={!canEdit
+										? 'Anda tidak memiliki izin untuk menghapus'
+										: 'Hapus kokurikuler'}
+									aria-label="Hapus kokurikuler"
+									disabled={!canManage || !canEdit}
+									onclick={() => openSingleDeleteModal(item)}
+								>
+									<Icon name="del" />
+								</button>
+							</td>
+						</tr>
+					{:else}
+						<tr>
+							<td class="py-6 text-center italic opacity-60" colspan="6">
+								Belum ada data kokurikuler
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	</div>
-</div>
+{/if}
